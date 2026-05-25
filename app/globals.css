@@ -1,26 +1,117 @@
 @import "tailwindcss";
 
 :root {
-  --background: #ffffff;
-  --foreground: #171717;
+  --ink: #0f0f0f;
+  --ink2: #3a3a3a;
+  --ink3: #777;
+  --ink4: #aaa;
+  --paper: #fafaf8;
+  --paper2: #f2f1ee;
+  --paper3: #e8e7e3;
 }
 
-@theme inline {
-  --color-background: var(--background);
-  --color-foreground: var(--foreground);
-  --font-sans: var(--font-geist-sans);
-  --font-mono: var(--font-geist-mono);
-}
-
-@media (prefers-color-scheme: dark) {
-  :root {
-    --background: #0a0a0a;
-    --foreground: #ededed;
-  }
+* {
+  box-sizing: border-box;
 }
 
 body {
-  background: var(--background);
-  color: var(--foreground);
-  font-family: Arial, Helvetica, sans-serif;
+  font-family: 'DM Sans', sans-serif;
+  background: var(--paper);
+  color: var(--ink);
+  -webkit-font-smoothing: antialiased;
+}
+
+/* Simple scrollbar */
+::-webkit-scrollbar {
+  width: 4px;
+}
+
+::-webkit-scrollbar-track {
+  background: transparent;
+}
+
+::-webkit-scrollbar-thumb {
+  background: var(--paper3);
+  border-radius: 2px;
+}
+
+/* Basic animations */
+@keyframes spin {
+  from { transform: rotate(0deg); }
+  to { transform: rotate(360deg); }
+}
+
+.animate-spin {
+  animation: spin 1s linear infinite;
+}
+
+/* ========== CONSISTENT CARD STYLES ========== */
+
+.card {
+  background: white;
+  border: 1px solid #e8e7e3;
+  border-radius: 12px;
+  transition: all 0.2s ease;
+}
+
+.card:hover {
+  border-color: #d0cfc9;
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.05);
+  transform: translateY(-1px);
+}
+
+.card-interactive {
+  cursor: pointer;
+}
+
+.card-interactive:active {
+  transform: translateY(0);
+}
+
+/* Card variants */
+.card-elevated {
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.05);
+}
+
+.card-compact {
+  padding: 12px;
+}
+
+.card-default {
+  padding: 16px;
+}
+
+.card-large {
+  padding: 20px;
+}
+
+/* Card header */
+.card-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: 12px;
+}
+
+.card-title {
+  font-family: 'DM Sans', sans-serif;
+  font-size: 15px;
+  font-weight: 500;
+  color: #0f0f0f;
+}
+
+.card-subtitle {
+  font-size: 12px;
+  color: #777;
+  margin-top: 4px;
+}
+
+/* Card footer */
+.card-footer {
+  margin-top: 16px;
+  padding-top: 12px;
+  border-top: 1px solid #f2f1ee;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
 }

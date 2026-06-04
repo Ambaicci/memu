@@ -1,7 +1,9 @@
 'use client';
 
-import { useState } from 'react';
+import { useState, useEffect, useCallback } from 'react';
 import { Search, Star, MessageCircle, Clock, ArrowRight, Users, Sparkles, Inbox } from 'lucide-react';
+import { createClient } from '@/lib/supabase/client';
+import { useToast } from '@/contexts/ToastContext';
 
 interface Connection {
   id: string;
@@ -15,111 +17,8 @@ interface Connection {
   lastMemuPreview: string;
   status: 'active' | 'quiet' | 'new';
   isStarred?: boolean;
+  userId: string; // The other party's user ID
 }
-
-// Demo data
-const connectionsData: Connection[] = [
-  {
-    id: '1',
-    name: 'Aisha Kimani',
-    handle: '@aisha.memu',
-    initials: 'AK',
-    color: '#e1f5ee',
-    textColor: '#0f6e56',
-    memuCount: 24,
-    lastMemuDate: 'Today, 9:41 AM',
-    lastMemuPreview: 'The board deck is ready for review. Let me know when you can look at it...',
-    status: 'active',
-    isStarred: true,
-  },
-  {
-    id: '2',
-    name: 'David Osei',
-    handle: '@david.memu',
-    initials: 'DO',
-    color: '#ede9fe',
-    textColor: '#5b21b6',
-    memuCount: 18,
-    lastMemuDate: 'Yesterday',
-    lastMemuPreview: 'The prototype is looking great. One small suggestion about the compose panel...',
-    status: 'active',
-    isStarred: true,
-  },
-  {
-    id: '3',
-    name: 'Tobias Nguyen',
-    handle: '@tobias.memu',
-    initials: 'TN',
-    color: '#f0f9ff',
-    textColor: '#0369a1',
-    memuCount: 12,
-    lastMemuDate: 'Monday',
-    lastMemuPreview: 'Server is stable now. The patch worked perfectly...',
-    status: 'active',
-  },
-  {
-    id: '4',
-    name: 'Amara Diallo',
-    handle: '@amara.memu',
-    initials: 'AD',
-    color: '#fdf4ff',
-    textColor: '#7e22ce',
-    memuCount: 9,
-    lastMemuDate: 'Sunday',
-    lastMemuPreview: 'The press release went out and the response has been incredible...',
-    status: 'active',
-  },
-  {
-    id: '5',
-    name: 'Zara Ahmed',
-    handle: '@zara.memu',
-    initials: 'ZA',
-    color: '#fef3c7',
-    textColor: '#92400e',
-    memuCount: 7,
-    lastMemuDate: 'Saturday',
-    lastMemuPreview: 'The community is growing faster than we projected...',
-    status: 'quiet',
-    isStarred: true,
-  },
-  {
-    id: '6',
-    name: 'Mum',
-    handle: '@mum.memu',
-    initials: 'MM',
-    color: '#fce7f3',
-    textColor: '#9d174d',
-    memuCount: 14,
-    lastMemuDate: 'Monday',
-    lastMemuPreview: 'So glad you\'re coming for Christmas! Send me your flight details...',
-    status: 'active',
-    isStarred: true,
-  },
-  {
-    id: '7',
-    name: 'Nairobi Design Co.',
-    handle: '@nairobi-design.memu',
-    initials: 'ND',
-    color: '#ecfdf5',
-    textColor: '#065f46',
-    memuCount: 6,
-    lastMemuDate: 'Friday',
-    lastMemuPreview: 'Invoice #2847 has been paid. Thank you for your business...',
-    status: 'quiet',
-  },
-  {
-    id: '8',
-    name: 'Maria Santos',
-    handle: '@maria.memu',
-    initials: 'MS',
-    color: '#fff7ed',
-    textColor: '#9a3412',
-    memuCount: 5,
-    lastMemuDate: 'Wednesday',
-    lastMemuPreview: 'Let\'s schedule a call to discuss the proposal...',
-    status: 'new',
-  },
-];
 
 const statusConfig = {
   active: { label: 'Active', color: 'text-[#059669]', bg: 'bg-[#d1fae5]', dot: 'bg-[#059669]' },
@@ -135,7 +34,170 @@ interface ConnectionsPanelProps {
 export default function ConnectionsPanel({ isGuest, requireAuth }: ConnectionsPanelProps = {}) {
   const [searchQuery, setSearchQuery] = useState('');
   const [filterFavorites, setFilterFavorites] = useState(false);
-  const [connections, setConnections] = useState(connectionsData);
+  const [connections, setConnections] = useState<Connection[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [currentUserId, setCurrentUserId] = useState<string | null>(null);
+  const { showToast } = useToast();
+
+  // Get current user
+  useEffect(() => {
+    const getUser = async () => {
+      const supabase = createClient();
+      const { data: { user } } = await supabase.auth.getUser();
+      if (user) setCurrentUserId(user.id);
+    };
+    getUser();
+  }, []);
+
+  // Fetch connections from Supabase (derived from memus table)
+  const fetchConnections = useCallback(async () => {
+    if (!currentUserId) {
+      setLoading(false);
+      return;
+    }
+
+    setLoading(true);
+    const supabase = createClient();
+    
+    try {
+      // Fetch all memus where current user is sender OR recipient
+      const { data: memus, error } = await supabase
+        .from('memus')
+        .select(`
+          id,
+          sender_id,
+          recipient_id,
+          recipient_email,
+          subject,
+          body,
+          created_at,
+          status,
+          sender:sender_id!inner(full_name, username),
+          recipient:recipient_id(full_name, username)
+        `)
+        .or(`sender_id.eq.${currentUserId},recipient_id.eq.${currentUserId}`)
+        .order('created_at', { ascending: false });
+
+      if (error) {
+        console.error('Error fetching connections:', error);
+        showToast('Failed to load connections', 'error');
+        setLoading(false);
+        return;
+      }
+
+      // Group memus by the other party (not current user)
+      const connectionMap = new Map<string, {
+        userId: string;
+        name: string;
+        username: string;
+        memus: any[];
+      }>();
+
+      for (const memu of memus || []) {
+        // Determine the other party
+        const isSender = memu.sender_id === currentUserId;
+        const otherParty = isSender ? memu.recipient : memu.sender;
+        
+        if (!otherParty || !otherParty.username) continue; // Skip external emails for now
+
+        const userId = isSender ? memu.recipient_id : memu.sender_id;
+        const key = userId || otherParty.username; // Fallback to username if no ID
+
+        if (!connectionMap.has(key)) {
+          connectionMap.set(key, {
+            userId: userId || key,
+            name: otherParty.full_name || otherParty.username,
+            username: otherParty.username,
+            memus: [],
+          });
+        }
+        connectionMap.get(key)!.memus.push(memu);
+      }
+
+      // Transform to Connection interface
+      const transformed: Connection[] = Array.from(connectionMap.values()).map(conn => {
+        const memus = conn.memus;
+        const lastMemu = memus[0]; // Most recent first due to order
+        const memuCount = memus.length;
+        
+        // Determine status based on activity
+        let status: 'active' | 'quiet' | 'new' = 'quiet';
+        const lastDate = new Date(lastMemu.created_at);
+        const now = new Date();
+        const diffHours = (now.getTime() - lastDate.getTime()) / 3600000;
+        
+        if (diffHours < 24) status = 'active';
+        if (memuCount === 1 && diffHours < 48) status = 'new';
+
+        return {
+          id: conn.userId,
+          name: conn.name,
+          handle: `@${conn.username}.memu`,
+          initials: getInitials(conn.name),
+          color: stringToColor(conn.userId),
+          textColor: '#1a1a1a',
+          memuCount,
+          lastMemuDate: formatLastMemuDate(lastMemu.created_at),
+          lastMemuPreview: stripHtml(lastMemu.body || '').slice(0, 100),
+          status,
+          isStarred: false, // Would load from user_stars table in Phase 2
+          userId: conn.userId,
+        };
+      });
+
+      setConnections(transformed);
+    } catch (err) {
+      console.error('Unexpected error fetching connections:', err);
+      showToast('Failed to load connections', 'error');
+    } finally {
+      setLoading(false);
+    }
+  }, [currentUserId, showToast]);
+
+  useEffect(() => {
+    if (currentUserId) {
+      fetchConnections();
+    }
+  }, [fetchConnections, currentUserId]);
+
+  // Helper: generate initials
+  const getInitials = (name: string) => {
+    return name
+      .split(' ')
+      .map(part => part[0])
+      .join('')
+      .toUpperCase()
+      .slice(0, 2);
+  };
+
+  // Helper: generate consistent color from ID
+  const stringToColor = (str: string) => {
+    let hash = 0;
+    for (let i = 0; i < str.length; i++) {
+      hash = str.charCodeAt(i) + ((hash << 5) - hash);
+    }
+    const hue = hash % 360;
+    return `hsl(${hue}, 60%, 70%)`;
+  };
+
+  // Helper: format last memu date
+  const formatLastMemuDate = (timestamp: string) => {
+    const now = new Date();
+    const last = new Date(timestamp);
+    const diffMs = now.getTime() - last.getTime();
+    const diffMins = Math.floor(diffMs / 60000);
+    const diffHours = Math.floor(diffMs / 3600000);
+    const diffDays = Math.floor(diffMs / 86400000);
+
+    if (diffMins < 1) return 'Just now';
+    if (diffMins < 60) return `${diffMins}m ago`;
+    if (diffHours < 24) return `${diffHours}h ago`;
+    if (diffDays < 7) return `${diffDays}d ago`;
+    return last.toLocaleDateString();
+  };
+
+  // Helper: strip HTML tags
+  const stripHtml = (html: string) => html.replace(/<[^>]*>/g, '');
 
   const filteredConnections = connections.filter(c => {
     const matchesSearch = c.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
@@ -144,25 +206,39 @@ export default function ConnectionsPanel({ isGuest, requireAuth }: ConnectionsPa
     return matchesSearch && matchesFavorite;
   });
 
-  const toggleFavorite = (id: string) => {
+  const toggleFavorite = async (id: string) => {
+    // In Phase 2: save to user_stars table
+    // For now: just toggle local state
     setConnections(prev => prev.map(c => 
       c.id === id ? { ...c, isStarred: !c.isStarred } : c
     ));
+    showToast('Favorite updated', 'success');
   };
 
   const openConnection = (connection: Connection) => {
     if (isGuest && requireAuth) {
       requireAuth('view conversation', () => {
-        alert(`Opening conversation with ${connection.name}\n\nThis will show all memus exchanged (${connection.memuCount} total memus). Coming soon! ✨`);
+        showToast(`Opening conversation with ${connection.name}`, 'success');
+        // In Phase 2: navigate to conversation view
       });
     } else {
-      alert(`Opening conversation with ${connection.name}\n\nThis will show all memus exchanged (${connection.memuCount} total memus). Coming soon! ✨`);
+      showToast(`Opening conversation with ${connection.name}`, 'success');
+      // In Phase 2: navigate to conversation view
     }
   };
 
   const handleOpenCompose = () => {
     window.dispatchEvent(new CustomEvent('openCompose'));
   };
+
+  // Loading state
+  if (loading) {
+    return (
+      <div className="flex items-center justify-center h-full py-20">
+        <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-[#4f46e5]" />
+      </div>
+    );
+  }
 
   // Empty State
   if (connections.length === 0) {
@@ -187,7 +263,7 @@ export default function ConnectionsPanel({ isGuest, requireAuth }: ConnectionsPa
 
   return (
     <div className="flex flex-col h-full">
-      {/* Header - Consistent with In/Out Memus */}
+      {/* Header */}
       <div className="px-4 md:px-8 pt-6 pb-0">
         <h1 className="font-['Playfair_Display'] text-3xl md:text-4xl font-normal tracking-tight text-[#0f0f0f]">Connections</h1>
         <p className="text-[13px] text-[#777] mt-1">
@@ -195,7 +271,7 @@ export default function ConnectionsPanel({ isGuest, requireAuth }: ConnectionsPa
         </p>
       </div>
 
-      {/* Search Bar - Matching OutMemusPanel */}
+      {/* Search Bar */}
       <div className="px-4 md:px-8 py-4">
         <div className="flex gap-3 items-center">
           <div className="flex-1 flex items-center gap-2.5 bg-[#f2f1ee] border border-[#e8e7e3] rounded-md px-3.5 py-2">

@@ -1,208 +1,247 @@
 'use client';
 
-import { useState } from 'react';
-import { Search, UserPlus, X, Crown, MoreVertical, UserMinus } from 'lucide-react';
+import { useState, useEffect, useCallback } from 'react';
+import { createClient } from '@/lib/supabase/client';
+import { useToast } from '@/contexts/ToastContext';
+import { 
+  Users, 
+  Shield, 
+  User, 
+  Trash2, 
+  Plus, 
+  Mail, 
+  Loader2, 
+  AlertCircle,
+  MoreHorizontal
+} from 'lucide-react';
 
 interface Member {
-  id: string;
-  name: string;
-  handle: string;
+  user_id: string;
+  role: 'admin' | 'member';
+  full_name: string | null;
+  username: string | null;
+  avatar_url: string | null;
   initials: string;
-  color: string;
-  textColor: string;
-  role: 'owner' | 'admin' | 'member';
-  joinedAt: string;
 }
 
 interface SpaceMembersProps {
   spaceId: string;
-  spaceName: string;
 }
 
-// Demo members data
-const demoMembers: Member[] = [
-  { id: '1', name: 'John Mark', handle: '@johnmark.memu', initials: 'JM', color: '#1a1a1a', textColor: 'white', role: 'owner', joinedAt: 'Jan 15, 2025' },
-  { id: '2', name: 'Aisha Kimani', handle: '@aisha.memu', initials: 'AK', color: '#e1f5ee', textColor: '#0f6e56', role: 'admin', joinedAt: 'Jan 16, 2025' },
-  { id: '3', name: 'David Osei', handle: '@david.memu', initials: 'DO', color: '#ede9fe', textColor: '#5b21b6', role: 'member', joinedAt: 'Jan 20, 2025' },
-  { id: '4', name: 'Tobias Nguyen', handle: '@tobias.memu', initials: 'TN', color: '#f0f9ff', textColor: '#0369a1', role: 'member', joinedAt: 'Feb 1, 2025' },
-  { id: '5', name: 'Amara Diallo', handle: '@amara.memu', initials: 'AD', color: '#fdf4ff', textColor: '#7e22ce', role: 'member', joinedAt: 'Feb 5, 2025' },
-];
+export default function SpaceMembers({ spaceId }: SpaceMembersProps) {
+  const [members, setMembers] = useState<Member[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
+  const [currentUserId, setCurrentUserId] = useState<string | null>(null);
+  const [isAdmin, setIsAdmin] = useState(false);
+  const { showToast } = useToast();
 
-const roleLabels = {
-  owner: 'Owner',
-  admin: 'Admin',
-  member: 'Member',
-};
+  // Get current user & admin status
+  useEffect(() => {
+    const getUser = async () => {
+      const supabase = createClient();
+      const { data: { user } } = await supabase.auth.getUser();
+      if (user) {
+        setCurrentUserId(user.id);
+        // Check if user is admin in this space
+        const { data: membership } = await supabase
+          .from('space_members')
+          .select('role')
+          .eq('space_id', spaceId)
+          .eq('user_id', user.id)
+          .single();
+        
+        if (membership) setIsAdmin(membership.role === 'admin');
+      }
+    };
+    getUser();
+  }, [spaceId]);
 
-const roleColors = {
-  owner: 'bg-[#fef3c7] text-[#d97706]',
-  admin: 'bg-[#ede9fe] text-[#4f46e5]',
-  member: 'bg-[#f2f1ee] text-[#777]',
-};
+  // Fetch members
+  const fetchMembers = useCallback(async () => {
+    if (!currentUserId) return;
+    setLoading(true);
+    setError(null);
+    
+    const supabase = createClient();
+    try {
+      const { data, error } = await supabase
+        .from('space_members')
+        .select('user_id, role, profiles(full_name, username, avatar_url)')
+        .eq('space_id', spaceId)
+        .order('role', { ascending: false }); // Admins first
 
-export default function SpaceMembers({ spaceId, spaceName }: SpaceMembersProps) {
-  const [members, setMembers] = useState<Member[]>(demoMembers);
-  const [searchQuery, setSearchQuery] = useState('');
-  const [showAddMember, setShowAddMember] = useState(false);
-  const [selectedMember, setSelectedMember] = useState<Member | null>(null);
+      if (error) {
+        console.error('Fetch members error:', error);
+        // Handle schema mismatch gracefully
+        if (error.code === '42P01' || error.code === 'PGRST116') {
+          setError('TABLE_MISSING');
+          setLoading(false);
+          return;
+        }
+        throw error;
+      }
 
-  const filteredMembers = members.filter(m =>
-    m.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
-    m.handle.toLowerCase().includes(searchQuery.toLowerCase())
-  );
+      // Transform data
+      const transformed: Member[] = (data || []).map((item: any) => {
+        const profile = item.profiles;
+        const name = profile?.full_name || profile?.username || 'Unknown User';
+        return {
+          user_id: item.user_id,
+          role: item.role,
+          full_name: profile?.full_name,
+          username: profile?.username,
+          avatar_url: profile?.avatar_url,
+          initials: name.split(' ').map(n => n[0]).join('').toUpperCase().slice(0, 2),
+        };
+      });
 
-  const handleRemoveMember = (memberId: string) => {
-    if (confirm('Remove this member from the space?')) {
-      setMembers(members.filter(m => m.id !== memberId));
+      setMembers(transformed);
+    } catch (err: any) {
+      console.error('Failed to fetch members:', err);
+      setError(err.message || 'Failed to load members');
+    } finally {
+      setLoading(false);
+    }
+  }, [spaceId, currentUserId]);
+
+  useEffect(() => {
+    if (currentUserId) fetchMembers();
+  }, [fetchMembers, currentUserId]);
+
+  // Remove member (Admin only)
+  const handleRemoveMember = async (userId: string) => {
+    if (userId === currentUserId) {
+      showToast("You can't remove yourself", 'error');
+      return;
+    }
+    
+    if (!confirm('Remove this member from the space?')) return;
+    
+    const supabase = createClient();
+    try {
+      const { error } = await supabase
+        .from('space_members')
+        .delete()
+        .eq('space_id', spaceId)
+        .eq('user_id', userId);
+      
+      if (error) throw error;
+      
+      showToast('Member removed', 'success');
+      fetchMembers();
+    } catch (err) {
+      showToast('Failed to remove member', 'error');
     }
   };
 
-  const handleChangeRole = (memberId: string, newRole: 'admin' | 'member') => {
-    setMembers(members.map(m =>
-      m.id === memberId ? { ...m, role: newRole } : m
-    ));
-    setSelectedMember(null);
+  // Invite member (Placeholder for Phase 2)
+  const handleInvite = () => {
+    showToast('Invite flow coming in Phase 2', 'success');
   };
 
-  const isOwner = members.find(m => m.role === 'owner')?.name === 'John Mark';
+  // Loading state
+  if (loading) {
+    return (
+      <div className="flex items-center justify-center h-64">
+        <Loader2 className="w-6 h-6 animate-spin text-[#4f46e5]" />
+      </div>
+    );
+  }
+
+  // Table missing state
+  if (error === 'TABLE_MISSING') {
+    return (
+      <div className="flex flex-col items-center justify-center h-64 text-center p-6">
+        <div className="w-16 h-16 rounded-full bg-[#f2f1ee] flex items-center justify-center mb-4">
+          <Users className="w-8 h-8 text-[#aaa]" />
+        </div>
+        <h3 className="text-lg font-medium text-[#0f0f0f] mb-2">Members is coming soon</h3>
+        <p className="text-sm text-[#777] max-w-md">
+          The member management system is being set up. You'll be able to invite and manage team members here shortly.
+        </p>
+      </div>
+    );
+  }
+
+  // Error state
+  if (error) {
+    return (
+      <div className="flex flex-col items-center justify-center h-64 text-center p-6">
+        <AlertCircle className="w-8 h-8 text-red-500 mb-3" />
+        <p className="text-sm text-red-600 mb-4">{error}</p>
+        <button onClick={fetchMembers} className="px-4 py-2 bg-[#4f46e5] text-white rounded-lg text-sm hover:bg-[#4338ca] transition">
+          Retry
+        </button>
+      </div>
+    );
+  }
 
   return (
-    <div className="space-y-4">
-      {/* Header with Add Button */}
-      <div className="flex items-center justify-between">
-        <div className="flex items-center gap-2">
-          <h3 className="text-[14px] font-medium text-[#0f0f0f]">Members</h3>
-          <span className="text-[11px] text-[#777]">{members.length} total</span>
-        </div>
-        {isOwner && (
+    <div className="max-w-3xl mx-auto">
+      {/* Header */}
+      <div className="flex items-center justify-between mb-6">
+        <h2 className="text-xl font-semibold text-[#0f0f0f]">Members ({members.length})</h2>
+        {isAdmin && (
           <button
-            onClick={() => setShowAddMember(true)}
-            className="flex items-center gap-1.5 px-3 py-1.5 bg-gradient-to-r from-[#4f46e5] to-[#0891b2] text-white rounded-lg text-[11px] font-medium hover:shadow-md transition"
+            onClick={handleInvite}
+            className="flex items-center gap-2 px-4 py-2 bg-[#0f0f0f] text-white rounded-lg text-sm hover:bg-[#2a2a2a] transition"
           >
-            <UserPlus size={12} />
-            Invite
+            <Plus size={14} /> Invite People
           </button>
         )}
       </div>
 
-      {/* Search Bar */}
-      <div className="flex items-center gap-2 bg-[#f2f1ee] border border-[#e8e7e3] rounded-lg px-3 py-1.5">
-        <Search size={14} className="text-[#777]" />
-        <input
-          type="text"
-          value={searchQuery}
-          onChange={(e) => setSearchQuery(e.target.value)}
-          placeholder="Search members..."
-          className="flex-1 text-[12px] outline-none bg-transparent"
-        />
-      </div>
-
-      {/* Members List */}
-      <div className="space-y-2">
-        {filteredMembers.map((member) => (
+      {/* Member List */}
+      <div className="bg-white border border-[#e8e7e3] rounded-xl overflow-hidden">
+        {members.map((member, index) => (
           <div
-            key={member.id}
-            className="flex items-center justify-between p-3 bg-white border border-[#e8e7e3] rounded-xl hover:border-[#d0cfc9] transition"
+            key={member.user_id}
+            className={`flex items-center justify-between p-4 ${index !== 0 ? 'border-t border-[#f2f1ee]' : ''}`}
           >
             <div className="flex items-center gap-3">
-              <div
-                className="w-9 h-9 rounded-full flex items-center justify-center text-[11px] font-medium shadow-sm"
-                style={{ background: member.color, color: member.textColor }}
-              >
-                {member.initials}
+              {/* Avatar */}
+              <div className="w-10 h-10 rounded-full bg-[#e8e7e3] flex items-center justify-center text-[13px] font-medium text-[#4f46e5] overflow-hidden flex-shrink-0">
+                {member.avatar_url ? (
+                  <img src={member.avatar_url} alt="" className="w-full h-full object-cover" />
+                ) : (
+                  member.initials
+                )}
               </div>
+              
+              {/* Info */}
               <div>
-                <div className="flex items-center gap-2">
-                  <span className="text-[13px] font-medium text-[#0f0f0f]">{member.name}</span>
-                  <span className={`text-[9px] px-1.5 py-0.5 rounded-full ${roleColors[member.role]}`}>
-                    {roleLabels[member.role]}
-                  </span>
-                </div>
-                <div className="text-[10px] text-[#777]">{member.handle}</div>
-                <div className="text-[9px] text-[#aaa] mt-0.5">Joined {member.joinedAt}</div>
+                <p className="text-[14px] font-medium text-[#0f0f0f]">
+                  {member.full_name || 'Unnamed User'}
+                  {member.user_id === currentUserId && <span className="text-[11px] text-[#777] ml-2">(You)</span>}
+                </p>
+                <p className="text-[12px] text-[#777]">@{member.username}</p>
               </div>
             </div>
 
-            {isOwner && member.role !== 'owner' && (
-              <div className="relative">
+            <div className="flex items-center gap-3">
+              {/* Role Badge */}
+              <span className={`flex items-center gap-1.5 text-[11px] font-medium px-2.5 py-1 rounded-full ${
+                member.role === 'admin' ? 'bg-[#ede9fe] text-[#7c3aed]' : 'bg-[#f2f1ee] text-[#777]'
+              }`}>
+                {member.role === 'admin' ? <Shield size={12} /> : <User size={12} />}
+                {member.role}
+              </span>
+
+              {/* Admin Actions */}
+              {isAdmin && member.user_id !== currentUserId && (
                 <button
-                  onClick={() => setSelectedMember(selectedMember?.id === member.id ? null : member)}
-                  className="p-1.5 rounded-lg hover:bg-[#f2f1ee] transition"
+                  onClick={() => handleRemoveMember(member.user_id)}
+                  className="p-1.5 rounded-lg hover:bg-red-50 text-[#aaa] hover:text-red-600 transition opacity-0 group-hover:opacity-100"
+                  title="Remove Member"
                 >
-                  <MoreVertical size={14} className="text-[#777]" />
+                  <Trash2 size={14} />
                 </button>
-                {selectedMember?.id === member.id && (
-                  <div className="absolute right-0 top-full mt-1 bg-white border border-[#e8e7e3] rounded-lg shadow-lg z-10 min-w-[140px]">
-                    {member.role !== 'admin' && (
-                      <button
-                        onClick={() => handleChangeRole(member.id, 'admin')}
-                        className="w-full text-left px-3 py-2 text-[12px] text-[#777] hover:bg-[#f2f1ee] transition"
-                      >
-                        Make Admin
-                      </button>
-                    )}
-                    {member.role !== 'member' && (
-                      <button
-                        onClick={() => handleChangeRole(member.id, 'member')}
-                        className="w-full text-left px-3 py-2 text-[12px] text-[#777] hover:bg-[#f2f1ee] transition"
-                      >
-                        Remove Admin
-                      </button>
-                    )}
-                    <button
-                      onClick={() => handleRemoveMember(member.id)}
-                      className="w-full text-left px-3 py-2 text-[12px] text-[#dc2626] hover:bg-red-50 transition"
-                    >
-                      Remove from Space
-                    </button>
-                  </div>
-                )}
-              </div>
-            )}
+              )}
+            </div>
           </div>
         ))}
       </div>
-
-      {/* Add Member Modal */}
-      {showAddMember && (
-        <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50" onClick={() => setShowAddMember(false)}>
-          <div className="bg-white rounded-2xl w-[400px] max-w-[90%] p-6 shadow-2xl" onClick={(e) => e.stopPropagation()}>
-            <div className="flex items-center justify-between mb-4">
-              <h3 className="text-[16px] font-semibold text-[#0f0f0f]">Invite to {spaceName}</h3>
-              <button onClick={() => setShowAddMember(false)} className="p-1 rounded-lg hover:bg-[#f2f1ee]">
-                <X size={16} />
-              </button>
-            </div>
-            <div className="relative mb-4">
-              <Search size={14} className="absolute left-3 top-1/2 -translate-y-1/2 text-[#aaa]" />
-              <input
-                type="text"
-                placeholder="Search by name or @handle"
-                className="w-full pl-9 pr-3 py-2 border border-[#e8e7e3] rounded-lg text-[13px] focus:outline-none focus:border-[#4f46e5]"
-              />
-            </div>
-            <div className="space-y-2 max-h-64 overflow-y-auto">
-              <div className="flex items-center justify-between p-2 rounded-lg hover:bg-[#f2f1ee]">
-                <div className="flex items-center gap-3">
-                  <div className="w-8 h-8 rounded-full bg-[#ede9fe] flex items-center justify-center text-[11px] font-medium text-[#5b21b6]">JD</div>
-                  <div>
-                    <div className="text-[13px] font-medium text-[#0f0f0f]">Jane Doe</div>
-                    <div className="text-[10px] text-[#777]">@jane.memu</div>
-                  </div>
-                </div>
-                <button className="px-2 py-1 text-[10px] bg-[#0f0f0f] text-white rounded-md hover:bg-[#2a2a2a] transition">
-                  Invite
-                </button>
-              </div>
-            </div>
-            <div className="mt-4 pt-4 border-t border-[#e8e7e3]">
-              <p className="text-[10px] text-[#777] text-center">
-                Invite people by their memu handle. They'll receive a notification.
-              </p>
-            </div>
-          </div>
-        </div>
-      )}
     </div>
   );
 }

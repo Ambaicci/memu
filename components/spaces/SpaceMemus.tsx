@@ -1,230 +1,220 @@
 'use client';
 
-import { useState } from 'react';
-import { Send, Eye, CheckCheck, Clock, BookOpen, CircleCheck, Inbox, Search, Filter } from 'lucide-react';
-import MemuReadPanel from '../MemuReadPanel';
+import { useState, useEffect, useCallback } from 'react';
+import { createClient } from '@/lib/supabase/client';
+import { useToast } from '@/contexts/ToastContext';
+import { Mail, AlertCircle, Loader2, Clock, CheckCircle2, XCircle } from 'lucide-react';
 
 interface Memu {
-  id: number;
-  from: string;
-  handle: string;
-  initials: string;
-  color: string;
-  textColor: string;
+  id: string;
   subject: string;
-  time: string;
-  nature: 'fyi' | 'decide' | 'resolve' | 'urgent';
-  preview: string;
+  nature: string;
+  status: string;
   body: string;
-  unread: boolean;
-  status: 'delivered' | 'opened' | 'partially_read' | 'fully_read';
+  sender_id: string;
+  created_at: string;
+  sender_name: string;
+  sender_initials: string;
 }
 
 interface SpaceMemusProps {
   spaceId: string;
-  spaceName: string;
 }
 
-const natureLabels = {
-  fyi: 'FYI',
-  decide: 'Decide',
-  resolve: 'Resolve',
-  urgent: 'Urgent',
-};
-
-const natureStyles = {
+const natureColors: Record<string, string> = {
   fyi: 'bg-[#fef3c7] text-[#d97706]',
   decide: 'bg-[#ede9fe] text-[#7c3aed]',
   resolve: 'bg-[#fee2e2] text-[#dc2626]',
   urgent: 'bg-[#d1fae5] text-[#059669]',
 };
 
-const statusConfig = {
-  delivered: { label: 'Delivered', icon: <CheckCheck size={11} />, color: 'text-[#3b82f6]', bg: 'bg-[#eff6ff]' },
-  opened: { label: 'Opened', icon: <Eye size={11} />, color: 'text-[#8b5cf6]', bg: 'bg-[#f5f3ff]' },
-  partially_read: { label: 'Partially Read', icon: <BookOpen size={11} />, color: 'text-[#f59e0b]', bg: 'bg-[#fffbeb]' },
-  fully_read: { label: 'Fully Read', icon: <CircleCheck size={11} />, color: 'text-[#10b981]', bg: 'bg-[#ecfdf5]' },
+const statusIcons: Record<string, React.ReactNode> = {
+  sent: <CheckCircle2 size={14} className="text-[#059669]" />,
+  delivered: <Clock size={14} className="text-[#d97706]" />,
+  read: <CheckCircle2 size={14} className="text-[#4f46e5]" />,
+  failed: <XCircle size={14} className="text-[#dc2626]" />,
 };
 
-// Demo memus for space
-const demoMemus: Memu[] = [
-  {
-    id: 1,
-    from: 'Aisha Kimani',
-    handle: '@aisha.memu',
-    initials: 'AK',
-    color: '#e1f5ee',
-    textColor: '#0f6e56',
-    subject: 'Q4 Budget — need your sign-off',
-    time: '9:41 AM',
-    nature: 'decide',
-    preview: 'The finance team has run the numbers and we need a decision by EOD Friday...',
-    body: '<p>Hey John,</p><p>The finance team has run the projections and we need your sign-off on two items.</p>',
-    unread: true,
-    status: 'delivered',
-  },
-  {
-    id: 2,
-    from: 'David Osei',
-    handle: '@david.memu',
-    initials: 'DO',
-    color: '#ede9fe',
-    textColor: '#5b21b6',
-    subject: 'Design feedback — a few thoughts',
-    time: '8:15 AM',
-    nature: 'fyi',
-    preview: 'Went through the prototype last night. The spaces feature is genuinely exciting...',
-    body: '<p>David,</p><p>Your feedback on spaces is spot on.</p>',
-    unread: false,
-    status: 'fully_read',
-  },
-  {
-    id: 3,
-    from: 'Tobias Nguyen',
-    handle: '@tobias.memu',
-    initials: 'TN',
-    color: '#f0f9ff',
-    textColor: '#0369a1',
-    subject: 'Server issue — needs resolution',
-    time: 'Yesterday',
-    nature: 'resolve',
-    preview: 'The staging environment went down at 3AM. Logs point to a config drift...',
-    body: '<p>Tobias,</p><p>Let\'s patch forward.</p>',
-    unread: false,
-    status: 'opened',
-  },
-];
+export default function SpaceMemus({ spaceId }: SpaceMemusProps) {
+  const [memus, setMemus] = useState<Memu[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
+  const [currentUserId, setCurrentUserId] = useState<string | null>(null);
+  const { showToast } = useToast();
 
-export default function SpaceMemus({ spaceId, spaceName }: SpaceMemusProps) {
-  const [filter, setFilter] = useState('all');
-  const [searchQuery, setSearchQuery] = useState('');
-  const [memus, setMemus] = useState<Memu[]>(demoMemus);
-  const [selectedMemu, setSelectedMemu] = useState<Memu | null>(null);
+  // Get current user
+  useEffect(() => {
+    const getUser = async () => {
+      const supabase = createClient();
+      const { data: { user } } = await supabase.auth.getUser();
+      if (user) setCurrentUserId(user.id);
+    };
+    getUser();
+  }, []);
 
-  const filteredMemus = memus.filter(m => {
-    const matchesFilter = filter === 'all' || m.nature === filter;
-    const matchesSearch = m.from.toLowerCase().includes(searchQuery.toLowerCase()) ||
-                          m.subject.toLowerCase().includes(searchQuery.toLowerCase());
-    return matchesFilter && matchesSearch;
-  });
+  // Fetch space-specific memus
+  const fetchMemus = useCallback(async () => {
+    if (!currentUserId) return;
+    setLoading(true);
+    setError(null);
+    
+    const supabase = createClient();
+    try {
+      // Try to fetch memus filtered by space_id
+      const { data, error } = await supabase
+        .from('memus')
+        .select('id, subject, nature, status, body, sender_id, created_at')
+        .eq('space_id', spaceId)
+        .order('created_at', { ascending: false });
 
-  const unreadCount = memus.filter(m => m.unread).length;
-  const totalCount = memus.length;
+      if (error) {
+        // If space_id column doesn't exist yet (Phase 1), show graceful state
+        if (error.code === '42703' || error.code === '42P01') {
+          setError('COLUMN_MISSING');
+          setLoading(false);
+          return;
+        }
+        throw error;
+      }
 
-  const handleMemuClick = (memu: Memu) => {
-    setSelectedMemu(memu);
-    if (memu.unread) {
-      setMemus(memus.map(m => m.id === memu.id ? { ...m, unread: false } : m));
+      // Enrich with sender info
+      const enriched: Memu[] = (data || []).map(m => ({
+        ...m,
+        sender_name: m.sender_id === currentUserId ? 'You' : 'Space Member',
+        sender_initials: m.sender_id === currentUserId ? 'YO' : 'SM',
+      }));
+
+      setMemus(enriched);
+    } catch (err: any) {
+      console.error('Failed to fetch space memus:', err);
+      setError(err.message || 'Failed to load memus');
+    } finally {
+      setLoading(false);
     }
+  }, [spaceId, currentUserId]);
+
+  useEffect(() => {
+    if (currentUserId) fetchMemus();
+  }, [fetchMemus, currentUserId]);
+
+  // Format date
+  const formatDate = (dateStr: string) => {
+    const date = new Date(dateStr);
+    const now = new Date();
+    const diff = now.getTime() - date.getTime();
+    const mins = Math.floor(diff / 60000);
+    if (mins < 1) return 'Just now';
+    if (mins < 60) return `${mins}m ago`;
+    if (mins < 1440) return `${Math.floor(mins / 60)}h ago`;
+    return date.toLocaleDateString();
   };
 
-  const handleReply = (replyText: string) => {
-    console.log('Reply sent:', replyText);
-    setSelectedMemu(null);
-  };
+  // Loading state
+  if (loading) {
+    return (
+      <div className="flex items-center justify-center h-64">
+        <Loader2 className="w-6 h-6 animate-spin text-[#4f46e5]" />
+      </div>
+    );
+  }
+
+  // Schema not ready yet
+  if (error === 'COLUMN_MISSING') {
+    return (
+      <div className="flex flex-col items-center justify-center h-64 text-center p-6">
+        <div className="w-16 h-16 rounded-full bg-[#f2f1ee] flex items-center justify-center mb-4">
+          <Mail className="w-8 h-8 text-[#aaa]" />
+        </div>
+        <h3 className="text-lg font-medium text-[#0f0f0f] mb-2">Space Memus is coming soon</h3>
+        <p className="text-sm text-[#777] max-w-md">
+          Space-specific messaging is being set up. Soon you'll be able to send structured memus directly to this space.
+        </p>
+      </div>
+    );
+  }
+
+  // Error state
+  if (error) {
+    return (
+      <div className="flex flex-col items-center justify-center h-64 text-center p-6">
+        <AlertCircle className="w-8 h-8 text-red-500 mb-3" />
+        <p className="text-sm text-red-600 mb-4">{error}</p>
+        <button onClick={fetchMemus} className="px-4 py-2 bg-[#4f46e5] text-white rounded-lg text-sm hover:bg-[#4338ca] transition">
+          Retry
+        </button>
+      </div>
+    );
+  }
+
+  // Empty state
+  if (memus.length === 0) {
+    return (
+      <div className="flex flex-col items-center justify-center h-64 text-center p-6">
+        <Mail className="w-8 h-8 text-[#aaa] mb-3" />
+        <p className="text-sm text-[#777] mb-4">No memus in this space yet. Start a structured thread to keep things organized.</p>
+        <button
+          onClick={() => showToast('Compose for space coming in Phase 2', 'success')}
+          className="flex items-center gap-2 px-4 py-2 bg-[#4f46e5] text-white rounded-lg text-sm hover:bg-[#4338ca] transition"
+        >
+          <Mail size={14} /> Compose Space Memu
+        </button>
+      </div>
+    );
+  }
 
   return (
-    <div className="flex flex-col h-full">
+    <div className="max-w-4xl mx-auto space-y-3">
       {/* Header */}
-      <div className="mb-4">
-        <h2 className="text-[18px] font-medium text-[#0f0f0f]">Memus</h2>
-        <p className="text-[12px] text-[#777]">{unreadCount} unread · {totalCount} total</p>
-      </div>
-
-      {/* Search Bar */}
-      <div className="mb-4">
-        <div className="flex gap-2">
-          <div className="flex-1 flex items-center gap-2 bg-[#f2f1ee] border border-[#e8e7e3] rounded-lg px-3 py-1.5">
-            <Search size={14} className="text-[#777]" />
-            <input
-              type="text"
-              value={searchQuery}
-              onChange={(e) => setSearchQuery(e.target.value)}
-              placeholder="Search memus..."
-              className="flex-1 text-[13px] outline-none bg-transparent"
-            />
-          </div>
-          <button className="p-2 border border-[#e8e7e3] rounded-lg hover:border-[#777] transition">
-            <Filter size={14} />
-          </button>
-        </div>
-      </div>
-
-      {/* Filter Pills */}
-      <div className="flex gap-2 flex-wrap mb-4">
+      <div className="flex items-center justify-between mb-4">
+        <h2 className="text-xl font-semibold text-[#0f0f0f]">Space Memus ({memus.length})</h2>
         <button
-          onClick={() => setFilter('all')}
-          className={`px-3 py-1 rounded-full text-[12px] font-medium transition ${
-            filter === 'all' ? 'bg-[#0f0f0f] text-white' : 'bg-[#f2f1ee] text-[#777] hover:bg-[#e8e7e3]'
-          }`}
+          onClick={() => showToast('Compose for space coming in Phase 2', 'success')}
+          className="flex items-center gap-2 px-4 py-2 bg-[#0f0f0f] text-white rounded-lg text-sm hover:bg-[#2a2a2a] transition"
         >
-          All
+          <Mail size={14} /> New Memu
         </button>
-        {Object.entries(natureLabels).map(([key, label]) => (
-          <button
-            key={key}
-            onClick={() => setFilter(key)}
-            className={`px-3 py-1 rounded-full text-[12px] font-medium transition ${
-              filter === key ? natureStyles[key as keyof typeof natureStyles] : 'bg-[#f2f1ee] text-[#777] hover:bg-[#e8e7e3]'
-            }`}
-          >
-            {label}
-          </button>
-        ))}
       </div>
 
-      {/* Memus List */}
-      <div className="flex-1 overflow-y-auto space-y-2">
-        {filteredMemus.map((memu) => {
-          const status = statusConfig[memu.status];
-          return (
-            <div
-              key={memu.id}
-              onClick={() => handleMemuClick(memu)}
-              className={`bg-white border rounded-xl p-3 cursor-pointer transition-all duration-200 hover:shadow-md ${
-                memu.unread ? 'border-l-4 border-l-[#4f46e5]' : 'border-[#e8e7e3] hover:border-[#d0cfc9]'
-              }`}
-            >
-              <div className="flex items-start gap-3">
-                <div className="flex-shrink-0">
-                  <div className="w-8 h-8 rounded-full flex items-center justify-center text-[11px] font-medium shadow-sm" style={{ background: memu.color, color: memu.textColor }}>
-                    {memu.initials}
+      {/* Memu List */}
+      {memus.map((memu) => (
+        <div
+          key={memu.id}
+          className="bg-white border border-[#e8e7e3] rounded-xl p-4 hover:border-[#d0cfc9] transition cursor-pointer"
+        >
+          <div className="flex items-start justify-between gap-4">
+            <div className="flex-1 min-w-0">
+              <div className="flex items-center gap-2 mb-1.5">
+                <span className={`text-[10px] font-medium px-2 py-0.5 rounded-full ${natureColors[memu.nature?.toLowerCase()] || 'bg-[#f2f1ee] text-[#777]'}`}>
+                  {memu.nature?.toUpperCase() || 'FYI'}
+                </span>
+                <span className="flex items-center gap-1 text-[10px] text-[#777]">
+                  {statusIcons[memu.status?.toLowerCase()] || <Clock size={14} className="text-[#aaa]" />}
+                  {memu.status}
+                </span>
+              </div>
+              
+              <h3 className="text-[14px] font-semibold text-[#0f0f0f] mb-1 truncate">
+                {memu.subject || '(No subject)'}
+              </h3>
+              
+              <p className="text-[12px] text-[#777] line-clamp-1 mb-2">
+                {memu.body.replace(/<[^>]*>/g, '').slice(0, 120)}...
+              </p>
+
+              <div className="flex items-center gap-3 text-[11px] text-[#777]">
+                <div className="flex items-center gap-1.5">
+                  <div className="w-5 h-5 rounded-full bg-[#ede9fe] flex items-center justify-center text-[9px] font-medium text-[#4f46e5]">
+                    {memu.sender_initials}
                   </div>
+                  <span>{memu.sender_name}</span>
                 </div>
-                <div className="flex-1 min-w-0">
-                  <div className="flex justify-between items-start">
-                    <div>
-                      <span className={`text-[13px] ${memu.unread ? 'font-semibold' : 'font-medium'}`}>{memu.from}</span>
-                      <span className="text-[10px] text-[#777] ml-2">{memu.handle}</span>
-                    </div>
-                    <span className="text-[10px] text-[#777]">{memu.time}</span>
-                  </div>
-                  <div className="text-[12px] font-medium text-[#0f0f0f] mt-0.5 truncate">{memu.subject}</div>
-                  <div className="text-[11px] text-[#777] mt-0.5 line-clamp-1">{memu.preview}</div>
-                  <div className="flex items-center gap-2 mt-2">
-                    <span className={`text-[9px] px-2 py-0.5 rounded-full ${natureStyles[memu.nature]}`}>
-                      {natureLabels[memu.nature]}
-                    </span>
-                    <div className={`flex items-center gap-1 px-1.5 py-0.5 rounded-full ${status.bg}`}>
-                      {status.icon}
-                      <span className={`text-[9px] font-medium ${status.color}`}>{status.label}</span>
-                    </div>
-                  </div>
-                </div>
+                <span>•</span>
+                <span>{formatDate(memu.created_at)}</span>
               </div>
             </div>
-          );
-        })}
-      </div>
-
-      {/* Memu Read Panel */}
-      {selectedMemu && (
-        <MemuReadPanel
-          memu={selectedMemu}
-          onClose={() => setSelectedMemu(null)}
-          onReply={handleReply}
-        />
-      )}
+          </div>
+        </div>
+      ))}
     </div>
   );
 }

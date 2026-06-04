@@ -1,267 +1,301 @@
 'use client';
 
-import { useState } from 'react';
-import { CheckSquare, Plus, X, Calendar, User, Flag, Trash2, Edit2 } from 'lucide-react';
+import { useState, useEffect, useCallback } from 'react';
+import { createClient } from '@/lib/supabase/client';
+import { useToast } from '@/contexts/ToastContext';
+import { 
+  CheckCircle2, 
+  Circle, 
+  Clock, 
+  Plus, 
+  Trash2, 
+  AlertCircle, 
+  Loader2,
+  CalendarDays
+} from 'lucide-react';
 
 interface Task {
   id: string;
   title: string;
-  assignedTo: string;
-  dueDate: string;
-  completed: boolean;
-  priority: 'high' | 'medium' | 'low';
-  createdAt: string;
+  description: string | null;
+  status: 'pending' | 'completed';
+  due_date: string | null;
+  created_at: string;
+  created_by: string;
 }
 
 interface SpaceTasksProps {
   spaceId: string;
-  initialTasks: Task[];
 }
 
-const priorityConfig = {
-  high: { label: 'High', color: 'bg-[#fee2e2] text-[#dc2626]', icon: '🔴' },
-  medium: { label: 'Medium', color: 'bg-[#fef3c7] text-[#d97706]', icon: '🟡' },
-  low: { label: 'Low', color: 'bg-[#d1fae5] text-[#059669]', icon: '🟢' },
-};
+export default function SpaceTasks({ spaceId }: SpaceTasksProps) {
+  const [tasks, setTasks] = useState<Task[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
+  const [showAddForm, setShowAddForm] = useState(false);
+  const [newTaskTitle, setNewTaskTitle] = useState('');
+  const [newTaskDue, setNewTaskDue] = useState('');
+  const [currentUserId, setCurrentUserId] = useState<string | null>(null);
+  const { showToast } = useToast();
 
-export default function SpaceTasks({ spaceId, initialTasks }: SpaceTasksProps) {
-  const [tasks, setTasks] = useState<Task[]>(initialTasks);
-  const [showCreateModal, setShowCreateModal] = useState(false);
-  const [newTask, setNewTask] = useState({ title: '', assignedTo: '', dueDate: '', priority: 'medium' as Task['priority'] });
-  const [editingTask, setEditingTask] = useState<Task | null>(null);
-  const [filter, setFilter] = useState<'all' | 'active' | 'completed'>('all');
-
-  const filteredTasks = tasks.filter(task => {
-    if (filter === 'active') return !task.completed;
-    if (filter === 'completed') return task.completed;
-    return true;
-  });
-
-  const handleToggleTask = (taskId: string) => {
-    setTasks(tasks.map(task => 
-      task.id === taskId ? { ...task, completed: !task.completed } : task
-    ));
-  };
-
-  const handleCreateTask = () => {
-    if (!newTask.title.trim()) return;
-    const task: Task = {
-      id: Date.now().toString(),
-      title: newTask.title,
-      assignedTo: newTask.assignedTo || 'Unassigned',
-      dueDate: newTask.dueDate || 'No date',
-      completed: false,
-      priority: newTask.priority,
-      createdAt: new Date().toLocaleDateString(),
+  // Get current user
+  useEffect(() => {
+    const getUser = async () => {
+      const supabase = createClient();
+      const { data: { user } } = await supabase.auth.getUser();
+      if (user) setCurrentUserId(user.id);
     };
-    setTasks([task, ...tasks]);
-    setNewTask({ title: '', assignedTo: '', dueDate: '', priority: 'medium' });
-    setShowCreateModal(false);
-  };
+    getUser();
+  }, []);
 
-  const handleDeleteTask = (taskId: string) => {
-    setTasks(tasks.filter(t => t.id !== taskId));
-  };
+  // Fetch tasks
+  const fetchTasks = useCallback(async () => {
+    if (!currentUserId) return;
+    setLoading(true);
+    setError(null);
+    
+    const supabase = createClient();
+    try {
+      const { data, error } = await supabase
+        .from('space_tasks')
+        .select('id, title, description, status, due_date, created_at, created_by')
+        .eq('space_id', spaceId)
+        .order('created_at', { ascending: false });
 
-  const handleEditTask = (task: Task) => {
-    setEditingTask(task);
-    setNewTask({ title: task.title, assignedTo: task.assignedTo, dueDate: task.dueDate, priority: task.priority });
-    setShowCreateModal(true);
-  };
+      if (error) {
+        // Table doesn't exist yet (Phase 1 fallback)
+        if (error.code === '42P01') {
+          setError('TABLE_MISSING');
+          setLoading(false);
+          return;
+        }
+        throw error;
+      }
 
-  const handleUpdateTask = () => {
-    if (editingTask && newTask.title.trim()) {
-      setTasks(tasks.map(t => 
-        t.id === editingTask.id 
-          ? { ...t, title: newTask.title, assignedTo: newTask.assignedTo, dueDate: newTask.dueDate, priority: newTask.priority }
-          : t
-      ));
-      setEditingTask(null);
-      setNewTask({ title: '', assignedTo: '', dueDate: '', priority: 'medium' });
-      setShowCreateModal(false);
+      setTasks(data || []);
+    } catch (err: any) {
+      console.error('Failed to fetch tasks:', err);
+      setError(err.message || 'Failed to load tasks');
+    } finally {
+      setLoading(false);
+    }
+  }, [spaceId, currentUserId]);
+
+  useEffect(() => {
+    if (currentUserId) fetchTasks();
+  }, [fetchTasks, currentUserId]);
+
+  // Add task
+  const handleAddTask = async () => {
+    if (!newTaskTitle.trim() || !currentUserId) return;
+    
+    const supabase = createClient();
+    try {
+      const { error } = await supabase
+        .from('space_tasks')
+        .insert({
+          space_id: spaceId,
+          title: newTaskTitle.trim(),
+          description: null,
+          status: 'pending',
+          due_date: newTaskDue || null,
+          created_by: currentUserId,
+        });
+      
+      if (error) throw error;
+      
+      setNewTaskTitle('');
+      setNewTaskDue('');
+      setShowAddForm(false);
+      fetchTasks();
+      showToast('Task added', 'success');
+    } catch (err: any) {
+      console.error('Failed to add task:', err);
+      showToast(err.message || 'Failed to add task', 'error');
     }
   };
 
-  const activeCount = tasks.filter(t => !t.completed).length;
-  const completedCount = tasks.filter(t => t.completed).length;
+  // Toggle task status
+  const toggleTaskStatus = async (taskId: string, currentStatus: string) => {
+    const supabase = createClient();
+    const newStatus = currentStatus === 'pending' ? 'completed' : 'pending';
+    
+    try {
+      const { error } = await supabase
+        .from('space_tasks')
+        .update({ status: newStatus })
+        .eq('id', taskId);
+      
+      if (error) throw error;
+      fetchTasks();
+    } catch (err) {
+      showToast('Failed to update task', 'error');
+    }
+  };
+
+  // Delete task
+  const deleteTask = async (taskId: string) => {
+    if (!confirm('Delete this task?')) return;
+    const supabase = createClient();
+    try {
+      const { error } = await supabase.from('space_tasks').delete().eq('id', taskId);
+      if (error) throw error;
+      fetchTasks();
+      showToast('Task deleted', 'success');
+    } catch (err) {
+      showToast('Failed to delete task', 'error');
+    }
+  };
+
+  // Format date
+  const formatDate = (dateStr: string | null) => {
+    if (!dateStr) return 'No due date';
+    const date = new Date(dateStr);
+    return date.toLocaleDateString('en-US', { month: 'short', day: 'numeric' });
+  };
+
+  // Loading state
+  if (loading) {
+    return (
+      <div className="flex items-center justify-center h-64">
+        <Loader2 className="w-6 h-6 animate-spin text-[#4f46e5]" />
+      </div>
+    );
+  }
+
+  // Table not ready yet
+  if (error === 'TABLE_MISSING') {
+    return (
+      <div className="flex flex-col items-center justify-center h-64 text-center p-6">
+        <div className="w-16 h-16 rounded-full bg-[#f2f1ee] flex items-center justify-center mb-4">
+          <CheckCircle2 className="w-8 h-8 text-[#aaa]" />
+        </div>
+        <h3 className="text-lg font-medium text-[#0f0f0f] mb-2">Tasks is coming soon</h3>
+        <p className="text-sm text-[#777] max-w-md">
+          The task management backend is being set up. You'll be able to create and track tasks here shortly.
+        </p>
+      </div>
+    );
+  }
+
+  // Error state
+  if (error) {
+    return (
+      <div className="flex flex-col items-center justify-center h-64 text-center p-6">
+        <AlertCircle className="w-8 h-8 text-red-500 mb-3" />
+        <p className="text-sm text-red-600 mb-4">{error}</p>
+        <button onClick={fetchTasks} className="px-4 py-2 bg-[#4f46e5] text-white rounded-lg text-sm hover:bg-[#4338ca] transition">
+          Retry
+        </button>
+      </div>
+    );
+  }
+
+  // Empty state
+  if (tasks.length === 0 && !showAddForm) {
+    return (
+      <div className="flex flex-col items-center justify-center h-64 text-center p-6">
+        <CheckCircle2 className="w-8 h-8 text-[#aaa] mb-3" />
+        <p className="text-sm text-[#777] mb-4">No tasks yet. Keep your space organized by adding one.</p>
+        <button
+          onClick={() => setShowAddForm(true)}
+          className="flex items-center gap-2 px-4 py-2 bg-[#4f46e5] text-white rounded-lg text-sm hover:bg-[#4338ca] transition"
+        >
+          <Plus size={14} /> Add Task
+        </button>
+      </div>
+    );
+  }
 
   return (
-    <div className="space-y-4">
-      {/* Header with Stats */}
-      <div className="flex items-center justify-between flex-wrap gap-3">
-        <div className="flex items-center gap-3">
-          <div className="flex items-center gap-1">
-            <div className="w-3 h-3 rounded-full bg-[#4f46e5]" />
-            <span className="text-[12px] font-medium text-[#777]">{activeCount} active</span>
-          </div>
-          <div className="flex items-center gap-1">
-            <div className="w-3 h-3 rounded-full bg-[#10b981]" />
-            <span className="text-[12px] font-medium text-[#777]">{completedCount} completed</span>
-          </div>
-        </div>
-        <div className="flex gap-2">
-          <select
-            value={filter}
-            onChange={(e) => setFilter(e.target.value as any)}
-            className="px-3 py-1.5 border border-[#e8e7e3] rounded-lg text-[12px] bg-white focus:outline-none focus:border-[#4f46e5]"
-          >
-            <option value="all">All Tasks</option>
-            <option value="active">Active</option>
-            <option value="completed">Completed</option>
-          </select>
-          <button
-            onClick={() => setShowCreateModal(true)}
-            className="flex items-center gap-1.5 px-3 py-1.5 bg-gradient-to-r from-[#4f46e5] to-[#0891b2] text-white rounded-lg text-[12px] font-medium hover:shadow-md transition"
-          >
-            <Plus size={14} />
-            New Task
-          </button>
-        </div>
+    <div className="max-w-3xl mx-auto">
+      {/* Header */}
+      <div className="flex items-center justify-between mb-6">
+        <h2 className="text-xl font-semibold text-[#0f0f0f]">Tasks</h2>
+        <button
+          onClick={() => setShowAddForm(!showAddForm)}
+          className="flex items-center gap-2 px-4 py-2 bg-[#0f0f0f] text-white rounded-lg text-sm hover:bg-[#2a2a2a] transition"
+        >
+          <Plus size={14} /> {showAddForm ? 'Cancel' : 'Add Task'}
+        </button>
       </div>
 
-      {/* Tasks List */}
-      {filteredTasks.length === 0 ? (
-        <div className="text-center py-12">
-          <CheckSquare size={48} className="text-[#aaa] mx-auto mb-4" />
-          <p className="text-[14px] text-[#777]">No tasks yet</p>
-          <p className="text-[12px] text-[#aaa] mt-1">Create a task to get organized</p>
-        </div>
-      ) : (
-        <div className="space-y-2">
-          {filteredTasks.map((task) => (
-            <div
-              key={task.id}
-              className="group flex items-center gap-3 p-3 bg-white border border-[#e8e7e3] rounded-xl hover:shadow-md transition-all duration-200"
-            >
+      {/* Add Task Form */}
+      {showAddForm && (
+        <div className="bg-white border border-[#e8e7e3] rounded-xl p-4 mb-6">
+          <div className="space-y-3">
+            <input
+              type="text"
+              value={newTaskTitle}
+              onChange={(e) => setNewTaskTitle(e.target.value)}
+              placeholder="What needs to be done?"
+              className="w-full border border-[#e8e7e3] rounded-lg px-4 py-2.5 text-[13.5px] outline-none focus:border-[#4f46e5] transition"
+              onKeyDown={(e) => e.key === 'Enter' && handleAddTask()}
+            />
+            <div className="flex gap-3">
               <input
-                type="checkbox"
-                checked={task.completed}
-                onChange={() => handleToggleTask(task.id)}
-                className="w-4 h-4 rounded border-[#e8e7e3] accent-[#4f46e5] cursor-pointer"
+                type="date"
+                value={newTaskDue}
+                onChange={(e) => setNewTaskDue(e.target.value)}
+                className="flex-1 border border-[#e8e7e3] rounded-lg px-4 py-2.5 text-[13.5px] outline-none focus:border-[#4f46e5] transition"
               />
-              <div className="flex-1">
-                <div className="flex items-center gap-2 flex-wrap">
-                  <span className={`text-[13px] ${task.completed ? 'line-through text-[#aaa]' : 'text-[#0f0f0f]'}`}>
-                    {task.title}
-                  </span>
-                  <span className={`text-[9px] px-1.5 py-0.5 rounded-full ${priorityConfig[task.priority].color}`}>
-                    {priorityConfig[task.priority].icon} {priorityConfig[task.priority].label}
-                  </span>
-                </div>
-                <div className="flex items-center gap-3 mt-1 flex-wrap">
-                  <span className="text-[10px] text-[#777] flex items-center gap-1">
-                    <User size={10} />
-                    {task.assignedTo}
-                  </span>
-                  <span className="text-[10px] text-[#777] flex items-center gap-1">
-                    <Calendar size={10} />
-                    Due {task.dueDate}
-                  </span>
-                </div>
-              </div>
-              <div className="flex items-center gap-1 opacity-0 group-hover:opacity-100 transition-all duration-200">
-                <button
-                  onClick={() => handleEditTask(task)}
-                  className="p-1.5 rounded-lg hover:bg-[#f2f1ee] transition"
-                  title="Edit"
-                >
-                  <Edit2 size={12} className="text-[#777]" />
-                </button>
-                <button
-                  onClick={() => handleDeleteTask(task.id)}
-                  className="p-1.5 rounded-lg hover:bg-red-50 transition"
-                  title="Delete"
-                >
-                  <Trash2 size={12} className="text-[#777] hover:text-[#dc2626]" />
-                </button>
-              </div>
-            </div>
-          ))}
-        </div>
-      )}
-
-      {/* Create/Edit Task Modal */}
-      {showCreateModal && (
-        <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50" onClick={() => {
-          setShowCreateModal(false);
-          setEditingTask(null);
-          setNewTask({ title: '', assignedTo: '', dueDate: '', priority: 'medium' });
-        }}>
-          <div className="bg-white rounded-2xl w-[450px] max-w-[90%] p-6 shadow-2xl" onClick={(e) => e.stopPropagation()}>
-            <h3 className="text-[18px] font-semibold text-[#0f0f0f] mb-4">
-              {editingTask ? 'Edit Task' : 'New Task'}
-            </h3>
-            <div className="space-y-4">
-              <div>
-                <label className="block text-[12px] font-medium text-[#777] mb-1">Task Title</label>
-                <input
-                  type="text"
-                  value={newTask.title}
-                  onChange={(e) => setNewTask({ ...newTask, title: e.target.value })}
-                  className="w-full px-4 py-2 border border-[#e8e7e3] rounded-lg text-[14px] focus:outline-none focus:border-[#4f46e5]"
-                  placeholder="What needs to be done?"
-                  autoFocus
-                />
-              </div>
-              <div>
-                <label className="block text-[12px] font-medium text-[#777] mb-1">Assigned To</label>
-                <input
-                  type="text"
-                  value={newTask.assignedTo}
-                  onChange={(e) => setNewTask({ ...newTask, assignedTo: e.target.value })}
-                  className="w-full px-4 py-2 border border-[#e8e7e3] rounded-lg text-[14px] focus:outline-none focus:border-[#4f46e5]"
-                  placeholder="Person's name"
-                />
-              </div>
-              <div>
-                <label className="block text-[12px] font-medium text-[#777] mb-1">Due Date</label>
-                <input
-                  type="date"
-                  value={newTask.dueDate}
-                  onChange={(e) => setNewTask({ ...newTask, dueDate: e.target.value })}
-                  className="w-full px-4 py-2 border border-[#e8e7e3] rounded-lg text-[14px] focus:outline-none focus:border-[#4f46e5]"
-                />
-              </div>
-              <div>
-                <label className="block text-[12px] font-medium text-[#777] mb-1">Priority</label>
-                <div className="flex gap-2">
-                  {(['high', 'medium', 'low'] as const).map((priority) => (
-                    <button
-                      key={priority}
-                      onClick={() => setNewTask({ ...newTask, priority })}
-                      className={`flex-1 px-3 py-2 rounded-lg text-[12px] font-medium transition ${
-                        newTask.priority === priority
-                          ? priorityConfig[priority].color
-                          : 'bg-[#f2f1ee] text-[#777] hover:bg-[#e8e7e3]'
-                      }`}
-                    >
-                      {priorityConfig[priority].label}
-                    </button>
-                  ))}
-                </div>
-              </div>
-            </div>
-            <div className="flex gap-3 justify-end mt-6">
               <button
-                onClick={() => {
-                  setShowCreateModal(false);
-                  setEditingTask(null);
-                }}
-                className="px-4 py-2 rounded-lg text-[13px] text-[#777] hover:bg-[#f2f1ee] transition"
+                onClick={handleAddTask}
+                disabled={!newTaskTitle.trim()}
+                className="px-5 py-2.5 bg-[#4f46e5] text-white rounded-lg text-sm font-medium hover:bg-[#4338ca] transition disabled:opacity-50"
               >
-                Cancel
-              </button>
-              <button
-                onClick={editingTask ? handleUpdateTask : handleCreateTask}
-                disabled={!newTask.title.trim()}
-                className="px-4 py-2 rounded-lg text-[13px] font-medium bg-gradient-to-r from-[#4f46e5] to-[#0891b2] text-white hover:shadow-lg transition disabled:opacity-50"
-              >
-                {editingTask ? 'Update Task' : 'Create Task'}
+                Add
               </button>
             </div>
           </div>
         </div>
       )}
+
+      {/* Task List */}
+      <div className="space-y-3">
+        {tasks.map((task) => (
+          <div
+            key={task.id}
+            className="bg-white border border-[#e8e7e3] rounded-xl p-4 flex items-center gap-4 group hover:border-[#d0cfc9] transition"
+          >
+            <button
+              onClick={() => toggleTaskStatus(task.id, task.status)}
+              className="flex-shrink-0"
+            >
+              {task.status === 'completed' ? (
+                <CheckCircle2 className="w-5 h-5 text-[#059669]" />
+              ) : (
+                <Circle className="w-5 h-5 text-[#aaa] group-hover:text-[#4f46e5] transition" />
+              )}
+            </button>
+            
+            <div className="flex-1 min-w-0">
+              <p className={`text-[14px] font-medium ${task.status === 'completed' ? 'line-through text-[#777]' : 'text-[#0f0f0f]'}`}>
+                {task.title}
+              </p>
+              <div className="flex items-center gap-3 mt-1">
+                <span className="text-[11px] text-[#777] flex items-center gap-1">
+                  <CalendarDays size={11} />
+                  {formatDate(task.due_date)}
+                </span>
+                <span className={`text-[10px] px-2 py-0.5 rounded-full font-medium ${
+                  task.status === 'completed' ? 'bg-[#d1fae5] text-[#059669]' : 'bg-[#f2f1ee] text-[#777]'
+                }`}>
+                  {task.status}
+                </span>
+              </div>
+            </div>
+
+            <button
+              onClick={() => deleteTask(task.id)}
+              className="opacity-0 group-hover:opacity-100 p-1.5 rounded-lg hover:bg-red-50 text-[#777] hover:text-red-600 transition"
+              title="Delete task"
+            >
+              <Trash2 size={14} />
+            </button>
+          </div>
+        ))}
+      </div>
     </div>
   );
 }

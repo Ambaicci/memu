@@ -1,9 +1,9 @@
 'use client';
 
 import { useState, useEffect, useRef } from 'react';
-import { X, Paperclip, Mic, Calendar as CalendarIcon, Mail, Maximize2, Minimize2, Users, CheckCircle, AlertCircle, Clock, FileText } from 'lucide-react';
+import { X, Paperclip, Mic, Calendar as CalendarIcon, Mail, Maximize2, Minimize2, Users, CheckCircle, AlertCircle } from 'lucide-react';
 import { useToast } from '@/contexts/ToastContext';
-
+import { createClient } from '@/lib/supabase/client';
 
 interface ComposePanelProps {
   isOpen: boolean;
@@ -57,9 +57,6 @@ export default function ComposePanel({ isOpen, onClose, onSend, prefilledTo, edi
   const [isFullscreen, setIsFullscreen] = useState(false);
   const [showHandleSelector, setShowHandleSelector] = useState(false);
   const [validationStatus, setValidationStatus] = useState<Record<string, 'valid' | 'invalid' | 'checking'>>({});
-  const [isScheduled, setIsScheduled] = useState(false);
-  const [scheduleDate, setScheduleDate] = useState('');
-  const [scheduleTime, setScheduleTime] = useState('');
   
   const { showToast } = useToast();
   const subjectInputRef = useRef<HTMLInputElement>(null);
@@ -81,7 +78,6 @@ export default function ComposePanel({ isOpen, onClose, onSend, prefilledTo, edi
     }, 300);
   };
 
-  // Populate form when editing a draft or using prefilled handle
   useEffect(() => {
     if (editingDraft) {
       setTo(editingDraft.toHandles || editingDraft.to || []);
@@ -104,17 +100,11 @@ export default function ComposePanel({ isOpen, onClose, onSend, prefilledTo, edi
       setBody('');
       setToInput('');
     }
-    setIsScheduled(false);
-    setScheduleDate('');
-    setScheduleTime('');
   }, [editingDraft, prefilledTo]);
 
-  // Focus management when panel opens
   useEffect(() => {
     if (isOpen) {
-      setTimeout(() => {
-        toInputRef.current?.focus();
-      }, 100);
+      setTimeout(() => toInputRef.current?.focus(), 100);
     }
   }, [isOpen]);
 
@@ -173,6 +163,9 @@ export default function ComposePanel({ isOpen, onClose, onSend, prefilledTo, edi
     return null;
   };
 
+  // ============================================
+  // SMART PENDING MEMUS LOGIC
+  // ============================================
   const handleSend = async () => {
     if (to.length === 0) {
       showToast('Please add at least one recipient', 'error');
@@ -194,81 +187,123 @@ export default function ComposePanel({ isOpen, onClose, onSend, prefilledTo, edi
       return;
     }
     
-    // Handle scheduled memu
-    if (isScheduled && scheduleDate && scheduleTime) {
-      const scheduledDateTime = new Date(`${scheduleDate}T${scheduleTime}`);
-      
-      if (scheduledDateTime <= new Date()) {
-        showToast('Please select a future date and time', 'error');
-        return;
-      }
-      
-      // Save to scheduled memus
-      const scheduledMemus = JSON.parse(localStorage.getItem('scheduled_memus') || '[]');
-      scheduledMemus.push({
-        id: Date.now(),
-        to,
-        subject,
-        nature,
-        body,
-        scheduledFor: scheduledDateTime.toISOString(),
-        createdAt: new Date().toISOString(),
-      });
-      localStorage.setItem('scheduled_memus', JSON.stringify(scheduledMemus));
-      
-      showToast(`📅 Memu scheduled for ${scheduledDateTime.toLocaleString()}`, 'success');
-      onClose();
-      return;
-    }
-    
     setSending(true);
     
-    let currentUser = { name: 'memu User', handle: '@user.memu' };
-    const savedUser = localStorage.getItem('memu_user');
-    if (savedUser) {
-      const parsed = JSON.parse(savedUser);
-      currentUser = { name: parsed.name, handle: parsed.handle };
-    }
-    
-    const emailRecipients = to.filter(t => isEmailAddress(t));
-    const memuRecipients = to.filter(t => !isEmailAddress(t));
-    
-    for (const email of emailRecipients) {
-      try {
-        await fetch('/api/send-email', {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({
-            to: email,
-            subject: subject,
-            body: { text: body, nature: nature },
-            fromName: currentUser.name,
-            fromHandle: currentUser.handle,
-          }),
-        });
-      } catch (err) {
-        console.error(`Failed to send to ${email}:`, err);
+    try {
+      const supabase = createClient();
+      const { data: { user } } = await supabase.auth.getUser();
+      
+      if (!user) {
+        showToast('You must be signed in to send a memu', 'error');
+        return;
       }
+
+      let sentCount = 0;
+      let pendingCount = 0;
+      let failedCount = 0;
+
+      // Process each recipient
+      for (const recipient of to) {
+        try {
+          // Check if recipient exists in profiles (Handles)
+          const handleName = recipient.replace('@', '').replace('.memu', '');
+          const { data: profile, error: profileError } = await supabase
+            .from('profiles')
+            .select('id')
+            .eq('username', handleName)
+            .maybeSingle();
+
+          if (profileError) {
+            console.warn('Profile lookup error:', profileError);
+          }
+
+          const recipientId = profile?.id || null;
+          const memoStatus = recipientId ? 'sent' : 'pending';
+
+          // Insert into database
+          const insertData: any = {
+            sender_id: user.id,
+            recipient_id: recipientId,
+            subject: subject.trim(),
+            body: body.trim(),
+            nature: nature,
+            status: memoStatus,
+          };
+
+          // Only add recipient_email if it's an actual email
+          if (isEmailAddress(recipient)) {
+            insertData.recipient_email = recipient;
+          }
+
+          const { error: dbError } = await supabase.from('memus').insert(insertData);
+
+          if (dbError) {
+            console.error('Database insert error:', JSON.stringify(dbError, null, 2));
+            throw dbError;
+          }
+
+          // If recipient exists and is an email, try to send via Resend
+          if (recipientId && isEmailAddress(recipient)) {
+            try {
+              const res = await fetch('/api/send-email', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({
+                  to: recipient,
+                  subject: subject.trim(),
+                  body: { text: body.trim(), nature: nature },
+                }),
+              });
+              if (res.ok) {
+                sentCount++;
+              } else {
+                console.warn('Email send failed:', res.status);
+                failedCount++;
+              }
+            } catch (err) {
+              console.error('Email send error:', err);
+              failedCount++;
+            }
+          } else if (recipientId) {
+            sentCount++;
+          } else {
+            pendingCount++;
+          }
+        } catch (err: any) {
+          console.error(`Failed to process memu for ${recipient}:`, err);
+          failedCount++;
+        }
+      }
+
+      // Show smart summary toast
+      const messages: string[] = [];
+      if (sentCount > 0) messages.push(`${sentCount} sent`);
+      if (pendingCount > 0) messages.push(`${pendingCount} pending (delivers when they join)`);
+      if (failedCount > 0) messages.push(`${failedCount} failed`);
+      
+      const summary = messages.join(' • ');
+      const toastType = failedCount > 0 && sentCount === 0 ? 'error' : 'success';
+      showToast(summary || 'Memu processed', toastType);
+
+      // Call the onSend callback
+      onSend({ to, subject, nature, body });
+      
+      // Reset form
+      setTo([]);
+      setSubject('');
+      setNature('decide');
+      setBody('');
+      setToInput('');
+      setValidationStatus({});
+      
+    } catch (err: any) {
+      console.error('Critical error in handleSend:', err);
+      showToast('Failed to send memu. Please try again.', 'error');
+    } finally {
+      // ALWAYS reset sending state
+      setSending(false);
+      onClose();
     }
-    
-    if (memuRecipients.length > 0) {
-      console.log('Internal memu recipients:', memuRecipients);
-    }
-    
-    onSend({ to, subject, nature, body });
-    showToast(`✨ Memu sent to ${to.join(', ')}`, 'success');
-    
-    setTo([]);
-    setSubject('');
-    setNature('decide');
-    setBody('');
-    setToInput('');
-    setValidationStatus({});
-    setSending(false);
-    setIsScheduled(false);
-    setScheduleDate('');
-    setScheduleTime('');
-    onClose();
   };
 
   const isEmail = (handle: string) => {
@@ -284,7 +319,7 @@ export default function ComposePanel({ isOpen, onClose, onSend, prefilledTo, edi
       {/* Header */}
       <div className="px-4 md:px-5 py-3 md:py-4 pb-2 md:pb-3 border-b border-[#f2f1ee] flex items-center justify-between">
         <h3 className="font-['Playfair_Display'] text-base italic text-[#0f0f0f]">
-          {editingDraft ? 'Edit draft' : (isScheduled ? 'Schedule Memu' : 'New memu')}
+          {editingDraft ? 'Edit draft' : 'New memu'}
         </h3>
         <div className="flex gap-1.5">
           <button 
@@ -302,14 +337,14 @@ export default function ComposePanel({ isOpen, onClose, onSend, prefilledTo, edi
       {/* TO Field */}
       <div className="px-4 md:px-5 py-2 border-b border-[#f2f1ee] flex items-start gap-2">
         <span className="text-[11.5px] font-medium text-[#777] w-10 md:w-12 pt-2.5">TO</span>
-        <div className="flex-1 flex-wrap gap-1.5 py-2">
+        <div className="flex-1 flex flex-wrap gap-1.5 py-2">
           {to.map(handle => {
             const isValid = validationStatus[handle] === 'valid';
             const isInvalid = validationStatus[handle] === 'invalid';
             return (
               <div 
                 key={handle} 
-                className={`inline-flex items-center text-xs font-medium px-2.5 py-1 rounded-full gap-1.5 transition ${
+                className={`text-xs font-medium px-2.5 py-1 rounded-full flex items-center gap-1.5 transition ${
                   isEmail(handle) 
                     ? isValid ? 'bg-[#d1fae5] text-[#059669]' : isInvalid ? 'bg-[#fee2e2] text-[#dc2626]' : 'bg-[#d1fae5] text-[#059669]'
                     : isValid ? 'bg-[#ede9fe] text-[#4f46e5]' : isInvalid ? 'bg-[#fee2e2] text-[#dc2626]' : 'bg-[#f2f1ee] text-[#4f46e5]'
@@ -322,7 +357,7 @@ export default function ComposePanel({ isOpen, onClose, onSend, prefilledTo, edi
               </div>
             );
           })}
-          <div className="inline-flex gap-1 flex-wrap">
+          <div className="flex flex-1 gap-1 flex-wrap">
             <input
               ref={toInputRef}
               type="text"
@@ -417,93 +452,19 @@ export default function ComposePanel({ isOpen, onClose, onSend, prefilledTo, edi
           <button className="w-8 h-8 border border-[#e8e7e3] rounded-md flex items-center justify-center text-[#777] hover:border-[#777] hover:text-[#0f0f0f] transition">
             <Mic size={13} />
           </button>
-          
-          {/* Schedule Button */}
-          <div className="relative">
-            <button
-              onClick={() => setIsScheduled(!isScheduled)}
-              className={`w-8 h-8 border rounded-md flex items-center justify-center transition ${
-                isScheduled 
-                  ? 'border-[#4f46e5] bg-[#ede9fe] text-[#4f46e5]' 
-                  : 'border-[#e8e7e3] text-[#777] hover:border-[#777]'
-              }`}
-              title="Schedule for later"
-            >
-              <CalendarIcon size={13} />
-            </button>
-            
-            <button
-  onClick={() => {
-    const template = {
-      name: subject || 'Untitled Template',
-      to: to,
-      subject: subject,
-      nature: nature,
-      body: body,
-      category: 'general',
-    };
-    const templates = JSON.parse(localStorage.getItem('memu_templates') || '[]');
-    templates.unshift({
-      id: Date.now().toString(),
-      ...template,
-      isStarred: false,
-      createdAt: new Date().toISOString(),
-    });
-    localStorage.setItem('memu_templates', JSON.stringify(templates));
-    showToast('✨ Saved as template', 'success');
-  }}
-  className="w-8 h-8 border border-[#e8e7e3] rounded-md flex items-center justify-center text-[#777] hover:border-[#777] hover:text-[#4f46e5] transition"
-  title="Save as template"
->
-  <FileText size={13} />
-</button>
-            {isScheduled && (
-              <div className="absolute bottom-full left-0 mb-2 p-3 bg-white rounded-xl shadow-lg border border-[#e8e7e3] z-50 w-64">
-                <div className="space-y-3">
-                  <div>
-                    <label className="text-[11px] font-medium text-[#777] block mb-1">Date</label>
-                    <input
-                      type="date"
-                      value={scheduleDate}
-                      onChange={(e) => setScheduleDate(e.target.value)}
-                      min={new Date().toISOString().split('T')[0]}
-                      className="w-full px-3 py-1.5 border border-[#e8e7e3] rounded-lg text-[13px]"
-                    />
-                  </div>
-                  <div>
-                    <label className="text-[11px] font-medium text-[#777] block mb-1">Time</label>
-                    <input
-                      type="time"
-                      value={scheduleTime}
-                      onChange={(e) => setScheduleTime(e.target.value)}
-                      className="w-full px-3 py-1.5 border border-[#e8e7e3] rounded-lg text-[13px]"
-                    />
-                  </div>
-                  <div className="text-[10px] text-[#aaa] text-center">
-                    {scheduleDate && scheduleTime ? (
-                      `Sending on ${new Date(scheduleDate).toLocaleDateString()} at ${scheduleTime}`
-                    ) : (
-                      'Select date and time'
-                    )}
-                  </div>
-                </div>
-              </div>
-            )}
-          </div>
+          <button className="w-8 h-8 border border-[#e8e7e3] rounded-md flex items-center justify-center text-[#777] hover:border-[#777] hover:text-[#0f0f0f] transition">
+            <CalendarIcon size={13} />
+          </button>
         </div>
-        
         <button
           onClick={handleSend}
           disabled={sending}
           className="bg-[#0f0f0f] text-white rounded-md px-3 md:px-5 py-1.5 md:py-2 text-[12px] md:text-[13px] font-medium flex items-center gap-1.5 hover:bg-[#2a2a2a] hover:-translate-y-0.5 transition disabled:opacity-50"
         >
-          {sending ? 'Sending...' : (isScheduled ? 'Schedule' : (editingDraft ? 'Update' : 'Send'))}
-          {!isScheduled && (
-            <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5">
-              <path d="M12 19l9 2-9-18-9 18 9-2zm0 0v-8" strokeLinecap="round"/>
-            </svg>
-          )}
-          {isScheduled && <Clock size={13} />}
+          {sending ? 'Sending...' : (editingDraft ? 'Update' : 'Send')}
+          <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5">
+            <path d="M12 19l9 2-9-18-9 18 9-2zm0 0v-8" strokeLinecap="round"/>
+          </svg>
         </button>
       </div>
 

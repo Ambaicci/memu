@@ -1,6 +1,7 @@
 'use client';
 
 import { useState, useEffect, useRef } from 'react';
+import { useRouter, useSearchParams } from 'next/navigation';
 import { FileText, Presentation, Table, X, File, FolderOpen, ChevronRight, Cloud, Briefcase } from 'lucide-react';
 
 interface OfficeSuite {
@@ -49,6 +50,8 @@ interface OfficeFABProps {
 }
 
 export default function OfficeFAB({ isGuest, requireAuth, onOpenSuite }: OfficeFABProps) {
+  const router = useRouter();
+  const searchParams = useSearchParams();
   const [isOpen, setIsOpen] = useState(false);
   const [isHovered, setIsHovered] = useState(false);
   const menuRef = useRef<HTMLDivElement>(null);
@@ -64,6 +67,11 @@ export default function OfficeFAB({ isGuest, requireAuth, onOpenSuite }: OfficeF
   }, []);
 
   const handleOpenSuite = (suiteId: string) => {
+    // Update URL for router compatibility (critical fix)
+    const params = new URLSearchParams(searchParams.toString());
+    params.set('panel', suiteId);
+    router.push(`?${params.toString()}`, { scroll: false });
+    
     if (isGuest && requireAuth) {
       requireAuth(suiteId, () => onOpenSuite?.(suiteId));
     } else {

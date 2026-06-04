@@ -1,11 +1,13 @@
 'use client';
 
-import { useState, useRef, useEffect } from 'react';
+import { useState, useRef, useEffect, useCallback } from 'react';
+import { createClient } from '@/lib/supabase/client';
+import { useToast } from '@/contexts/ToastContext';
 import { 
   FileText, Trash2, Plus, Eye, EyeOff, Download, Copy, Check, 
-  Maximize2, Minimize2
+  Maximize2, Minimize2, Loader2, AlertCircle, Cloud, CloudOff, Type
 } from 'lucide-react';
-import ToolDrawer from './ToolDrawer';
+import DocsToolbox from './DocsToolbox';
 
 interface Document {
   id: string;
@@ -15,6 +17,8 @@ interface Document {
   charCount: number;
   lastEdited: string;
   createdAt: string;
+  updated_at?: string;
+  user_id?: string;
 }
 
 // Simple markdown renderer
@@ -44,24 +48,105 @@ export default function DocsPanel() {
   const [wordCount, setWordCount] = useState(0);
   const [charCount, setCharCount] = useState(0);
   const [isFullscreen, setIsFullscreen] = useState(false);
+  const [syncStatus, setSyncStatus] = useState<'cloud' | 'local' | 'error'>('cloud');
+  const [loading, setLoading] = useState(true);
+  const [currentUserId, setCurrentUserId] = useState<string | null>(null);
+  
   const editorRef = useRef<HTMLDivElement>(null);
   const saveTimeoutRef = useRef<NodeJS.Timeout | null>(null);
+  const { showToast } = useToast();
 
-  // Load documents from localStorage
+  // Get current user
   useEffect(() => {
-    const saved = localStorage.getItem('memu_docs_v2');
-    if (saved) {
-      const parsed = JSON.parse(saved);
-      setDocuments(parsed);
-      if (parsed.length > 0 && !activeDocId) {
-        setActiveDocId(parsed[0].id);
-        setDocTitle(parsed[0].title);
-        setDocContent(parsed[0].content);
-        setWordCount(parsed[0].wordCount);
-        setCharCount(parsed[0].charCount);
-      }
-    }
+    const getUser = async () => {
+      const supabase = createClient();
+      const { data: { user } } = await supabase.auth.getUser();
+      if (user) setCurrentUserId(user.id);
+    };
+    getUser();
   }, []);
+
+  // Load documents: Supabase first, localStorage fallback
+  const loadDocuments = useCallback(async () => {
+    setLoading(true);
+    const supabase = createClient();
+    let fetchError: any = null;
+    
+    try {
+      // Try Supabase first
+      if (currentUserId) {
+        const { data, error } = await supabase
+          .from('docs')
+          .select('*')
+          .eq('user_id', currentUserId)
+          .order('updated_at', { ascending: false });
+
+        fetchError = error;
+        
+        if (error && error.code !== '42P01') throw error;
+        
+        if (data && data.length > 0) {
+          // Map DB columns (snake_case) to Local State (camelCase)
+          const mappedDocs = data.map(doc => ({
+            ...doc,
+            wordCount: doc.word_count || 0,
+            charCount: doc.char_count || 0,
+          }));
+          
+          setDocuments(mappedDocs);
+          setSyncStatus('cloud');
+          if (!activeDocId) {
+            setActiveDocId(mappedDocs[0].id);
+            setDocTitle(mappedDocs[0].title);
+            setDocContent(mappedDocs[0].content);
+            setWordCount(mappedDocs[0].wordCount);
+            setCharCount(mappedDocs[0].charCount);
+          }
+          setLoading(false);
+          return;
+        }
+      }
+      
+      // Fallback to localStorage
+      const saved = localStorage.getItem('memu_docs_v2');
+      if (saved) {
+        const parsed = JSON.parse(saved);
+        setDocuments(parsed);
+        setSyncStatus('local');
+        if (parsed.length > 0 && !activeDocId) {
+          setActiveDocId(parsed[0].id);
+          setDocTitle(parsed[0].title);
+          setDocContent(parsed[0].content);
+          setWordCount(parsed[0].wordCount);
+          setCharCount(parsed[0].charCount);
+        }
+      }
+      
+      // If table doesn't exist, show graceful toast
+      if (fetchError?.code === '42P01') {
+        showToast('Docs cloud sync coming soon — using local storage for now', 'success');
+        setSyncStatus('local');
+      }
+    } catch (err) {
+      console.error('Failed to load docs:', err);
+      setSyncStatus('error');
+      // Fallback to localStorage on any error
+      const saved = localStorage.getItem('memu_docs_v2');
+      if (saved) {
+        const parsed = JSON.parse(saved);
+        setDocuments(parsed);
+        setSyncStatus('local');
+      }
+    } finally {
+      setLoading(false);
+    }
+  }, [currentUserId, activeDocId, showToast]);
+
+  useEffect(() => {
+    if (currentUserId !== undefined) {
+      loadDocuments();
+    }
+  }, [loadDocuments, currentUserId]);
 
   // Update word/char count
   useEffect(() => {
@@ -71,61 +156,156 @@ export default function DocsPanel() {
     setCharCount(chars);
   }, [docContent]);
 
-  // Auto-save
-  const handleAutoSave = () => {
-    if (!activeDocId) return;
+  // Auto-save with debouncing
+  const handleAutoSave = useCallback(async () => {
+    if (!activeDocId || !currentUserId) return;
     
     setIsSaving(true);
     if (saveTimeoutRef.current) clearTimeout(saveTimeoutRef.current);
     
-    saveTimeoutRef.current = setTimeout(() => {
+    saveTimeoutRef.current = setTimeout(async () => {
+      const supabase = createClient();
+      // Send snake_case keys to match DB schema exactly
+      const updatedDoc = {
+        title: docTitle,
+        content: docContent,
+        word_count: wordCount,
+        char_count: charCount,
+        last_edited: new Date().toLocaleDateString(),
+        updated_at: new Date().toISOString(),
+      };
+
+      let saveError: any = null;
+      
+      try {
+        // Try Supabase first
+        if (currentUserId) {
+          const { error } = await supabase
+            .from('docs')
+            .update(updatedDoc)
+            .eq('id', activeDocId)
+            .eq('user_id', currentUserId);
+
+          saveError = error;
+          
+          if (error && error.code !== '42P01') throw error;
+          
+          if (!error) {
+            setDocuments(docs => docs.map(doc => 
+              doc.id === activeDocId ? { ...doc, ...updatedDoc, wordCount, charCount } : doc
+            ));
+            setSyncStatus('cloud');
+            setIsSaving(false);
+            return;
+          }
+        }
+      } catch (err) {
+        console.error('Supabase save failed:', JSON.stringify(err, null, 2));
+      }
+      
+      // Fallback to localStorage
       const updated = documents.map(doc => 
-        doc.id === activeDocId 
-          ? { 
-              ...doc, 
-              title: docTitle, 
-              content: docContent, 
-              wordCount: wordCount,
-              charCount: charCount,
-              lastEdited: new Date().toLocaleDateString() 
-            }
-          : doc
+        doc.id === activeDocId ? { ...doc, ...updatedDoc, wordCount, charCount } : doc
       );
       setDocuments(updated);
       localStorage.setItem('memu_docs_v2', JSON.stringify(updated));
+      setSyncStatus('local');
       setIsSaving(false);
-      setTimeout(() => setIsSaving(false), 1000);
     }, 1000);
-  };
+  }, [activeDocId, docContent, docTitle, wordCount, charCount, documents, currentUserId]);
 
   useEffect(() => {
-    if (activeDocId) {
+    if (activeDocId && docContent !== undefined) {
       handleAutoSave();
     }
-  }, [docContent, docTitle, activeDocId]);
+  }, [docContent, docTitle, activeDocId, handleAutoSave]);
 
-  const handleNewDoc = () => {
+  // Create new doc
+  const handleNewDoc = async () => {
     if (!newDocTitle.trim()) return;
     
     const newDoc: Document = {
-      id: Date.now().toString(),
+      id: crypto.randomUUID(),
       title: newDocTitle,
       content: '# ' + newDocTitle + '\n\nStart writing here...',
       wordCount: 0,
       charCount: 0,
       lastEdited: 'Just now',
       createdAt: new Date().toLocaleDateString(),
+      user_id: currentUserId || undefined,
     };
     
-    setDocuments([...documents, newDoc]);
+    const supabase = createClient();
+    
+    try {
+      if (currentUserId) {
+        const { error } = await supabase.from('docs').insert({
+          ...newDoc,
+          word_count: 0,
+          char_count: 0,
+          created_at: new Date().toISOString(),
+          updated_at: new Date().toISOString(),
+        });
+        
+        if (!error) {
+          setDocuments(prev => [newDoc, ...prev]);
+          setActiveDocId(newDoc.id);
+          setDocTitle(newDoc.title);
+          setDocContent(newDoc.content);
+          setSyncStatus('cloud');
+          setShowNewDocModal(false);
+          setNewDocTitle('');
+          return;
+        }
+      }
+    } catch (err) {
+      console.error('Supabase insert failed:', err);
+    }
+    
+    // Fallback to localStorage
+    setDocuments(prev => [newDoc, ...prev]);
+    localStorage.setItem('memu_docs_v2', JSON.stringify([newDoc, ...documents]));
     setActiveDocId(newDoc.id);
     setDocTitle(newDoc.title);
     setDocContent(newDoc.content);
+    setSyncStatus('local');
     setShowNewDocModal(false);
     setNewDocTitle('');
   };
 
-  const handleDeleteDoc = (id: string) => {
+  // Delete doc
+  const handleDeleteDoc = async (id: string) => {
+    const supabase = createClient();
+    
+    try {
+      if (currentUserId) {
+        const { error } = await supabase
+          .from('docs')
+          .delete()
+          .eq('id', id)
+          .eq('user_id', currentUserId);
+        
+        if (!error) {
+          const updated = documents.filter(doc => doc.id !== id);
+          setDocuments(updated);
+          setSyncStatus('cloud');
+          if (activeDocId === id && updated.length > 0) {
+            setActiveDocId(updated[0].id);
+            setDocTitle(updated[0].title);
+            setDocContent(updated[0].content);
+          } else if (updated.length === 0) {
+            setActiveDocId(null);
+            setDocTitle('Untitled');
+            setDocContent('');
+          }
+          return;
+        }
+      }
+    } catch (err) {
+      console.error('Supabase delete failed:', err);
+    }
+    
+    // Fallback to localStorage
     const updated = documents.filter(doc => doc.id !== id);
     setDocuments(updated);
     localStorage.setItem('memu_docs_v2', JSON.stringify(updated));
@@ -207,49 +387,53 @@ export default function DocsPanel() {
     }
   };
 
-  const activeDoc = documents.find(d => d.id === activeDocId);
-
-  // Shortcut handlers
+  // Keyboard shortcuts
   useEffect(() => {
     const handleKeyDown = (e: KeyboardEvent) => {
       if (e.ctrlKey || e.metaKey) {
-        if (e.key === 's') {
-          e.preventDefault();
-          handleAutoSave();
-        }
-        if (e.key === 'p') {
-          e.preventDefault();
-          window.print();
-        }
-        if (e.key === 'f') {
-          e.preventDefault();
-          setIsFocusMode(!isFocusMode);
-        }
-        if (e.key === 'b') {
-          e.preventDefault();
-          handleFormat('bold');
-        }
-        if (e.key === 'i') {
-          e.preventDefault();
-          handleFormat('italic');
-        }
-        if (e.key === 'u') {
-          e.preventDefault();
-          handleFormat('underline');
-        }
+        if (e.key === 's') { e.preventDefault(); handleAutoSave(); }
+        if (e.key === 'p') { e.preventDefault(); window.print(); }
+        if (e.key === 'f') { e.preventDefault(); setIsFocusMode(!isFocusMode); }
+        if (e.key === 'b') { e.preventDefault(); handleFormat('bold'); }
+        if (e.key === 'i') { e.preventDefault(); handleFormat('italic'); }
+        if (e.key === 'u') { e.preventDefault(); handleFormat('underline'); }
       }
     };
     window.addEventListener('keydown', handleKeyDown);
     return () => window.removeEventListener('keydown', handleKeyDown);
-  }, [isFocusMode]);
+  }, [isFocusMode, handleAutoSave]);
+
+  if (loading) {
+    return (
+      <div className="flex items-center justify-center h-full">
+        <div className="text-center">
+          <Loader2 className="w-8 h-8 animate-spin text-[#4f46e5] mx-auto mb-3" />
+          <p className="text-[#777]">Loading documents...</p>
+        </div>
+      </div>
+    );
+  }
+
+  const activeDoc = documents.find(d => d.id === activeDocId);
 
   return (
     <div className={`${isFullscreen ? 'fixed inset-0 z-50 bg-[#fafaf8]' : 'flex h-full'} bg-[#fafaf8] transition-all duration-300 ${isFocusMode ? 'focus-mode' : ''}`}>
       {/* Sidebar */}
       <div className="w-64 border-r border-[#e8e7e3] bg-white flex flex-col">
         <div className="px-4 pt-6 pb-2">
-          <h1 className="h2">memu Docs</h1>
-          <p className="body-small mt-1">Write, edit, and format documents</p>
+          <div className="flex items-center justify-between">
+            <div>
+              <h1 className="h2">memu Docs</h1>
+              <p className="body-small mt-1">Write, edit, and format documents</p>
+            </div>
+            <div className={`p-1.5 rounded-full ${
+              syncStatus === 'cloud' ? 'bg-[#d1fae5] text-[#059669]' :
+              syncStatus === 'local' ? 'bg-[#fef3c7] text-[#d97706]' :
+              'bg-[#fee2e2] text-[#dc2626]'
+            }`} title={syncStatus === 'cloud' ? 'Synced to cloud' : syncStatus === 'local' ? 'Saved locally' : 'Sync error'}>
+              {syncStatus === 'cloud' ? <Cloud size={14} /> : syncStatus === 'local' ? <CloudOff size={14} /> : <AlertCircle size={14} />}
+            </div>
+          </div>
         </div>
         <div className="p-4 border-t border-[#e8e7e3]">
           <button
@@ -343,7 +527,15 @@ export default function DocsPanel() {
                   {isPreviewMode ? 'Write' : 'Preview'}
                 </button>
                 
-                {!isPreviewMode && <ToolDrawer onFormat={handleFormat} onInsert={handleInsert} />}
+                {/* INTEGRATED DOCS TOOLBOX */}
+                {!isPreviewMode && (
+                  <DocsToolbox 
+                    onFormat={handleFormat} 
+                    onInsert={handleInsert}
+                    wordCount={wordCount}
+                    charCount={charCount}
+                  />
+                )}
               </div>
 
               <div className="flex items-center gap-3 flex-wrap">
@@ -351,7 +543,9 @@ export default function DocsPanel() {
                   {wordCount} words • {charCount} chars
                 </div>
                 {isSaving && (
-                  <div className="text-[10px] text-[#059669] animate-pulse">Saving...</div>
+                  <div className="text-[10px] text-[#059669] animate-pulse flex items-center gap-1">
+                    <Loader2 size={10} className="animate-spin" /> Saving...
+                  </div>
                 )}
                 <div className="w-px h-5 bg-[#e8e7e3]" />
                 <button
@@ -460,55 +654,16 @@ export default function DocsPanel() {
       )}
 
       <style>{`
-        .focus-mode .w-64 {
-          display: none;
-        }
-        .prose {
-          font-family: 'DM Sans', sans-serif;
-        }
-        .prose h1 {
-          font-size: 2em;
-          font-weight: 700;
-          margin-top: 1em;
-          margin-bottom: 0.5em;
-        }
-        .prose h2 {
-          font-size: 1.5em;
-          font-weight: 600;
-          margin-top: 0.8em;
-          margin-bottom: 0.4em;
-        }
-        .prose h3 {
-          font-size: 1.25em;
-          font-weight: 500;
-          margin-top: 0.6em;
-          margin-bottom: 0.3em;
-        }
-        .prose p {
-          margin-bottom: 0.75em;
-          line-height: 1.6;
-        }
-        .prose ul, .prose ol {
-          margin-left: 1.5em;
-          margin-bottom: 0.75em;
-        }
-        .prose li {
-          margin-bottom: 0.25em;
-        }
-        .prose blockquote {
-          border-left: 3px solid #4f46e5;
-          padding-left: 1em;
-          margin: 1em 0;
-          color: #666;
-          font-style: italic;
-        }
-        .prose code {
-          background: #f2f1ee;
-          padding: 0.2em 0.4em;
-          border-radius: 6px;
-          font-size: 0.85em;
-          color: #dc2626;
-        }
+        .focus-mode .w-64 { display: none; }
+        .prose { font-family: 'DM Sans', sans-serif; }
+        .prose h1 { font-size: 2em; font-weight: 700; margin-top: 1em; margin-bottom: 0.5em; }
+        .prose h2 { font-size: 1.5em; font-weight: 600; margin-top: 0.8em; margin-bottom: 0.4em; }
+        .prose h3 { font-size: 1.25em; font-weight: 500; margin-top: 0.6em; margin-bottom: 0.3em; }
+        .prose p { margin-bottom: 0.75em; line-height: 1.6; }
+        .prose ul, .prose ol { margin-left: 1.5em; margin-bottom: 0.75em; }
+        .prose li { margin-bottom: 0.25em; }
+        .prose blockquote { border-left: 3px solid #4f46e5; padding-left: 1em; margin: 1em 0; color: #666; font-style: italic; }
+        .prose code { background: #f2f1ee; padding: 0.2em 0.4em; border-radius: 6px; font-size: 0.85em; color: #dc2626; }
       `}</style>
     </div>
   );

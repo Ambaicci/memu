@@ -1,7 +1,9 @@
 'use client';
 
-import { useState } from 'react';
+import { useState, useEffect, useCallback } from 'react';
 import { Search, Star, Mail, Users, UserPlus, Inbox } from 'lucide-react';
+import { createClient } from '@/lib/supabase/client';
+import { useToast } from '@/contexts/ToastContext';
 
 interface Handle {
   id: string;
@@ -14,20 +16,6 @@ interface Handle {
   isFavorite?: boolean;
 }
 
-// Demo data
-const handlesData: Handle[] = [
-  { id: '1', name: 'Aisha Kimani', handle: '@aisha.memu', role: 'CFO · Horizon Group', initials: 'AK', color: '#e1f5ee', textColor: '#0f6e56', isFavorite: true },
-  { id: '2', name: 'David Osei', handle: '@david.memu', role: 'Product Lead', initials: 'DO', color: '#ede9fe', textColor: '#5b21b6', isFavorite: true },
-  { id: '3', name: 'Zara Ahmed', handle: '@zara.memu', role: 'NGO Director', initials: 'ZA', color: '#fef3c7', textColor: '#92400e' },
-  { id: '4', name: 'Tobias Nguyen', handle: '@tobias.memu', role: 'Lead Engineer', initials: 'TN', color: '#f0f9ff', textColor: '#0369a1' },
-  { id: '5', name: 'Amara Diallo', handle: '@amara.memu', role: 'Head of Comms', initials: 'AD', color: '#fdf4ff', textColor: '#7e22ce', isFavorite: true },
-  { id: '6', name: 'Nairobi Design Co.', handle: '@nairobi-design.memu', role: 'Design Studio', initials: 'ND', color: '#ecfdf5', textColor: '#065f46' },
-  { id: '7', name: 'Mum', handle: '@mum.memu', role: 'Most Important Handle', initials: 'MM', color: '#fce7f3', textColor: '#9d174d', isFavorite: true },
-  { id: '8', name: 'Maria Santos', handle: '@maria.memu', role: 'Strategy Consultant', initials: 'MS', color: '#fff7ed', textColor: '#9a3412' },
-  { id: '9', name: 'Kofi Mensah', handle: '@kofi.memu', role: 'Creative Director', initials: 'KM', color: '#e0e7ff', textColor: '#4338ca' },
-  { id: '10', name: 'Esther Wanjiku', handle: '@esther.memu', role: 'Community Manager', initials: 'EW', color: '#fce7f3', textColor: '#be185d' },
-];
-
 interface HandlesPanelProps {
   isGuest?: boolean;
   requireAuth?: (action: string, callback: () => void) => void;
@@ -36,20 +24,137 @@ interface HandlesPanelProps {
 
 export default function HandlesPanel({ isGuest, requireAuth, onComposeToHandle }: HandlesPanelProps = {}) {
   const [searchQuery, setSearchQuery] = useState('');
-  const [handles, setHandles] = useState(handlesData);
+  const [handles, setHandles] = useState<Handle[]>([]);
   const [filterFavorites, setFilterFavorites] = useState(false);
+  const [loading, setLoading] = useState(true);
+  const [currentUserId, setCurrentUserId] = useState<string | null>(null);
+  const [favorites, setFavorites] = useState<Set<string>>(new Set());
+  const { showToast } = useToast();
+
+  // Get current user
+  useEffect(() => {
+    const getUser = async () => {
+      const supabase = createClient();
+      const { data: { user } } = await supabase.auth.getUser();
+      if (user) setCurrentUserId(user.id);
+    };
+    getUser();
+  }, []);
+
+  // Load favorites from localStorage (Phase 2: move to Supabase user_stars table)
+  useEffect(() => {
+    try {
+      const saved = localStorage.getItem('memu_favorites');
+      if (saved) {
+        const ids = JSON.parse(saved) as string[];
+        setFavorites(new Set(ids));
+      }
+    } catch (err) {
+      console.error('Failed to load favorites:', err);
+    }
+  }, []);
+
+  // Save favorites to localStorage
+  const saveFavorites = useCallback((ids: Set<string>) => {
+    try {
+      localStorage.setItem('memu_favorites', JSON.stringify(Array.from(ids)));
+    } catch (err) {
+      console.error('Failed to save favorites:', err);
+    }
+  }, []);
+
+  // Fetch handles from Supabase profiles table
+  const fetchHandles = useCallback(async () => {
+    if (!currentUserId) {
+      setLoading(false);
+      return;
+    }
+
+    setLoading(true);
+    const supabase = createClient();
+    
+    try {
+      // Fetch only existing columns: id, full_name, username, bio (if exists)
+      const { data, error } = await supabase
+        .from('profiles')
+        .select('id, full_name, username, bio')
+        .neq('id', currentUserId)
+        .order('full_name', { ascending: true });
+
+      if (error) {
+        console.error('Error fetching handles:', error);
+        showToast('Failed to load handles', 'error');
+      } else {
+        // Transform to Handle interface
+        const transformed: Handle[] = (data || []).map(profile => ({
+          id: profile.id,
+          name: profile.full_name || profile.username || 'Unknown',
+          handle: `@${profile.username}.memu`,
+          // Use bio if exists, otherwise fallback
+          role: profile.bio || 'memu user',
+          initials: getInitials(profile.full_name || profile.username || 'U'),
+          color: stringToColor(profile.id),
+          textColor: '#1a1a1a',
+          isFavorite: favorites.has(profile.id),
+        }));
+        setHandles(transformed);
+      }
+    } catch (err) {
+      console.error('Unexpected error fetching handles:', err);
+      showToast('Failed to load handles', 'error');
+    } finally {
+      setLoading(false);
+    }
+  }, [currentUserId, favorites, showToast]);
+
+  useEffect(() => {
+    if (currentUserId) {
+      fetchHandles();
+    }
+  }, [fetchHandles, currentUserId]);
+
+  // Helper: generate initials
+  const getInitials = (name: string) => {
+    return name
+      .split(' ')
+      .map(part => part[0])
+      .join('')
+      .toUpperCase()
+      .slice(0, 2);
+  };
+
+  // Helper: generate consistent color from ID
+  const stringToColor = (str: string) => {
+    let hash = 0;
+    for (let i = 0; i < str.length; i++) {
+      hash = str.charCodeAt(i) + ((hash << 5) - hash);
+    }
+    const hue = hash % 360;
+    return `hsl(${hue}, 60%, 70%)`;
+  };
 
   const filteredHandles = handles.filter(h => {
     const matchesSearch = h.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
                           h.handle.toLowerCase().includes(searchQuery.toLowerCase()) ||
                           h.role.toLowerCase().includes(searchQuery.toLowerCase());
-    const matchesFavorite = filterFavorites ? h.isFavorite : true;
+    const matchesFavorite = filterFavorites ? favorites.has(h.id) : true;
     return matchesSearch && matchesFavorite;
   });
 
   const toggleFavorite = (id: string) => {
+    const newFavorites = new Set(favorites);
+    if (newFavorites.has(id)) {
+      newFavorites.delete(id);
+      showToast('Removed from favorites', 'success');
+    } else {
+      newFavorites.add(id);
+      showToast('Added to favorites', 'success');
+    }
+    setFavorites(newFavorites);
+    saveFavorites(newFavorites);
+    // Update local handle list
     setHandles(prev => prev.map(h => 
-      h.id === id ? { ...h, isFavorite: !h.isFavorite } : h
+      h.id === id ? { ...h, isFavorite: newFavorites.has(id) } : h
     ));
   };
 
@@ -62,12 +167,21 @@ export default function HandlesPanel({ isGuest, requireAuth, onComposeToHandle }
   };
 
   const handleAddHandle = () => {
-    alert('Add new handle feature coming soon! ✨');
+    showToast('Handle search coming soon! Type a name in the search bar to find users.', 'success');
   };
 
   const handleOpenCompose = () => {
     window.dispatchEvent(new CustomEvent('openCompose'));
   };
+
+  // Loading state
+  if (loading) {
+    return (
+      <div className="flex items-center justify-center h-full py-20">
+        <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-[#4f46e5]" />
+      </div>
+    );
+  }
 
   // Empty State
   if (handles.length === 0) {
@@ -81,11 +195,11 @@ export default function HandlesPanel({ isGuest, requireAuth, onComposeToHandle }
           Add handles to build your network. Start by connecting with people you communicate with.
         </p>
         <button
-          onClick={handleAddHandle}
+          onClick={handleOpenCompose}
           className="px-5 py-2.5 bg-gradient-to-r from-[#4f46e5] to-[#0891b2] text-white rounded-xl text-[13px] font-medium hover:shadow-lg transition flex items-center gap-2 mx-auto"
         >
           <UserPlus size={16} />
-          Add your first handle
+          Write your first memu
         </button>
       </div>
     );
@@ -93,15 +207,15 @@ export default function HandlesPanel({ isGuest, requireAuth, onComposeToHandle }
 
   return (
     <div className="flex flex-col h-full">
-      {/* Header - Consistent with In/Out Memus */}
+      {/* Header */}
       <div className="px-4 md:px-8 pt-6 pb-0">
         <h1 className="font-['Playfair_Display'] text-3xl md:text-4xl font-normal tracking-tight text-[#0f0f0f]">Handles</h1>
         <p className="text-[13px] text-[#777] mt-1">
-          {handles.length} contacts · {handles.filter(h => h.isFavorite).length} favorites
+          {handles.length} contacts · {favorites.size} favorites
         </p>
       </div>
 
-      {/* Search Bar - Matching OutMemusPanel */}
+      {/* Search Bar */}
       <div className="px-4 md:px-8 py-4">
         <div className="flex gap-3 items-center">
           <div className="flex-1 flex items-center gap-2.5 bg-[#f2f1ee] border border-[#e8e7e3] rounded-md px-3.5 py-2">
@@ -174,7 +288,7 @@ export default function HandlesPanel({ isGuest, requireAuth, onComposeToHandle }
                     }}
                     className="p-1.5 rounded-md hover:bg-[#f2f1ee] transition flex-shrink-0"
                   >
-                    <Star size={14} className={handle.isFavorite ? 'fill-[#d97706] text-[#d97706]' : 'text-[#aaa]'} />
+                    <Star size={14} className={favorites.has(handle.id) ? 'fill-[#d97706] text-[#d97706]' : 'text-[#aaa]'} />
                   </button>
                 </div>
 

@@ -1,232 +1,251 @@
 'use client';
 
-import { useState } from 'react';
-import { FileText, Download, Trash2, Upload, FolderOpen, Image, File, Film, Music, Archive, X } from 'lucide-react';
+import { useState, useEffect, useCallback } from 'react';
+import { createClient } from '@/lib/supabase/client';
+import { useToast } from '@/contexts/ToastContext';
+import { FileText, Image, Video, File, Music, Archive, AlertCircle, Loader2, Upload, Trash2, Eye } from 'lucide-react';
 
-interface FileItem {
+interface SpaceFile {
   id: string;
   name: string;
-  type: 'doc' | 'sheet' | 'slide' | 'image' | 'pdf' | 'video' | 'audio' | 'archive';
-  size: string;
-  uploadedBy: string;
-  uploadedAt: string;
-  url?: string;
+  type: string;
+  size_bytes: number;
+  url: string | null;
+  uploaded_by: string;
+  uploaded_at: string;
+  uploader_name: string;
 }
 
 interface SpaceFilesProps {
   spaceId: string;
-  initialFiles: FileItem[];
 }
 
-const fileTypeIcons = {
-  doc: <FileText size={16} />,
-  sheet: <FileText size={16} />,
-  slide: <FileText size={16} />,
-  image: <Image size={16} />,
-  pdf: <FileText size={16} />,
-  video: <Film size={16} />,
-  audio: <Music size={16} />,
-  archive: <Archive size={16} />,
+const typeIcons: Record<string, React.ReactNode> = {
+  pdf: <FileText size={18} className="text-red-500" />,
+  image: <Image size={18} className="text-blue-500" />,
+  video: <Video size={18} className="text-purple-500" />,
+  audio: <Music size={18} className="text-pink-500" />,
+  archive: <Archive size={18} className="text-yellow-600" />,
+  default: <File size={18} className="text-gray-500" />,
 };
 
-const fileTypeColors = {
-  doc: 'bg-[#ede9fe] text-[#4f46e5]',
-  sheet: 'bg-[#d1fae5] text-[#059669]',
-  slide: 'bg-[#fef3c7] text-[#d97706]',
-  image: 'bg-[#e0e7ff] text-[#4338ca]',
-  pdf: 'bg-[#fee2e2] text-[#dc2626]',
-  video: 'bg-[#fce7f3] text-[#be185d]',
-  audio: 'bg-[#cffafe] text-[#0891b2]',
-  archive: 'bg-[#f3f4f6] text-[#6b7280]',
-};
+export default function SpaceFiles({ spaceId }: SpaceFilesProps) {
+  const [files, setFiles] = useState<SpaceFile[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
+  const [currentUserId, setCurrentUserId] = useState<string | null>(null);
+  const { showToast } = useToast();
 
-export default function SpaceFiles({ spaceId, initialFiles }: SpaceFilesProps) {
-  const [files, setFiles] = useState<FileItem[]>(initialFiles);
-  const [isUploading, setIsUploading] = useState(false);
-  const [selectedFile, setSelectedFile] = useState<FileItem | null>(null);
-  const [searchQuery, setSearchQuery] = useState('');
+  // Get current user
+  useEffect(() => {
+    const getUser = async () => {
+      const supabase = createClient();
+      const { data: { user } } = await supabase.auth.getUser();
+      if (user) setCurrentUserId(user.id);
+    };
+    getUser();
+  }, []);
 
-  const filteredFiles = files.filter(f => 
-    f.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
-    f.uploadedBy.toLowerCase().includes(searchQuery.toLowerCase())
-  );
-
-  const handleFileUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
-    if (!e.target.files) return;
-    setIsUploading(true);
+  // Fetch files for this space
+  const fetchFiles = useCallback(async () => {
+    if (!currentUserId) return;
+    setLoading(true);
+    setError(null);
     
-    // Simulate upload
-    setTimeout(() => {
-      const newFiles: FileItem[] = Array.from(e.target.files!).map((file, idx) => ({
-        id: Date.now().toString() + idx,
-        name: file.name,
-        type: getFileType(file.name),
-        size: formatFileSize(file.size),
-        uploadedBy: 'You',
-        uploadedAt: 'Just now',
+    const supabase = createClient();
+    try {
+      const { data, error } = await supabase
+        .from('space_files')
+        .select('id, name, type, size_bytes, url, uploaded_by, uploaded_at')
+        .eq('space_id', spaceId)
+        .order('uploaded_at', { ascending: false });
+
+      if (error) {
+        if (error.code === '42P01') {
+          setError('TABLE_MISSING');
+          setLoading(false);
+          return;
+        }
+        throw error;
+      }
+
+      const enriched: SpaceFile[] = (data || []).map(f => ({
+        ...f,
+        uploader_name: f.uploaded_by === currentUserId ? 'You' : 'Member',
       }));
-      setFiles([...newFiles, ...files]);
-      setIsUploading(false);
-    }, 1000);
+
+      setFiles(enriched);
+    } catch (err: any) {
+      console.error('Failed to fetch files:', err);
+      setError(err.message || 'Failed to load files');
+    } finally {
+      setLoading(false);
+    }
+  }, [spaceId, currentUserId]);
+
+  useEffect(() => {
+    if (currentUserId) fetchFiles();
+  }, [fetchFiles, currentUserId]);
+
+  // Format file size
+  const formatSize = (bytes: number) => {
+    if (bytes === 0) return '0 B';
+    const k = 1024;
+    const sizes = ['B', 'KB', 'MB', 'GB'];
+    const i = Math.floor(Math.log(bytes) / Math.log(k));
+    return parseFloat((bytes / Math.pow(k, i)).toFixed(1)) + ' ' + sizes[i];
   };
 
-  const getFileType = (filename: string): FileItem['type'] => {
-    const ext = filename.split('.').pop()?.toLowerCase();
-    if (['jpg', 'jpeg', 'png', 'gif', 'webp'].includes(ext || '')) return 'image';
-    if (['pdf'].includes(ext || '')) return 'pdf';
-    if (['mp4', 'mov', 'webm'].includes(ext || '')) return 'video';
-    if (['mp3', 'wav', 'ogg'].includes(ext || '')) return 'audio';
-    if (['zip', 'rar', '7z'].includes(ext || '')) return 'archive';
-    if (['doc', 'docx', 'txt', 'md'].includes(ext || '')) return 'doc';
-    if (['xls', 'xlsx'].includes(ext || '')) return 'sheet';
-    if (['ppt', 'pptx'].includes(ext || '')) return 'slide';
-    return 'doc';
+  // Format date
+  const formatDate = (dateStr: string) => {
+    const date = new Date(dateStr);
+    const now = new Date();
+    const diff = now.getTime() - date.getTime();
+    const mins = Math.floor(diff / 60000);
+    if (mins < 1) return 'Just now';
+    if (mins < 60) return `${mins}m ago`;
+    if (mins < 1440) return `${Math.floor(mins / 60)}h ago`;
+    return date.toLocaleDateString();
   };
 
-  const formatFileSize = (bytes: number): string => {
-    if (bytes < 1024) return bytes + ' B';
-    if (bytes < 1024 * 1024) return (bytes / 1024).toFixed(1) + ' KB';
-    return (bytes / (1024 * 1024)).toFixed(1) + ' MB';
+  // Delete file
+  const handleDelete = async (fileId: string) => {
+    if (!confirm('Delete this file?')) return;
+    const supabase = createClient();
+    try {
+      const { error } = await supabase.from('space_files').delete().eq('id', fileId);
+      if (error) throw error;
+      fetchFiles();
+      showToast('File deleted', 'success');
+    } catch (err) {
+      showToast('Failed to delete file', 'error');
+    }
   };
 
-  const handleDownload = (file: FileItem) => {
-    alert(`Downloading ${file.name}...`);
-  };
+  // Loading state
+  if (loading) {
+    return (
+      <div className="flex items-center justify-center h-64">
+        <Loader2 className="w-6 h-6 animate-spin text-[#4f46e5]" />
+      </div>
+    );
+  }
 
-  const handleDelete = (fileId: string) => {
-    setFiles(files.filter(f => f.id !== fileId));
-  };
+  // Table not ready yet
+  if (error === 'TABLE_MISSING') {
+    return (
+      <div className="flex flex-col items-center justify-center h-64 text-center p-6">
+        <div className="w-16 h-16 rounded-full bg-[#f2f1ee] flex items-center justify-center mb-4">
+          <FileText className="w-8 h-8 text-[#aaa]" />
+        </div>
+        <h3 className="text-lg font-medium text-[#0f0f0f] mb-2">Files is coming soon</h3>
+        <p className="text-sm text-[#777] max-w-md">
+          The file storage backend is being set up. You'll be able to upload and share files here shortly.
+        </p>
+      </div>
+    );
+  }
 
-  const handlePreview = (file: FileItem) => {
-    setSelectedFile(file);
-  };
+  // Error state
+  if (error) {
+    return (
+      <div className="flex flex-col items-center justify-center h-64 text-center p-6">
+        <AlertCircle className="w-8 h-8 text-red-500 mb-3" />
+        <p className="text-sm text-red-600 mb-4">{error}</p>
+        <button onClick={fetchFiles} className="px-4 py-2 bg-[#4f46e5] text-white rounded-lg text-sm hover:bg-[#4338ca] transition">
+          Retry
+        </button>
+      </div>
+    );
+  }
+
+  // Empty state
+  if (files.length === 0) {
+    return (
+      <div className="flex flex-col items-center justify-center h-64 text-center p-6">
+        <FileText className="w-8 h-8 text-[#aaa] mb-3" />
+        <p className="text-sm text-[#777] mb-4">No files yet. Upload documents to share with your space.</p>
+        <button
+          onClick={() => showToast('File upload coming in Phase 2', 'success')}
+          className="flex items-center gap-2 px-4 py-2 bg-[#4f46e5] text-white rounded-lg text-sm hover:bg-[#4338ca] transition"
+        >
+          <Upload size={14} /> Upload File
+        </button>
+      </div>
+    );
+  }
 
   return (
-    <div className="space-y-4">
-      {/* Header with Upload */}
-      <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
-        <div className="relative flex-1">
-          <input
-            type="text"
-            value={searchQuery}
-            onChange={(e) => setSearchQuery(e.target.value)}
-            placeholder="Search files..."
-            className="w-full px-4 py-2 border border-[#e8e7e3] rounded-lg text-[13px] focus:outline-none focus:border-[#4f46e5] bg-white"
-          />
-        </div>
-        <label className="cursor-pointer">
-          <div className="flex items-center gap-2 px-4 py-2 bg-gradient-to-r from-[#4f46e5] to-[#0891b2] text-white rounded-lg text-[13px] font-medium hover:shadow-lg transition">
-            <Upload size={14} />
-            Upload File
-          </div>
-          <input type="file" multiple onChange={handleFileUpload} className="hidden" />
-        </label>
+    <div className="max-w-4xl mx-auto">
+      {/* Header */}
+      <div className="flex items-center justify-between mb-6">
+        <h2 className="text-xl font-semibold text-[#0f0f0f]">Files ({files.length})</h2>
+        <button
+          onClick={() => showToast('File upload coming in Phase 2', 'success')}
+          className="flex items-center gap-2 px-4 py-2 bg-[#0f0f0f] text-white rounded-lg text-sm hover:bg-[#2a2a2a] transition"
+        >
+          <Upload size={14} /> Upload
+        </button>
       </div>
 
-      {/* Uploading Indicator */}
-      {isUploading && (
-        <div className="flex items-center gap-2 p-3 bg-[#f2f1ee] rounded-lg animate-pulse">
-          <div className="w-4 h-4 border-2 border-[#4f46e5] border-t-transparent rounded-full animate-spin" />
-          <span className="text-[12px] text-[#777]">Uploading files...</span>
+      {/* File List */}
+      <div className="bg-white border border-[#e8e7e3] rounded-xl overflow-hidden">
+        <div className="grid grid-cols-12 gap-4 px-4 py-3 bg-[#f2f1ee] text-[11px] font-semibold text-[#777] uppercase tracking-wide">
+          <div className="col-span-5">Name</div>
+          <div className="col-span-2">Type</div>
+          <div className="col-span-2">Size</div>
+          <div className="col-span-2">Uploaded</div>
+          <div className="col-span-1 text-right">Actions</div>
         </div>
-      )}
 
-      {/* Files List */}
-      {filteredFiles.length === 0 ? (
-        <div className="text-center py-12">
-          <FolderOpen size={48} className="text-[#aaa] mx-auto mb-4" />
-          <p className="text-[14px] text-[#777]">No files yet</p>
-          <p className="text-[12px] text-[#aaa] mt-1">Upload your first file to get started</p>
-        </div>
-      ) : (
-        <div className="space-y-2">
-          {filteredFiles.map((file) => (
-            <div
-              key={file.id}
-              onClick={() => handlePreview(file)}
-              className="flex items-center justify-between p-3 bg-white border border-[#e8e7e3] rounded-xl hover:shadow-md hover:-translate-y-0.5 transition-all duration-200 cursor-pointer group"
-            >
-              <div className="flex items-center gap-3 flex-1 min-w-0">
-                <div className={`w-10 h-10 rounded-lg flex items-center justify-center flex-shrink-0 ${fileTypeColors[file.type]}`}>
-                  {fileTypeIcons[file.type]}
-                </div>
-                <div className="flex-1 min-w-0">
-                  <div className="text-[13px] font-medium text-[#0f0f0f] truncate">{file.name}</div>
-                  <div className="flex items-center gap-2 mt-1 flex-wrap">
-                    <span className="text-[10px] text-[#777]">{file.size}</span>
-                    <span className="w-1 h-1 rounded-full bg-[#ddd]" />
-                    <span className="text-[10px] text-[#777]">Uploaded by {file.uploadedBy}</span>
-                    <span className="w-1 h-1 rounded-full bg-[#ddd]" />
-                    <span className="text-[10px] text-[#777]">{file.uploadedAt}</span>
-                  </div>
-                </div>
+        {files.map((file) => (
+          <div
+            key={file.id}
+            className="grid grid-cols-12 gap-4 px-4 py-3 border-t border-[#f2f1ee] items-center hover:bg-[#fafaf8] transition group"
+          >
+            <div className="col-span-5 flex items-center gap-3 min-w-0">
+              <div className="w-8 h-8 rounded-lg bg-[#f2f1ee] flex items-center justify-center flex-shrink-0">
+                {typeIcons[file.type?.toLowerCase()] || typeIcons.default}
               </div>
-              <div className="flex items-center gap-1 opacity-0 group-hover:opacity-100 transition-all duration-200">
-                <button
-                  onClick={(e) => { e.stopPropagation(); handleDownload(file); }}
-                  className="p-2 rounded-lg hover:bg-[#f2f1ee] transition"
-                  title="Download"
-                >
-                  <Download size={14} className="text-[#777]" />
-                </button>
-                <button
-                  onClick={(e) => { e.stopPropagation(); handleDelete(file.id); }}
-                  className="p-2 rounded-lg hover:bg-red-50 transition"
-                  title="Delete"
-                >
-                  <Trash2 size={14} className="text-[#777] hover:text-[#dc2626]" />
-                </button>
+              <div className="min-w-0">
+                <p className="text-[13px] font-medium text-[#0f0f0f] truncate">{file.name}</p>
+                <p className="text-[11px] text-[#777] truncate">by {file.uploader_name}</p>
               </div>
             </div>
-          ))}
-        </div>
-      )}
 
-      {/* File Preview Modal */}
-      {selectedFile && (
-        <div className="fixed inset-0 bg-black/70 flex items-center justify-center z-50" onClick={() => setSelectedFile(null)}>
-          <div className="bg-white rounded-2xl w-[600px] max-w-[90%] max-h-[80vh] flex flex-col shadow-2xl" onClick={(e) => e.stopPropagation()}>
-            <div className="p-4 border-b border-[#e8e7e3] flex items-center justify-between">
-              <div className="flex items-center gap-3">
-                <div className={`w-10 h-10 rounded-lg flex items-center justify-center ${fileTypeColors[selectedFile.type]}`}>
-                  {fileTypeIcons[selectedFile.type]}
-                </div>
-                <div>
-                  <h3 className="text-[15px] font-medium text-[#0f0f0f]">{selectedFile.name}</h3>
-                  <p className="text-[11px] text-[#777]">{selectedFile.size} • Uploaded by {selectedFile.uploadedBy}</p>
-                </div>
-              </div>
-              <button onClick={() => setSelectedFile(null)} className="p-1 rounded-lg hover:bg-[#f2f1ee] transition">
-                <X size={18} />
+            <div className="col-span-2">
+              <span className="text-[11px] font-medium px-2 py-0.5 rounded-full bg-[#f2f1ee] text-[#777]">
+                {file.type?.toUpperCase() || 'FILE'}
+              </span>
+            </div>
+
+            <div className="col-span-2 text-[12px] text-[#777]">
+              {formatSize(file.size_bytes || 0)}
+            </div>
+
+            <div className="col-span-2 text-[12px] text-[#777]">
+              {formatDate(file.uploaded_at)}
+            </div>
+
+            <div className="col-span-1 flex items-center justify-end gap-1 opacity-0 group-hover:opacity-100 transition">
+              <button
+                onClick={() => showToast('Preview coming in Phase 2', 'success')}
+                className="p-1.5 rounded-lg hover:bg-[#e8e7e3] text-[#777] transition"
+                title="Preview"
+              >
+                <Eye size={14} />
+              </button>
+              <button
+                onClick={() => handleDelete(file.id)}
+                className="p-1.5 rounded-lg hover:bg-red-50 text-[#777] hover:text-red-600 transition"
+                title="Delete"
+              >
+                <Trash2 size={14} />
               </button>
             </div>
-            <div className="flex-1 overflow-auto p-6 text-center">
-              {selectedFile.type === 'image' ? (
-                <div className="bg-[#f2f1ee] rounded-lg p-8">
-                  <Image size={48} className="text-[#aaa] mx-auto mb-4" />
-                  <p className="text-[13px] text-[#777]">Image preview coming soon</p>
-                </div>
-              ) : selectedFile.type === 'pdf' ? (
-                <div className="bg-[#f2f1ee] rounded-lg p-8">
-                  <FileText size={48} className="text-[#aaa] mx-auto mb-4" />
-                  <p className="text-[13px] text-[#777]">PDF preview coming soon</p>
-                </div>
-              ) : (
-                <div className="bg-[#f2f1ee] rounded-lg p-8">
-                  <File size={48} className="text-[#aaa] mx-auto mb-4" />
-                  <p className="text-[13px] text-[#777]">Preview not available</p>
-                  <button
-                    onClick={() => handleDownload(selectedFile)}
-                    className="mt-4 px-4 py-2 bg-[#0f0f0f] text-white rounded-lg text-[13px] hover:bg-[#2a2a2a] transition"
-                  >
-                    Download File
-                  </button>
-                </div>
-              )}
-            </div>
           </div>
-        </div>
-      )}
+        ))}
+      </div>
     </div>
   );
 }

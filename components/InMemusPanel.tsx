@@ -1,7 +1,8 @@
 'use client';
 
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { Search, Filter, Eye, CheckCheck, Clock, BookOpen, CircleCheck, Inbox } from 'lucide-react';
+import { createClient } from '@/lib/supabase/client';
 import MemuReadPanel from './MemuReadPanel';
 
 type StatusType = 'delivered' | 'opened' | 'partially_read' | 'fully_read';
@@ -38,120 +39,14 @@ const statusConfig: Record<StatusType, { label: string; icon: React.ReactNode; c
   },
 };
 
-// Demo data
-const memusData = [
-  {
-    id: 1,
-    from: 'Aisha Kimani',
-    handle: '@aisha.memu',
-    initials: 'AK',
-    color: '#e1f5ee',
-    textColor: '#0f6e56',
-    subject: 'Q4 Budget — need your sign-off',
-    time: '9:41 AM',
-    nature: 'decide',
-    unread: true,
-    status: 'delivered' as StatusType,
-    preview: 'Hey John — the finance team has run the numbers and we need a decision by EOD Friday on the proposed allocation…',
-    body: '<p>Hey John,</p><p>The finance team has run the projections and we land in a solid position — but we need your sign-off on two items before we can move to the board.</p><p>Aisha</p>',
-  },
-  {
-    id: 2,
-    from: 'David Osei',
-    handle: '@david.memu',
-    initials: 'DO',
-    color: '#ede9fe',
-    textColor: '#5b21b6',
-    subject: 'memu design feedback — a few thoughts',
-    time: '8:15 AM',
-    nature: 'fyi',
-    unread: false,
-    status: 'fully_read' as StatusType,
-    preview: 'Went through the prototype last night. The spaces feature is genuinely exciting…',
-    body: '<p>David,</p><p>Your feedback on spaces is spot on.</p><p>John</p>',
-  },
-  {
-    id: 3,
-    from: 'Zara Ahmed',
-    handle: '@zara.memu',
-    initials: 'ZA',
-    color: '#fef3c7',
-    textColor: '#92400e',
-    subject: 'Village broadband project update',
-    time: 'Yesterday',
-    nature: 'fyi',
-    unread: false,
-    status: 'opened' as StatusType,
-    preview: 'The pilot in Machakos went better than expected. 94 households connected…',
-    body: '<p>Zara,</p><p>This is incredible news.</p><p>John</p>',
-  },
-  {
-    id: 4,
-    from: 'Mum',
-    handle: '@mum.memu',
-    initials: 'MM',
-    color: '#fce7f3',
-    textColor: '#9d174d',
-    subject: 'Christmas plans — are you coming?',
-    time: 'Monday',
-    nature: 'decide',
-    unread: true,
-    status: 'delivered' as StatusType,
-    preview: 'Your father wants to know by end of the month…',
-    body: '<p>Mum,</p><p>Yes, I\'ll be there!</p><p>John</p>',
-  },
-  {
-    id: 5,
-    from: 'Tobias Nguyen',
-    handle: '@tobias.memu',
-    initials: 'TN',
-    color: '#f0f9ff',
-    textColor: '#0369a1',
-    subject: 'Server issue — needs resolution',
-    time: 'Monday',
-    nature: 'resolve',
-    unread: false,
-    status: 'partially_read' as StatusType,
-    preview: 'The memu staging environment went down at 3AM…',
-    body: '<p>Tobias,</p><p>Let\'s patch forward.</p><p>John</p>',
-  },
-  {
-    id: 6,
-    from: 'Nairobi Design Co.',
-    handle: '@nairobi-design.memu',
-    initials: 'ND',
-    color: '#ecfdf5',
-    textColor: '#065f46',
-    subject: 'Invoice #2847 — project complete ✓',
-    time: 'Sunday',
-    nature: 'fyi',
-    unread: false,
-    status: 'fully_read' as StatusType,
-    preview: 'Thanks for a brilliant collaboration…',
-    body: '<p>Team,</p><p>Thank you!</p><p>John</p>',
-  },
-  {
-    id: 7,
-    from: 'Amara Diallo',
-    handle: '@amara.memu',
-    initials: 'AD',
-    color: '#fdf4ff',
-    textColor: '#7e22ce',
-    subject: 'URGENT: Launch announcement needs approval',
-    time: 'Sunday',
-    nature: 'urgent',
-    unread: true,
-    status: 'delivered' as StatusType,
-    preview: 'We go live in 48 hours…',
-    body: '<p>Amara,</p><p>Approved!</p><p>John</p>',
-  },
-];
-
 const natureLabels: Record<string, string> = {
   fyi: 'FYI',
   decide: 'Decide',
   resolve: 'Resolve',
   urgent: 'Urgent',
+  broadcast: 'Broadcast',
+  voice: 'Voice',
+  group: 'Group',
 };
 
 const natureStyles: Record<string, { bg: string; text: string; border: string }> = {
@@ -159,26 +54,162 @@ const natureStyles: Record<string, { bg: string; text: string; border: string }>
   decide: { bg: 'bg-[#ede9fe]', text: 'text-[#7c3aed]', border: 'border-[#c4b5fd]' },
   resolve: { bg: 'bg-[#fee2e2]', text: 'text-[#dc2626]', border: 'border-[#fecaca]' },
   urgent: { bg: 'bg-[#d1fae5]', text: 'text-[#059669]', border: 'border-[#a7f3d0]' },
+  broadcast: { bg: 'bg-[#e0e7ff]', text: 'text-[#4338ca]', border: 'border-[#c7d2fe]' },
+  voice: { bg: 'bg-[#fce7f3]', text: 'text-[#be185d]', border: 'border-[#fbcfe8]' },
+  group: { bg: 'bg-[#e6e6fa]', text: 'text-[#5b21b6]', border: 'border-[#d8b4fe]' },
+};
+
+interface MemuWithSender {
+  id: string;
+  sender_id: string;
+  recipient_id: string;
+  subject: string;
+  body: string;
+  nature: string;
+  status: string;
+  created_at: string;
+  read_at: string | null;
+  delivered_at: string | null;
+  opened_at?: string | null;
+  sender: {
+    full_name: string;
+    username: string;
+    avatar_url: string | null;
+  };
+}
+
+// Helper to generate initials from full name
+const getInitials = (name: string) => {
+  return name
+    .split(' ')
+    .map(part => part[0])
+    .join('')
+    .toUpperCase()
+    .slice(0, 2);
+};
+
+// Helper to get a consistent colour from a string (for avatar background)
+const stringToColor = (str: string) => {
+  let hash = 0;
+  for (let i = 0; i < str.length; i++) {
+    hash = str.charCodeAt(i) + ((hash << 5) - hash);
+  }
+  const hue = hash % 360;
+  return `hsl(${hue}, 60%, 70%)`;
 };
 
 export default function InMemusPanel({ isGuest, requireAuth }: InMemusPanelProps = {}) {
   const [filter, setFilter] = useState('all');
   const [searchQuery, setSearchQuery] = useState('');
-  const [memus, setMemus] = useState(memusData);
+  const [memus, setMemus] = useState<MemuWithSender[]>([]);
+  const [loading, setLoading] = useState(true);
   const [selectedMemu, setSelectedMemu] = useState<any>(null);
+  const [currentUserId, setCurrentUserId] = useState<string | null>(null);
 
-  const filteredMemus = memus.filter(m => {
-    const matchesFilter = filter === 'all' || m.nature === filter;
-    const matchesSearch = m.from.toLowerCase().includes(searchQuery.toLowerCase()) ||
-                          m.subject.toLowerCase().includes(searchQuery.toLowerCase());
-    return matchesFilter && matchesSearch;
-  });
+  // Get current user ID
+  useEffect(() => {
+    const getUser = async () => {
+      const supabase = createClient();
+      const { data: { user } } = await supabase.auth.getUser();
+      if (user) setCurrentUserId(user.id);
+    };
+    getUser();
+  }, []);
 
-  const unreadCount = memus.filter(m => m.unread).length;
-  const totalCount = memus.length;
+  // Fetch memus where current user is recipient
+  useEffect(() => {
+    if (!currentUserId) return;
 
-  const handleFilter = (newFilter: string) => {
-    setFilter(newFilter);
+    const fetchMemus = async () => {
+      const supabase = createClient();
+      setLoading(true);
+      const { data, error } = await supabase
+        .from('memus')
+        .select(`
+          id,
+          sender_id,
+          recipient_id,
+          subject,
+          body,
+          nature,
+          status,
+          created_at,
+          read_at,
+          delivered_at,
+          opened_at,
+          sender:sender_id (
+            full_name,
+            username,
+            avatar_url
+          )
+        `)
+        .eq('recipient_id', currentUserId)
+        .order('created_at', { ascending: false });
+
+      if (error) {
+        console.error('Error fetching memus:', error);
+      } else {
+        setMemus(data as MemuWithSender[]);
+      }
+      setLoading(false);
+    };
+
+    fetchMemus();
+
+    // Optional: subscribe to realtime changes for this user
+    const supabase = createClient();
+    const channel = supabase
+      .channel('inmemus-channel')
+      .on(
+        'postgres_changes',
+        {
+          event: '*',
+          schema: 'public',
+          table: 'memus',
+          filter: `recipient_id=eq.${currentUserId}`,
+        },
+        () => {
+          fetchMemus(); // re-fetch when something changes
+        }
+      )
+      .subscribe();
+
+    return () => {
+      supabase.removeChannel(channel);
+    };
+  }, [currentUserId]);
+
+  // Mark memu as read when opened
+  const markAsRead = async (memuId: string) => {
+    const supabase = createClient();
+    const { error } = await supabase
+      .from('memus')
+      .update({ read_at: new Date().toISOString(), status: 'read' })
+      .eq('id', memuId)
+      .eq('recipient_id', currentUserId);
+    if (error) console.error('Error marking as read:', error);
+    else {
+      // Update local state
+      setMemus(prev =>
+        prev.map(m =>
+          m.id === memuId
+            ? { ...m, read_at: new Date().toISOString(), status: 'read' }
+            : m
+        )
+      );
+    }
+  };
+
+  const handleMemuClick = async (memu: MemuWithSender) => {
+    if (isGuest && requireAuth) {
+      requireAuth('read memu', () => {
+        setSelectedMemu(memu);
+        if (!memu.read_at) markAsRead(memu.id);
+      });
+    } else {
+      setSelectedMemu(memu);
+      if (!memu.read_at) markAsRead(memu.id);
+    }
   };
 
   const handleReply = (replyText: string) => {
@@ -186,21 +217,30 @@ export default function InMemusPanel({ isGuest, requireAuth }: InMemusPanelProps
     setSelectedMemu(null);
   };
 
-  const handleMemuClick = (memu: any) => {
-    if (isGuest && requireAuth) {
-      requireAuth('read memu', () => setSelectedMemu(memu));
-    } else {
-      setSelectedMemu(memu);
-    }
-  };
-
   const handleOpenCompose = () => {
     window.dispatchEvent(new CustomEvent('openCompose'));
   };
 
-  const getStatusConfig = (status: StatusType) => {
-    return statusConfig[status] || statusConfig.delivered;
-  };
+  // Filtering logic
+  const filteredMemus = memus.filter(m => {
+    const matchesFilter = filter === 'all' || m.nature === filter;
+    const matchesSearch =
+      m.sender.full_name.toLowerCase().includes(searchQuery.toLowerCase()) ||
+      m.subject.toLowerCase().includes(searchQuery.toLowerCase());
+    return matchesFilter && matchesSearch;
+  });
+
+  const unreadCount = memus.filter(m => !m.read_at).length;
+  const totalCount = memus.length;
+
+  // Loading state
+  if (loading) {
+    return (
+      <div className="flex items-center justify-center h-full py-20">
+        <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-[#4f46e5]" />
+      </div>
+    );
+  }
 
   // Empty State
   if (memus.length === 0) {
@@ -217,7 +257,7 @@ export default function InMemusPanel({ isGuest, requireAuth }: InMemusPanelProps
           onClick={handleOpenCompose}
           className="px-5 py-2.5 bg-gradient-to-r from-[#4f46e5] to-[#0891b2] text-white rounded-xl text-[13px] font-medium hover:shadow-lg transition"
         >
-          ✏️ Write your first memu
+          ✨ Write your first memu
         </button>
       </div>
     );
@@ -225,13 +265,13 @@ export default function InMemusPanel({ isGuest, requireAuth }: InMemusPanelProps
 
   return (
     <div className="flex flex-col h-full">
-      {/* Header - Matching OutMemusPanel */}
+      {/* Header */}
       <div className="px-4 md:px-8 pt-6 pb-0">
         <h1 className="font-['Playfair_Display'] text-3xl md:text-4xl font-normal tracking-tight text-[#0f0f0f]">In-memus</h1>
         <p className="text-[13px] text-[#777] mt-1">{unreadCount} unread · {totalCount} total</p>
       </div>
 
-      {/* Search Bar - Matching OutMemusPanel */}
+      {/* Search Bar */}
       <div className="px-4 md:px-8 py-4">
         <div className="flex gap-3 items-center">
           <div className="flex-1 flex items-center gap-2.5 bg-[#f2f1ee] border border-[#e8e7e3] rounded-md px-3.5 py-2">
@@ -250,10 +290,10 @@ export default function InMemusPanel({ isGuest, requireAuth }: InMemusPanelProps
         </div>
       </div>
 
-      {/* Filter Pills - Matching OutMemusPanel */}
+      {/* Filter Pills */}
       <div className="px-4 md:px-8 py-4 flex gap-2 flex-wrap">
         <button
-          onClick={() => handleFilter('all')}
+          onClick={() => setFilter('all')}
           className={`px-4 py-1.5 rounded-full text-[12.5px] font-medium transition-all duration-200 ${
             filter === 'all'
               ? 'bg-[#0f0f0f] text-white shadow-md'
@@ -265,7 +305,7 @@ export default function InMemusPanel({ isGuest, requireAuth }: InMemusPanelProps
         {Object.entries(natureLabels).map(([key, label]) => (
           <button
             key={key}
-            onClick={() => handleFilter(key)}
+            onClick={() => setFilter(key)}
             className={`px-4 py-1.5 rounded-full text-[12.5px] font-medium transition-all duration-200 ${
               filter === key
                 ? `${natureStyles[key].bg} ${natureStyles[key].text} shadow-md`
@@ -277,24 +317,34 @@ export default function InMemusPanel({ isGuest, requireAuth }: InMemusPanelProps
         ))}
       </div>
 
-      {/* Memus List - Matching OutMemusPanel card style */}
+      {/* Memus List */}
       <div className="flex-1 overflow-y-auto px-4 md:px-8 pb-32">
         {filteredMemus.map((memu) => {
-          const status = getStatusConfig(memu.status);
+          const senderName = memu.sender.full_name;
+          const senderHandle = memu.sender.username;
+          const initials = getInitials(senderName);
+          const avatarColor = stringToColor(senderName);
+          const isUnread = !memu.read_at;
+          // Determine status badge based on read status
+          let statusType: StatusType = 'delivered';
+          if (memu.read_at) statusType = 'fully_read';
+          else if (memu.opened_at) statusType = 'opened';
+          const status = statusConfig[statusType];
+
           return (
-             <div
-  key={memu.id}
-  onClick={() => handleMemuClick(memu)}
-  className="bg-white border border-[#e8e7e3] rounded-xl p-4 mb-3 transition-all duration-200 hover:shadow-md hover:-translate-y-0.5 cursor-pointer"
->             
-<div className="flex items-start gap-3.5">
+            <div
+              key={memu.id}
+              onClick={() => handleMemuClick(memu)}
+              className="bg-white border border-[#e8e7e3] rounded-xl p-4 mb-3 transition-all duration-200 hover:shadow-md hover:-translate-y-0.5 cursor-pointer"
+            >
+              <div className="flex items-start gap-3.5">
                 {/* Avatar */}
                 <div className="flex-shrink-0">
                   <div
                     className="w-10 h-10 rounded-full flex items-center justify-center text-[13px] font-medium shadow-sm"
-                    style={{ background: memu.color, color: memu.textColor }}
+                    style={{ background: avatarColor, color: '#fff' }}
                   >
-                    {memu.initials}
+                    {initials}
                   </div>
                 </div>
 
@@ -302,28 +352,30 @@ export default function InMemusPanel({ isGuest, requireAuth }: InMemusPanelProps
                 <div className="flex-1 min-w-0">
                   <div className="flex justify-between items-start gap-2 flex-wrap">
                     <div className="flex items-center gap-2 flex-wrap">
-                      <span className={`text-[13.5px] ${memu.unread ? 'font-semibold text-[#0f0f0f]' : 'font-medium text-[#0f0f0f]'}`}>
-                        {memu.from}
+                      <span className={`text-[13.5px] ${isUnread ? 'font-semibold text-[#0f0f0f]' : 'font-medium text-[#0f0f0f]'}`}>
+                        {senderName}
                       </span>
-                      <span className="text-[11px] text-[#777]">{memu.handle}</span>
+                      <span className="text-[11px] text-[#777]">{senderHandle}</span>
                     </div>
-                    <span className="text-[11.5px] text-[#777] flex-shrink-0">{memu.time}</span>
+                    <span className="text-[11.5px] text-[#777] flex-shrink-0">
+                      {new Date(memu.created_at).toLocaleString()}
+                    </span>
                   </div>
-                  
+
                   <div className="text-[13px] text-[#3a3a3a] font-medium mb-1 line-clamp-1">
                     {memu.subject}
                   </div>
-                  
+
                   <div className="text-[12.5px] text-[#777] line-clamp-1 mb-2">
-                    {memu.preview}
+                    {memu.body.replace(/<[^>]*>/g, '').substring(0, 100)}...
                   </div>
-                  
+
                   <div className="flex items-center gap-2 flex-wrap">
                     {/* Nature Tag */}
-                    <span className={`text-[10.5px] font-medium px-2.5 py-0.5 rounded-full ${natureStyles[memu.nature].bg} ${natureStyles[memu.nature].text}`}>
-                      {natureLabels[memu.nature]}
+                    <span className={`text-[10.5px] font-medium px-2.5 py-0.5 rounded-full ${natureStyles[memu.nature]?.bg || 'bg-gray-100'} ${natureStyles[memu.nature]?.text || 'text-gray-700'}`}>
+                      {natureLabels[memu.nature] || memu.nature}
                     </span>
-                    
+
                     {/* Status Badge */}
                     <div className={`flex items-center gap-1.5 px-2 py-0.5 rounded-full ${status.bgColor}`}>
                       {status.icon}
@@ -336,7 +388,6 @@ export default function InMemusPanel({ isGuest, requireAuth }: InMemusPanelProps
           );
         })}
 
-        {/* Empty filter state */}
         {filteredMemus.length === 0 && memus.length > 0 && (
           <div className="flex flex-col items-center justify-center py-16 text-center">
             <div className="w-16 h-16 rounded-full bg-[#f2f1ee] flex items-center justify-center mb-4">
@@ -357,7 +408,6 @@ export default function InMemusPanel({ isGuest, requireAuth }: InMemusPanelProps
         }
       `}</style>
 
-      {/* Memu Read Panel */}
       {selectedMemu && (
         <MemuReadPanel
           memu={selectedMemu}

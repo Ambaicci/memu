@@ -1,10 +1,12 @@
 'use client';
 
-import { useState } from 'react';
+import { useState, useEffect, useCallback } from 'react';
 import { Search, Filter, Trash2, Edit2, MoreHorizontal, FileText, Inbox } from 'lucide-react';
+import { createClient } from '@/lib/supabase/client';
+import { useToast } from '@/contexts/ToastContext';
 
 interface Draft {
-  id: number;
+  id: string;
   to: string[];
   toHandles: string[];
   subject: string;
@@ -12,41 +14,10 @@ interface Draft {
   nature: string;
   preview: string;
   body: string;
+  sender_id: string;
+  created_at: string;
+  updated_at: string;
 }
-
-// Demo data
-const draftsData: Draft[] = [
-  {
-    id: 1,
-    to: ['Maria Santos'],
-    toHandles: ['@maria.memu'],
-    subject: 'Partnership Proposal – Outline',
-    lastEdited: 'Today',
-    nature: 'decide',
-    preview: 'We have been thinking about a potential synergy between our platforms. I believe a strategic partnership could benefit both...',
-    body: '<p>Maria,</p><p>We have been thinking about a potential synergy between our platforms.</p>',
-  },
-  {
-    id: 2,
-    to: ['Kofi Mensah', 'Esther Wanjiku'],
-    toHandles: ['@kofi.memu', '@esther.memu'],
-    subject: 'Event Recap – Community Meetup',
-    lastEdited: '3 days ago',
-    nature: 'fyi',
-    preview: 'Just wanted to drop a quick note about Thursday\'s community meetup. The turnout was incredible – over 50 people showed up...',
-    body: '<p>Kofi, Esther,</p><p>Just wanted to drop a quick note about Thursday\'s community meetup.</p>',
-  },
-  {
-    id: 3,
-    to: ['Aisha Kimani'],
-    toHandles: ['@aisha.memu'],
-    subject: 'Q1 Financial Summary – Draft for Review',
-    lastEdited: '5 days ago',
-    nature: 'resolve',
-    preview: 'Attached is the draft Q1 financial summary. Please review the numbers on page 4 – I want to make sure we\'re aligned before...',
-    body: '<p>Aisha,</p><p>Attached is the draft Q1 financial summary.</p>',
-  },
-];
 
 const natureLabels: Record<string, string> = {
   fyi: 'FYI',
@@ -71,7 +42,108 @@ interface DraftsPanelProps {
 export default function DraftsPanel({ isGuest, requireAuth, onEditDraft }: DraftsPanelProps = {}) {
   const [filter, setFilter] = useState('all');
   const [searchQuery, setSearchQuery] = useState('');
-  const [drafts, setDrafts] = useState(draftsData);
+  const [drafts, setDrafts] = useState<Draft[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
+  const [currentUserId, setCurrentUserId] = useState<string | null>(null);
+  const { showToast } = useToast();
+
+  // Get current user
+  useEffect(() => {
+    const getUser = async () => {
+      const supabase = createClient();
+      const { data: { user } } = await supabase.auth.getUser();
+      if (user) setCurrentUserId(user.id);
+    };
+    getUser();
+  }, []);
+
+  // Fetch drafts from Supabase
+  const fetchDrafts = useCallback(async () => {
+    if (!currentUserId) {
+      setLoading(false);
+      return;
+    }
+
+    setLoading(true);
+    setError(null);
+    const supabase = createClient();
+    
+    try {
+      // First, try to fetch with status column
+      let { data, error } = await supabase
+        .from('memus')
+        .select('*')
+        .eq('sender_id', currentUserId)
+        .eq('status', 'draft')
+        .order('updated_at', { ascending: false });
+
+      // If that fails, try without status filter (table might not have status column yet)
+      if (error && error.message.includes('status')) {
+        console.warn('Status column not found, fetching all memus for user');
+        const fallback = await supabase
+          .from('memus')
+          .select('*')
+          .eq('sender_id', currentUserId)
+          .order('updated_at', { ascending: false });
+        data = fallback.data;
+        error = fallback.error;
+      }
+
+      if (error) {
+        console.error('Error fetching drafts:', error);
+        setError(`Failed to load drafts: ${error.message}`);
+        showToast('Failed to load drafts', 'error');
+      } else {
+        // Transform DB rows to Draft interface
+        const transformed: Draft[] = (data || []).map(row => ({
+          id: row.id,
+          to: row.recipient_email ? [row.recipient_email] : [],
+          toHandles: [],
+          subject: row.subject || '(No subject)',
+          lastEdited: formatLastEdited(row.updated_at || row.created_at),
+          nature: row.nature?.toLowerCase() || 'decide',
+          preview: stripHtml(row.body || '').slice(0, 100),
+          body: row.body || '',
+          sender_id: row.sender_id,
+          created_at: row.created_at,
+          updated_at: row.updated_at || row.created_at,
+        }));
+        setDrafts(transformed);
+      }
+    } catch (err) {
+      console.error('Unexpected error fetching drafts:', err);
+      setError('An unexpected error occurred while loading drafts');
+      showToast('Failed to load drafts', 'error');
+    } finally {
+      setLoading(false);
+    }
+  }, [currentUserId, showToast]);
+
+  useEffect(() => {
+    if (currentUserId) {
+      fetchDrafts();
+    }
+  }, [fetchDrafts, currentUserId]);
+
+  // Helper: format "last edited" timestamp
+  const formatLastEdited = (timestamp: string) => {
+    const now = new Date();
+    const edited = new Date(timestamp);
+    const diffMs = now.getTime() - edited.getTime();
+    const diffMins = Math.floor(diffMs / 60000);
+    const diffHours = Math.floor(diffMs / 3600000);
+    const diffDays = Math.floor(diffMs / 86400000);
+
+    if (diffMins < 1) return 'Just now';
+    if (diffMins < 60) return `${diffMins}m ago`;
+    if (diffHours < 24) return `${diffHours}h ago`;
+    if (diffDays < 7) return `${diffDays}d ago`;
+    return edited.toLocaleDateString();
+  };
+
+  // Helper: strip HTML tags for preview
+  const stripHtml = (html: string) => html.replace(/<[^>]*>/g, '');
 
   const filteredDrafts = drafts.filter(d => {
     const matchesFilter = filter === 'all' || d.nature === filter;
@@ -94,15 +166,59 @@ export default function DraftsPanel({ isGuest, requireAuth, onEditDraft }: Draft
     }
   };
 
-  const handleDeleteDraft = (id: number) => {
-    if (confirm('Delete this draft? It will be gone forever.')) {
-      setDrafts(drafts.filter(d => d.id !== id));
+  const handleDeleteDraft = async (id: string) => {
+    if (!confirm('Delete this draft? It will be gone forever.')) return;
+    
+    const supabase = createClient();
+    const { error } = await supabase
+      .from('memus')
+      .delete()
+      .eq('id', id)
+      .eq('sender_id', currentUserId);
+    
+    if (error) {
+      console.error('Error deleting draft:', error);
+      showToast('Failed to delete draft', 'error');
+    } else {
+      showToast('Draft deleted', 'success');
+      fetchDrafts();
     }
   };
 
   const handleOpenCompose = () => {
     window.dispatchEvent(new CustomEvent('openCompose'));
   };
+
+  // Loading state
+  if (loading) {
+    return (
+      <div className="flex items-center justify-center h-full py-20">
+        <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-[#4f46e5]" />
+      </div>
+    );
+  }
+
+  // Error state
+  if (error) {
+    return (
+      <div className="flex flex-col items-center justify-center h-full py-20 text-center px-4">
+        <div className="w-16 h-16 rounded-full bg-[#fee2e2] flex items-center justify-center mb-4">
+          <FileText size={32} className="text-[#dc2626]" />
+        </div>
+        <h3 className="text-[18px] font-medium text-[#0f0f0f] mb-2">Unable to load drafts</h3>
+        <p className="text-[13px] text-[#777] max-w-md mb-4">{error}</p>
+        <p className="text-[12px] text-[#aaa] mb-6">
+          The memus table might be missing required columns. Run the database setup SQL to fix this.
+        </p>
+        <button
+          onClick={() => fetchDrafts()}
+          className="px-5 py-2.5 bg-[#4f46e5] text-white rounded-xl text-[13px] font-medium hover:bg-[#4338ca] transition"
+        >
+          Retry
+        </button>
+      </div>
+    );
+  }
 
   // Empty State
   if (drafts.length === 0) {
@@ -127,13 +243,13 @@ export default function DraftsPanel({ isGuest, requireAuth, onEditDraft }: Draft
 
   return (
     <div className="flex flex-col h-full">
-      {/* Header - Consistent with In/Out Memus */}
+      {/* Header */}
       <div className="px-4 md:px-8 pt-6 pb-0">
         <h1 className="font-['Playfair_Display'] text-3xl md:text-4xl font-normal tracking-tight text-[#0f0f0f]">Drafts</h1>
         <p className="text-[13px] text-[#777] mt-1">{totalCount} unsent memus</p>
       </div>
 
-      {/* Search Bar - Matching OutMemusPanel */}
+      {/* Search Bar */}
       <div className="px-4 md:px-8 py-4">
         <div className="flex gap-3 items-center">
           <div className="flex-1 flex items-center gap-2.5 bg-[#f2f1ee] border border-[#e8e7e3] rounded-md px-3.5 py-2">
@@ -152,7 +268,7 @@ export default function DraftsPanel({ isGuest, requireAuth, onEditDraft }: Draft
         </div>
       </div>
 
-      {/* Filter Pills - Matching OutMemusPanel */}
+      {/* Filter Pills */}
       <div className="px-4 md:px-8 py-4 flex gap-2 flex-wrap">
         <button
           onClick={() => handleFilter('all')}
@@ -218,8 +334,8 @@ export default function DraftsPanel({ isGuest, requireAuth, onEditDraft }: Draft
                 
                 <div className="flex items-center justify-between gap-4 flex-wrap">
                   <div className="flex items-center gap-2">
-                    <span className={`text-[10.5px] font-medium px-2.5 py-0.5 rounded-full ${natureStyles[draft.nature].bg} ${natureStyles[draft.nature].text}`}>
-                      {natureLabels[draft.nature]}
+                    <span className={`text-[10.5px] font-medium px-2.5 py-0.5 rounded-full ${natureStyles[draft.nature]?.bg || 'bg-[#f2f1ee]'} ${natureStyles[draft.nature]?.text || 'text-[#777]'}`}>
+                      {natureLabels[draft.nature] || draft.nature}
                     </span>
                     <span className="text-[10.5px] font-medium px-2.5 py-0.5 rounded-full bg-[#f2f1ee] text-[#777]">
                       Draft
@@ -251,7 +367,6 @@ export default function DraftsPanel({ isGuest, requireAuth, onEditDraft }: Draft
           </div>
         ))}
 
-        {/* Empty filter state */}
         {filteredDrafts.length === 0 && drafts.length > 0 && (
           <div className="flex flex-col items-center justify-center py-16 text-center">
             <div className="w-16 h-16 rounded-full bg-[#f2f1ee] flex items-center justify-center mb-4">

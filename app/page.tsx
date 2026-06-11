@@ -170,9 +170,9 @@ export default function MemuApp() {
       case 'calendar':
         return <CalendarPanel isGuest={!session} requireAuth={requireAuth} />;
       case 'confer':
-        return <ConferPanel isGuest={!session} requireAuth={requireAuth} />;
+        return <ConferPanel />;
       case 'airshare':
-        return <AirSharePanel isGuest={!session} requireAuth={requireAuth} />;
+        return <AirSharePanel />;
       case 'docs':
         return <DocsPanel />;
       case 'slides':

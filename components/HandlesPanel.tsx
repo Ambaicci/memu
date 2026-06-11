@@ -1,9 +1,10 @@
 'use client';
 
 import { useState, useEffect, useCallback } from 'react';
-import { Search, Star, Mail, Users, UserPlus, Inbox } from 'lucide-react';
+import { Search, Star, Mail, Users, UserPlus, Inbox, MessageSquare } from 'lucide-react';
 import { createClient } from '@/lib/supabase/client';
 import { useToast } from '@/contexts/ToastContext';
+import DirectMemoComposer from './direct-memos/DirectMemoComposer';
 
 interface Handle {
   id: string;
@@ -29,6 +30,7 @@ export default function HandlesPanel({ isGuest, requireAuth, onComposeToHandle }
   const [loading, setLoading] = useState(true);
   const [currentUserId, setCurrentUserId] = useState<string | null>(null);
   const [favorites, setFavorites] = useState<Set<string>>(new Set());
+  const [memoRecipient, setMemoRecipient] = useState<{ id: string; name: string } | null>(null);
   const { showToast } = useToast();
 
   // Get current user
@@ -166,6 +168,16 @@ export default function HandlesPanel({ isGuest, requireAuth, onComposeToHandle }
     }
   };
 
+  const handleSendDirectMemo = (handle: Handle) => {
+    if (isGuest && requireAuth) {
+      requireAuth('send direct memo', () => {
+        setMemoRecipient({ id: handle.id, name: handle.name });
+      });
+    } else {
+      setMemoRecipient({ id: handle.id, name: handle.name });
+    }
+  };
+
   const handleAddHandle = () => {
     showToast('Handle search coming soon! Type a name in the search bar to find users.', 'success');
   };
@@ -206,107 +218,129 @@ export default function HandlesPanel({ isGuest, requireAuth, onComposeToHandle }
   }
 
   return (
-    <div className="flex flex-col h-full">
-      {/* Header */}
-      <div className="px-4 md:px-8 pt-6 pb-0">
-        <h1 className="font-['Playfair_Display'] text-3xl md:text-4xl font-normal tracking-tight text-[#0f0f0f]">Handles</h1>
-        <p className="text-[13px] text-[#777] mt-1">
-          {handles.length} contacts · {favorites.size} favorites
-        </p>
-      </div>
+    <>
+      <div className="flex flex-col h-full">
+        {/* Header */}
+        <div className="px-4 md:px-8 pt-6 pb-0">
+          <h1 className="font-['Playfair_Display'] text-3xl md:text-4xl font-normal tracking-tight text-[#0f0f0f]">Handles</h1>
+          <p className="text-[13px] text-[#777] mt-1">
+            {handles.length} contacts · {favorites.size} favorites
+          </p>
+        </div>
 
-      {/* Search Bar */}
-      <div className="px-4 md:px-8 py-4">
-        <div className="flex gap-3 items-center">
-          <div className="flex-1 flex items-center gap-2.5 bg-[#f2f1ee] border border-[#e8e7e3] rounded-md px-3.5 py-2">
-            <Search size={15} className="text-[#777]" />
-            <input
-              type="text"
-              value={searchQuery}
-              onChange={(e) => setSearchQuery(e.target.value)}
-              placeholder="Search handles or names…"
-              className="flex-1 text-[13.5px] outline-none bg-transparent"
-            />
+        {/* Search Bar */}
+        <div className="px-4 md:px-8 py-4">
+          <div className="flex gap-3 items-center">
+            <div className="flex-1 flex items-center gap-2.5 bg-[#f2f1ee] border border-[#e8e7e3] rounded-md px-3.5 py-2">
+              <Search size={15} className="text-[#777]" />
+              <input
+                type="text"
+                value={searchQuery}
+                onChange={(e) => setSearchQuery(e.target.value)}
+                placeholder="Search handles or names…"
+                className="flex-1 text-[13.5px] outline-none bg-transparent"
+              />
+            </div>
+            <button
+              onClick={() => setFilterFavorites(!filterFavorites)}
+              className={`flex items-center gap-2 px-3.5 py-2 rounded-md text-[13px] font-medium transition ${
+                filterFavorites 
+                  ? 'bg-[#fef3c7] text-[#d97706] border border-[#fde68a]' 
+                  : 'bg-white border border-[#e8e7e3] text-[#3a3a3a] hover:border-[#777]'
+              }`}
+            >
+              <Star size={14} className={filterFavorites ? 'fill-[#d97706]' : ''} />
+              Favorites
+            </button>
+            <button
+              onClick={handleAddHandle}
+              className="flex items-center gap-2 px-3.5 py-2 rounded-md text-[13px] font-medium bg-[#0f0f0f] text-white hover:bg-[#2a2a2a] transition"
+            >
+              <UserPlus size={14} />
+              Add
+            </button>
           </div>
-          <button
-            onClick={() => setFilterFavorites(!filterFavorites)}
-            className={`flex items-center gap-2 px-3.5 py-2 rounded-md text-[13px] font-medium transition ${
-              filterFavorites 
-                ? 'bg-[#fef3c7] text-[#d97706] border border-[#fde68a]' 
-                : 'bg-white border border-[#e8e7e3] text-[#3a3a3a] hover:border-[#777]'
-            }`}
-          >
-            <Star size={14} className={filterFavorites ? 'fill-[#d97706]' : ''} />
-            Favorites
-          </button>
-          <button
-            onClick={handleAddHandle}
-            className="flex items-center gap-2 px-3.5 py-2 rounded-md text-[13px] font-medium bg-[#0f0f0f] text-white hover:bg-[#2a2a2a] transition"
-          >
-            <UserPlus size={14} />
-            Add
-          </button>
+        </div>
+
+        {/* Handles Grid */}
+        <div className="flex-1 overflow-y-auto px-4 md:px-8 pb-32">
+          {filteredHandles.length === 0 ? (
+            <div className="flex flex-col items-center justify-center py-16 text-center">
+              <div className="w-16 h-16 rounded-full bg-[#f2f1ee] flex items-center justify-center mb-4">
+                <Search size={28} className="text-[#aaa]" />
+              </div>
+              <h3 className="text-[15px] font-medium text-[#0f0f0f] mb-1">No matching handles</h3>
+              <p className="text-[13px] text-[#777]">Try a different search or filter</p>
+            </div>
+          ) : (
+            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+              {filteredHandles.map((handle) => (
+                <div
+                  key={handle.id}
+                  className="bg-white border border-[#e8e7e3] rounded-xl p-5 transition-all duration-200 hover:shadow-md hover:-translate-y-0.5 hover:border-[#d0cfc9]"
+                >
+                  {/* Avatar */}
+                  <div
+                    className="w-11 h-11 rounded-full flex items-center justify-center text-base font-medium mb-3 shadow-sm"
+                    style={{ background: handle.color, color: handle.textColor }}
+                  >
+                    {handle.initials}
+                  </div>
+
+                  {/* Info */}
+                  <div className="flex items-start justify-between">
+                    <div className="flex-1">
+                      <div className="text-[14px] font-medium text-[#0f0f0f] mb-0.5">{handle.name}</div>
+                      <div className="text-[12px] text-[#4f46e5] font-medium mb-2">{handle.handle}</div>
+                      <div className="text-[12px] text-[#777] mb-3">{handle.role}</div>
+                    </div>
+                    <button
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        toggleFavorite(handle.id);
+                      }}
+                      className="p-1.5 rounded-md hover:bg-[#f2f1ee] transition flex-shrink-0"
+                    >
+                      <Star size={14} className={favorites.has(handle.id) ? 'fill-[#d97706] text-[#d97706]' : 'text-[#aaa]'} />
+                    </button>
+                  </div>
+
+                  {/* Actions */}
+                  <div className="flex gap-2 mt-2">
+                    <button
+                      onClick={() => handleCompose(handle.handle)}
+                      className="flex-1 flex items-center justify-center gap-1.5 bg-[#0f0f0f] text-white rounded-md py-2 text-[11.5px] font-medium hover:bg-[#2a2a2a] transition"
+                    >
+                      <Mail size={12} />
+                      Write
+                    </button>
+                    <button
+                      onClick={() => handleSendDirectMemo(handle)}
+                      className="flex-1 flex items-center justify-center gap-1.5 bg-[#4f46e5] text-white rounded-md py-2 text-[11.5px] font-medium hover:bg-[#4338ca] transition"
+                    >
+                      <MessageSquare size={12} />
+                      Memo
+                    </button>
+                  </div>
+                </div>
+              ))}
+            </div>
+          )}
         </div>
       </div>
-
-      {/* Handles Grid */}
-      <div className="flex-1 overflow-y-auto px-4 md:px-8 pb-32">
-        {filteredHandles.length === 0 ? (
-          <div className="flex flex-col items-center justify-center py-16 text-center">
-            <div className="w-16 h-16 rounded-full bg-[#f2f1ee] flex items-center justify-center mb-4">
-              <Search size={28} className="text-[#aaa]" />
-            </div>
-            <h3 className="text-[15px] font-medium text-[#0f0f0f] mb-1">No matching handles</h3>
-            <p className="text-[13px] text-[#777]">Try a different search or filter</p>
-          </div>
-        ) : (
-          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-            {filteredHandles.map((handle) => (
-              <div
-                key={handle.id}
-                className="bg-white border border-[#e8e7e3] rounded-xl p-5 transition-all duration-200 hover:shadow-md hover:-translate-y-0.5 hover:border-[#d0cfc9]"
-              >
-                {/* Avatar */}
-                <div
-                  className="w-11 h-11 rounded-full flex items-center justify-center text-base font-medium mb-3 shadow-sm"
-                  style={{ background: handle.color, color: handle.textColor }}
-                >
-                  {handle.initials}
-                </div>
-
-                {/* Info */}
-                <div className="flex items-start justify-between">
-                  <div className="flex-1">
-                    <div className="text-[14px] font-medium text-[#0f0f0f] mb-0.5">{handle.name}</div>
-                    <div className="text-[12px] text-[#4f46e5] font-medium mb-2">{handle.handle}</div>
-                    <div className="text-[12px] text-[#777] mb-3">{handle.role}</div>
-                  </div>
-                  <button
-                    onClick={(e) => {
-                      e.stopPropagation();
-                      toggleFavorite(handle.id);
-                    }}
-                    className="p-1.5 rounded-md hover:bg-[#f2f1ee] transition flex-shrink-0"
-                  >
-                    <Star size={14} className={favorites.has(handle.id) ? 'fill-[#d97706] text-[#d97706]' : 'text-[#aaa]'} />
-                  </button>
-                </div>
-
-                {/* Actions */}
-                <div className="flex gap-2 mt-2">
-                  <button
-                    onClick={() => handleCompose(handle.handle)}
-                    className="flex-1 flex items-center justify-center gap-1.5 bg-[#0f0f0f] text-white rounded-md py-2 text-[11.5px] font-medium hover:bg-[#2a2a2a] transition"
-                  >
-                    <Mail size={12} />
-                    Write
-                  </button>
-                </div>
-              </div>
-            ))}
-          </div>
-        )}
-      </div>
-    </div>
+             {/* Direct Memo Composer Slide-Over */}
+      {memoRecipient && (
+        <DirectMemoComposer
+          recipientId={memoRecipient.id}
+          recipientName={memoRecipient.name}
+          onClose={() => setMemoRecipient(null)}
+          onSent={() => {
+            // Toast is already shown by DirectMemoComposer, no need to duplicate
+            setMemoRecipient(null);
+          }}
+        />
+      )}
+     
+    </>
   );
 }

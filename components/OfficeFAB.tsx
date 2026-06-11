@@ -1,8 +1,11 @@
 'use client';
 
 import { useState, useEffect, useRef } from 'react';
-import { useRouter, useSearchParams } from 'next/navigation';
-import { FileText, Presentation, Table, X, File, FolderOpen, ChevronRight, Cloud, Briefcase } from 'lucide-react';
+import { createClient } from '@/lib/supabase/client';
+import { 
+  FileText, Presentation, Table, X, File, FolderOpen, ChevronRight, 
+  Cloud, Briefcase, StickyNote, Loader2 
+} from 'lucide-react';
 
 interface OfficeSuite {
   id: string;
@@ -10,6 +13,13 @@ interface OfficeSuite {
   icon: React.ReactNode;
   color: string;
   description: string;
+}
+
+interface RecentItem {
+  id: string;
+  title: string | null;
+  type: 'docs' | 'slides' | 'sheets' | 'notes';
+  updated_at: string;
 }
 
 const officeSuites: OfficeSuite[] = [
@@ -35,6 +45,13 @@ const officeSuites: OfficeSuite[] = [
     description: 'Spreadsheets & data',
   },
   {
+    id: 'notes',
+    name: 'memu Notes',
+    icon: <StickyNote size={18} />,
+    color: 'from-[#ec4899] to-[#f43f5e]',
+    description: 'Quick thoughts & tasks',
+  },
+  {
     id: 'airshare',
     name: 'memu AirShare',
     icon: <Cloud size={18} />,
@@ -46,38 +63,98 @@ const officeSuites: OfficeSuite[] = [
 interface OfficeFABProps {
   isGuest?: boolean;
   requireAuth?: (action: string, callback: () => void) => void;
-  onOpenSuite?: (suiteId: string) => void;
+  onOpenItem?: (suiteId: string, itemId?: string) => void;
 }
 
-export default function OfficeFAB({ isGuest, requireAuth, onOpenSuite }: OfficeFABProps) {
-  const router = useRouter();
-  const searchParams = useSearchParams();
+export default function OfficeFAB({ isGuest, requireAuth, onOpenItem }: OfficeFABProps) {
   const [isOpen, setIsOpen] = useState(false);
   const [isHovered, setIsHovered] = useState(false);
+  const [recentItems, setRecentItems] = useState<RecentItem[]>([]);
+  const [loadingRecent, setLoadingRecent] = useState(false);
+  const [userId, setUserId] = useState<string | null>(null);
   const menuRef = useRef<HTMLDivElement>(null);
 
+  // Get current user ID for fetching recent items
   useEffect(() => {
-    const handleClickOutside = (event: MouseEvent) => {
-      if (menuRef.current && !menuRef.current.contains(event.target as Node)) {
-        setIsOpen(false);
-      }
+    const getUser = async () => {
+      const supabase = createClient();
+      const { data: { user } } = await supabase.auth.getUser();
+      if (user) setUserId(user.id);
     };
-    document.addEventListener('mousedown', handleClickOutside);
-    return () => document.removeEventListener('mousedown', handleClickOutside);
+    getUser();
   }, []);
 
-  const handleOpenSuite = (suiteId: string) => {
-    // Update URL for router compatibility (critical fix)
-    const params = new URLSearchParams(searchParams.toString());
-    params.set('panel', suiteId);
-    router.push(`?${params.toString()}`, { scroll: false });
-    
+  // Fetch real recent items when menu opens
+  useEffect(() => {
+    if (isOpen && userId) {
+      fetchRecentItems();
+    }
+  }, [isOpen, userId]);
+
+  const fetchRecentItems = async () => {
+    if (!userId) return;
+    setLoadingRecent(true);
+    const supabase = createClient();
+
+    try {
+      // Fetch top 2 from each category
+      const [docsRes, slidesRes, sheetsRes, notesRes] = await Promise.all([
+        supabase.from('docs').select('id, title, updated_at').eq('user_id', userId).order('updated_at', { ascending: false }).limit(2),
+        supabase.from('slides_presentations').select('id, title, updated_at').eq('user_id', userId).order('updated_at', { ascending: false }).limit(2),
+        supabase.from('sheets_workbooks').select('id, name, updated_at').eq('user_id', userId).order('updated_at', { ascending: false }).limit(2),
+        supabase.from('notes').select('id, title, updated_at').eq('user_id', userId).order('updated_at', { ascending: false }).limit(2),
+      ]);
+
+      const items: RecentItem[] = [];
+      if (docsRes.data) items.push(...docsRes.data.map(d => ({ id: d.id, title: d.title, type: 'docs' as const, updated_at: d.updated_at })));
+      if (slidesRes.data) items.push(...slidesRes.data.map(d => ({ id: d.id, title: d.title, type: 'slides' as const, updated_at: d.updated_at })));
+      if (sheetsRes.data) items.push(...sheetsRes.data.map(d => ({ id: d.id, title: d.name, type: 'sheets' as const, updated_at: d.updated_at })));
+      if (notesRes.data) items.push(...notesRes.data.map(d => ({ id: d.id, title: d.title, type: 'notes' as const, updated_at: d.updated_at })));
+
+      // Sort all combined items by most recent
+      items.sort((a, b) => new Date(b.updated_at).getTime() - new Date(a.updated_at).getTime());
+
+      // Keep only the top 3
+      setRecentItems(items.slice(0, 3));
+    } catch (err) {
+      console.error('Failed to fetch recent items:', err);
+    } finally {
+      setLoadingRecent(false);
+    }
+  };
+
+  const handleOpenItem = (suiteId: string, itemId?: string) => {
     if (isGuest && requireAuth) {
-      requireAuth(suiteId, () => onOpenSuite?.(suiteId));
+      requireAuth(suiteId, () => onOpenItem?.(suiteId, itemId));
     } else {
-      onOpenSuite?.(suiteId);
+      onOpenItem?.(suiteId, itemId);
     }
     setIsOpen(false);
+  };
+
+  const getIconForType = (type: string) => {
+    switch (type) {
+      case 'docs': return <FileText size={10} className="text-[#4f46e5]" />;
+      case 'slides': return <Presentation size={10} className="text-[#059669]" />;
+      case 'sheets': return <Table size={10} className="text-[#d97706]" />;
+      case 'notes': return <StickyNote size={10} className="text-[#ec4899]" />;
+      default: return <File size={10} className="text-[#aaa]" />;
+    }
+  };
+
+  const formatTime = (dateStr: string) => {
+    const date = new Date(dateStr);
+    const now = new Date();
+    const diffMs = now.getTime() - date.getTime();
+    const mins = Math.floor(diffMs / 60000);
+    const hours = Math.floor(diffMs / 3600000);
+    const days = Math.floor(diffMs / 86400000);
+    
+    if (mins < 1) return 'Just now';
+    if (mins < 60) return `${mins}m ago`;
+    if (hours < 24) return `${hours}h ago`;
+    if (days < 7) return `${days}d ago`;
+    return date.toLocaleDateString();
   };
 
   return (
@@ -108,7 +185,7 @@ export default function OfficeFAB({ isGuest, requireAuth, onOpenSuite }: OfficeF
         {officeSuites.map((suite, index) => (
           <button
             key={suite.id}
-            onClick={() => handleOpenSuite(suite.id)}
+            onClick={() => handleOpenItem(suite.id)}
             className={`group flex items-center gap-3 bg-white/95 backdrop-blur-sm border border-white/40 rounded-xl p-3 shadow-lg hover:shadow-xl transition-all duration-200 hover:-translate-y-0.5 w-56 ${
               isOpen ? 'animate-slideUp' : ''
             }`}
@@ -128,25 +205,36 @@ export default function OfficeFAB({ isGuest, requireAuth, onOpenSuite }: OfficeF
           </button>
         ))}
         
-        {/* Recent Documents */}
+        {/* REAL Recent Documents Section */}
         <div className="bg-white/95 backdrop-blur-sm border border-white/40 rounded-xl p-3 w-56 shadow-lg">
           <div className="flex items-center gap-2 mb-2 pb-2 border-b border-[#f2f1ee]">
             <FolderOpen size={12} className="text-[#777]" />
             <span className="text-[10px] font-medium text-[#777] uppercase tracking-wide">Recent</span>
           </div>
+          
           <div className="space-y-1.5">
-            <button className="flex items-center gap-2 text-[12px] text-[#3a3a3a] hover:text-[#4f46e5] transition w-full text-left py-1 group">
-              <File size={10} className="text-[#aaa] group-hover:text-[#4f46e5]" />
-              Q4 Strategy Document
-            </button>
-            <button className="flex items-center gap-2 text-[12px] text-[#3a3a3a] hover:text-[#4f46e5] transition w-full text-left py-1 group">
-              <File size={10} className="text-[#aaa] group-hover:text-[#4f46e5]" />
-              Product Roadmap 2025
-            </button>
-            <button className="flex items-center gap-2 text-[12px] text-[#3a3a3a] hover:text-[#4f46e5] transition w-full text-left py-1 group">
-              <Cloud size={10} className="text-[#aaa] group-hover:text-[#4f46e5]" />
-              Shared: Investor Deck
-            </button>
+            {loadingRecent ? (
+              <div className="flex items-center gap-2 py-1">
+                <Loader2 size={10} className="animate-spin text-[#aaa]" />
+                <span className="text-[11px] text-[#aaa]">Loading recent...</span>
+              </div>
+            ) : recentItems.length === 0 ? (
+              <div className="py-1">
+                <span className="text-[11px] text-[#aaa] italic">No recent items</span>
+              </div>
+            ) : (
+              recentItems.map((item) => (
+                <button
+                  key={item.id}
+                  onClick={() => handleOpenItem(item.type, item.id)}
+                  className="flex items-center gap-2 text-[12px] text-[#3a3a3a] hover:text-[#4f46e5] transition w-full text-left py-1 group"
+                >
+                  {getIconForType(item.type)}
+                  <span className="flex-1 truncate">{item.title || 'Untitled'}</span>
+                  <span className="text-[9px] text-[#aaa] flex-shrink-0">{formatTime(item.updated_at)}</span>
+                </button>
+              ))
+            )}
           </div>
         </div>
       </div>

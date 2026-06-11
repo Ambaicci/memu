@@ -4,8 +4,8 @@ import { useState, useRef, useEffect, useCallback } from 'react';
 import { createClient } from '@/lib/supabase/client';
 import { useToast } from '@/contexts/ToastContext';
 import { 
-  FileText, Trash2, Plus, Eye, EyeOff, Download, Copy, Check, 
-  Maximize2, Minimize2, Loader2, AlertCircle, Cloud, CloudOff, Type
+  FileText, Trash2, Plus, Eye, EyeOff, Download, Copy, 
+  Maximize2, Minimize2, Loader2, Cloud
 } from 'lucide-react';
 import DocsToolbox from './DocsToolbox';
 
@@ -13,15 +13,13 @@ interface Document {
   id: string;
   title: string;
   content: string;
-  wordCount: number;
-  charCount: number;
-  lastEdited: string;
-  createdAt: string;
-  updated_at?: string;
-  user_id?: string;
+  word_count: number;
+  char_count: number;
+  last_edited: string;
+  created_at: string;
+  updated_at: string;
 }
 
-// Simple markdown renderer
 function renderMarkdown(text: string): string {
   return text
     .replace(/^# (.*$)/gim, '<h1 class="text-3xl font-bold mt-6 mb-3">$1</h1>')
@@ -48,7 +46,6 @@ export default function DocsPanel() {
   const [wordCount, setWordCount] = useState(0);
   const [charCount, setCharCount] = useState(0);
   const [isFullscreen, setIsFullscreen] = useState(false);
-  const [syncStatus, setSyncStatus] = useState<'cloud' | 'local' | 'error'>('cloud');
   const [loading, setLoading] = useState(true);
   const [currentUserId, setCurrentUserId] = useState<string | null>(null);
   
@@ -61,92 +58,49 @@ export default function DocsPanel() {
     const getUser = async () => {
       const supabase = createClient();
       const { data: { user } } = await supabase.auth.getUser();
-      if (user) setCurrentUserId(user.id);
+      if (user) {
+        setCurrentUserId(user.id);
+        fetchDocuments(user.id);
+      } else {
+        setLoading(false);
+      }
     };
     getUser();
   }, []);
 
-  // Load documents: Supabase first, localStorage fallback
-  const loadDocuments = useCallback(async () => {
+  // Fetch all documents
+  const fetchDocuments = async (userId: string) => {
     setLoading(true);
     const supabase = createClient();
-    let fetchError: any = null;
     
-    try {
-      // Try Supabase first
-      if (currentUserId) {
-        const { data, error } = await supabase
-          .from('docs')
-          .select('*')
-          .eq('user_id', currentUserId)
-          .order('updated_at', { ascending: false });
+    const { data, error } = await supabase
+      .from('docs')
+      .select('*')
+      .eq('user_id', userId)
+      .order('updated_at', { ascending: false });
 
-        fetchError = error;
-        
-        if (error && error.code !== '42P01') throw error;
-        
-        if (data && data.length > 0) {
-          // Map DB columns (snake_case) to Local State (camelCase)
-          const mappedDocs = data.map(doc => ({
-            ...doc,
-            wordCount: doc.word_count || 0,
-            charCount: doc.char_count || 0,
-          }));
-          
-          setDocuments(mappedDocs);
-          setSyncStatus('cloud');
-          if (!activeDocId) {
-            setActiveDocId(mappedDocs[0].id);
-            setDocTitle(mappedDocs[0].title);
-            setDocContent(mappedDocs[0].content);
-            setWordCount(mappedDocs[0].wordCount);
-            setCharCount(mappedDocs[0].charCount);
-          }
-          setLoading(false);
-          return;
-        }
+    if (error) {
+      console.error('Error fetching docs:', error);
+      showToast('Failed to load documents', 'error');
+    } else if (data) {
+      setDocuments(data);
+      if (data.length > 0 && !activeDocId) {
+        setActiveDocId(data[0].id);
+        setDocTitle(data[0].title);
+        setDocContent(data[0].content);
+        setWordCount(data[0].word_count);
+        setCharCount(data[0].char_count);
       }
-      
-      // Fallback to localStorage
-      const saved = localStorage.getItem('memu_docs_v2');
-      if (saved) {
-        const parsed = JSON.parse(saved);
-        setDocuments(parsed);
-        setSyncStatus('local');
-        if (parsed.length > 0 && !activeDocId) {
-          setActiveDocId(parsed[0].id);
-          setDocTitle(parsed[0].title);
-          setDocContent(parsed[0].content);
-          setWordCount(parsed[0].wordCount);
-          setCharCount(parsed[0].charCount);
-        }
-      }
-      
-      // If table doesn't exist, show graceful toast
-      if (fetchError?.code === '42P01') {
-        showToast('Docs cloud sync coming soon — using local storage for now', 'success');
-        setSyncStatus('local');
-      }
-    } catch (err) {
-      console.error('Failed to load docs:', err);
-      setSyncStatus('error');
-      // Fallback to localStorage on any error
-      const saved = localStorage.getItem('memu_docs_v2');
-      if (saved) {
-        const parsed = JSON.parse(saved);
-        setDocuments(parsed);
-        setSyncStatus('local');
-      }
-    } finally {
-      setLoading(false);
     }
-  }, [currentUserId, activeDocId, showToast]);
+    setLoading(false);
+  };
 
+  // FIX: Only update editor content when switching docs or modes (not on every keystroke)
   useEffect(() => {
-    if (currentUserId !== undefined) {
-      loadDocuments();
+    if (editorRef.current && !isPreviewMode && activeDocId) {
+      editorRef.current.innerHTML = docContent.replace(/\n/g, '<br/>');
     }
-  }, [loadDocuments, currentUserId]);
+  }, [activeDocId, isPreviewMode]);
 
   // Update word/char count
   useEffect(() => {
@@ -165,54 +119,33 @@ export default function DocsPanel() {
     
     saveTimeoutRef.current = setTimeout(async () => {
       const supabase = createClient();
-      // Send snake_case keys to match DB schema exactly
-      const updatedDoc = {
-        title: docTitle,
-        content: docContent,
-        word_count: wordCount,
-        char_count: charCount,
-        last_edited: new Date().toLocaleDateString(),
-        updated_at: new Date().toISOString(),
-      };
-
-      let saveError: any = null;
       
-      try {
-        // Try Supabase first
-        if (currentUserId) {
-          const { error } = await supabase
-            .from('docs')
-            .update(updatedDoc)
-            .eq('id', activeDocId)
-            .eq('user_id', currentUserId);
+      const { error } = await supabase
+        .from('docs')
+        .update({
+          title: docTitle,
+          content: docContent,
+          word_count: wordCount,
+          char_count: charCount,
+          last_edited: 'Just now',
+        })
+        .eq('id', activeDocId)
+        .eq('user_id', currentUserId);
 
-          saveError = error;
-          
-          if (error && error.code !== '42P01') throw error;
-          
-          if (!error) {
-            setDocuments(docs => docs.map(doc => 
-              doc.id === activeDocId ? { ...doc, ...updatedDoc, wordCount, charCount } : doc
-            ));
-            setSyncStatus('cloud');
-            setIsSaving(false);
-            return;
-          }
-        }
-      } catch (err) {
-        console.error('Supabase save failed:', JSON.stringify(err, null, 2));
+      if (error) {
+        console.error('Save error:', error);
+        showToast('Failed to save document', 'error');
+      } else {
+        // Update local state to reflect the save
+        setDocuments(docs => docs.map(d => 
+          d.id === activeDocId 
+            ? { ...d, title: docTitle, content: docContent, word_count: wordCount, char_count: charCount, last_edited: 'Just now' }
+            : d
+        ));
       }
-      
-      // Fallback to localStorage
-      const updated = documents.map(doc => 
-        doc.id === activeDocId ? { ...doc, ...updatedDoc, wordCount, charCount } : doc
-      );
-      setDocuments(updated);
-      localStorage.setItem('memu_docs_v2', JSON.stringify(updated));
-      setSyncStatus('local');
       setIsSaving(false);
     }, 1000);
-  }, [activeDocId, docContent, docTitle, wordCount, charCount, documents, currentUserId]);
+  }, [activeDocId, docContent, docTitle, wordCount, charCount, currentUserId, showToast]);
 
   useEffect(() => {
     if (activeDocId && docContent !== undefined) {
@@ -220,110 +153,87 @@ export default function DocsPanel() {
     }
   }, [docContent, docTitle, activeDocId, handleAutoSave]);
 
-  // Create new doc
+  // Create new doc - FIXED
   const handleNewDoc = async () => {
-    if (!newDocTitle.trim()) return;
-    
-    const newDoc: Document = {
-      id: crypto.randomUUID(),
-      title: newDocTitle,
-      content: '# ' + newDocTitle + '\n\nStart writing here...',
-      wordCount: 0,
-      charCount: 0,
-      lastEdited: 'Just now',
-      createdAt: new Date().toLocaleDateString(),
-      user_id: currentUserId || undefined,
-    };
+    if (!newDocTitle.trim() || !currentUserId) return;
     
     const supabase = createClient();
     
-    try {
-      if (currentUserId) {
-        const { error } = await supabase.from('docs').insert({
-          ...newDoc,
-          word_count: 0,
-          char_count: 0,
-          created_at: new Date().toISOString(),
-          updated_at: new Date().toISOString(),
-        });
-        
-        if (!error) {
-          setDocuments(prev => [newDoc, ...prev]);
-          setActiveDocId(newDoc.id);
-          setDocTitle(newDoc.title);
-          setDocContent(newDoc.content);
-          setSyncStatus('cloud');
-          setShowNewDocModal(false);
-          setNewDocTitle('');
-          return;
-        }
-      }
-    } catch (err) {
-      console.error('Supabase insert failed:', err);
+    const { data, error } = await supabase
+      .from('docs')
+      .insert({
+        user_id: currentUserId,
+        title: newDocTitle.trim(),
+        content: '',
+        word_count: 0,
+        char_count: 0,
+        last_edited: 'Just now',
+      })
+      .select()
+      .single();
+    
+    if (error) {
+      console.error('Create error:', error);
+      showToast('Failed to create document', 'error');
+      return;
+    }
+
+    if (data) {
+      // Add to local state immediately
+      setDocuments(prev => [data, ...prev]);
+      setActiveDocId(data.id);
+      setDocTitle(data.title);
+      setDocContent(data.content);
+      setWordCount(0);
+      setCharCount(0);
     }
     
-    // Fallback to localStorage
-    setDocuments(prev => [newDoc, ...prev]);
-    localStorage.setItem('memu_docs_v2', JSON.stringify([newDoc, ...documents]));
-    setActiveDocId(newDoc.id);
-    setDocTitle(newDoc.title);
-    setDocContent(newDoc.content);
-    setSyncStatus('local');
     setShowNewDocModal(false);
     setNewDocTitle('');
+    showToast('Document created', 'success');
   };
 
   // Delete doc
   const handleDeleteDoc = async (id: string) => {
+    if (!currentUserId) return;
+    
     const supabase = createClient();
+    const { error } = await supabase
+      .from('docs')
+      .delete()
+      .eq('id', id)
+      .eq('user_id', currentUserId);
     
-    try {
-      if (currentUserId) {
-        const { error } = await supabase
-          .from('docs')
-          .delete()
-          .eq('id', id)
-          .eq('user_id', currentUserId);
-        
-        if (!error) {
-          const updated = documents.filter(doc => doc.id !== id);
-          setDocuments(updated);
-          setSyncStatus('cloud');
-          if (activeDocId === id && updated.length > 0) {
-            setActiveDocId(updated[0].id);
-            setDocTitle(updated[0].title);
-            setDocContent(updated[0].content);
-          } else if (updated.length === 0) {
-            setActiveDocId(null);
-            setDocTitle('Untitled');
-            setDocContent('');
-          }
-          return;
-        }
-      }
-    } catch (err) {
-      console.error('Supabase delete failed:', err);
+    if (error) {
+      console.error('Delete error:', error);
+      showToast('Failed to delete document', 'error');
+      return;
     }
-    
-    // Fallback to localStorage
+
     const updated = documents.filter(doc => doc.id !== id);
     setDocuments(updated);
-    localStorage.setItem('memu_docs_v2', JSON.stringify(updated));
+    
     if (activeDocId === id && updated.length > 0) {
       setActiveDocId(updated[0].id);
       setDocTitle(updated[0].title);
       setDocContent(updated[0].content);
+      setWordCount(updated[0].word_count);
+      setCharCount(updated[0].char_count);
     } else if (updated.length === 0) {
       setActiveDocId(null);
       setDocTitle('Untitled');
       setDocContent('');
     }
+    
+    showToast('Document deleted', 'success');
   };
 
   const handleSelectDoc = (doc: Document) => {
     setActiveDocId(doc.id);
     setDocTitle(doc.title);
     setDocContent(doc.content);
+    setWordCount(doc.word_count);
+    setCharCount(doc.char_count);
   };
 
   const handleExport = (format: 'md' | 'html') => {
@@ -341,23 +251,16 @@ export default function DocsPanel() {
 
   const handleCopy = async () => {
     await navigator.clipboard.writeText(docContent);
-    const btn = document.getElementById('copy-btn');
-    if (btn) {
-      btn.innerHTML = '<span class="text-[#10b981]">✓</span>';
-      setTimeout(() => {
-        btn.innerHTML = '<svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 16H6a2 2 0 01-2-2V6a2 2 0 012-2h8a2 2 0 012 2v2m-6 12h8a2 2 0 002-2v-8a2 2 0 00-2-2h-8a2 2 0 00-2 2v8a2 2 0 002 2z"></path></svg>';
-      }, 1500);
-    }
+    showToast('Copied to clipboard', 'success');
   };
 
   const handleFormat = (command: string, value?: string) => {
     if (editorRef.current) {
       editorRef.current.focus();
       document.execCommand(command, false, value || '');
-      const content = editorRef.current.innerHTML;
-      const tempDiv = document.createElement('div');
-      tempDiv.innerHTML = content;
-      setDocContent(tempDiv.innerText);
+      if (editorRef.current) {
+        setDocContent(editorRef.current.innerText);
+      }
     }
   };
 
@@ -380,10 +283,9 @@ export default function DocsPanel() {
           document.execCommand('formatBlock', false, '<blockquote>');
           break;
       }
-      const content = editorRef.current.innerHTML;
-      const tempDiv = document.createElement('div');
-      tempDiv.innerHTML = content;
-      setDocContent(tempDiv.innerText);
+      if (editorRef.current) {
+        setDocContent(editorRef.current.innerText);
+      }
     }
   };
 
@@ -414,89 +316,87 @@ export default function DocsPanel() {
     );
   }
 
-  const activeDoc = documents.find(d => d.id === activeDocId);
-
   return (
-    <div className={`${isFullscreen ? 'fixed inset-0 z-50 bg-[#fafaf8]' : 'flex h-full'} bg-[#fafaf8] transition-all duration-300 ${isFocusMode ? 'focus-mode' : ''}`}>
-      {/* Sidebar */}
-      <div className="w-64 border-r border-[#e8e7e3] bg-white flex flex-col">
-        <div className="px-4 pt-6 pb-2">
-          <div className="flex items-center justify-between">
-            <div>
-              <h1 className="h2">memu Docs</h1>
-              <p className="body-small mt-1">Write, edit, and format documents</p>
-            </div>
-            <div className={`p-1.5 rounded-full ${
-              syncStatus === 'cloud' ? 'bg-[#d1fae5] text-[#059669]' :
-              syncStatus === 'local' ? 'bg-[#fef3c7] text-[#d97706]' :
-              'bg-[#fee2e2] text-[#dc2626]'
-            }`} title={syncStatus === 'cloud' ? 'Synced to cloud' : syncStatus === 'local' ? 'Saved locally' : 'Sync error'}>
-              {syncStatus === 'cloud' ? <Cloud size={14} /> : syncStatus === 'local' ? <CloudOff size={14} /> : <AlertCircle size={14} />}
+    <div className={`${isFullscreen ? 'fixed inset-0 z-50' : 'flex h-full'} bg-[#fafaf8] transition-all duration-300 ${isFocusMode ? 'focus-mode' : ''}`}>
+      {/* Sidebar - IMPROVED STRUCTURE */}
+      <div className="w-64 border-r border-[#e8e7e3] bg-white flex flex-col shadow-sm">
+        <div className="px-4 pt-6 pb-4 border-b border-[#f2f1ee]">
+          <div className="flex items-center justify-between mb-1">
+            <h1 className="text-[18px] font-semibold text-[#0f0f0f]">memu Docs</h1>
+            <div className="p-1.5 rounded-full bg-[#d1fae5] text-[#059669]" title="Synced to cloud">
+              <Cloud size={14} />
             </div>
           </div>
+          <p className="text-[11px] text-[#777]">Write, edit, and format</p>
         </div>
-        <div className="p-4 border-t border-[#e8e7e3]">
+        
+        <div className="p-3">
           <button
             onClick={() => setShowNewDocModal(true)}
-            className="w-full flex items-center justify-center gap-2 py-2 bg-gradient-to-r from-[#4f46e5] to-[#7c3aed] text-white rounded-lg text-[13px] font-medium hover:from-[#5b21b6] hover:to-[#6d28d9] transition"
+            className="w-full flex items-center justify-center gap-2 py-2.5 bg-gradient-to-r from-[#4f46e5] to-[#7c3aed] text-white rounded-lg text-[13px] font-medium hover:from-[#5b21b6] hover:to-[#6d28d9] transition shadow-sm"
           >
             <Plus size={14} />
             New Document
           </button>
         </div>
-        <div className="flex-1 overflow-y-auto">
+        
+        <div className="flex-1 overflow-y-auto px-2 pb-4">
           {documents.length === 0 ? (
             <div className="p-6 text-center">
               <FileText size={32} className="text-[#aaa] mx-auto mb-3" />
-              <p className="body-small">No documents yet</p>
+              <p className="text-[12px] text-[#777] mb-2">No documents yet</p>
               <button
                 onClick={() => setShowNewDocModal(true)}
-                className="mt-2 text-[11px] text-[#4f46e5] hover:underline"
+                className="text-[11px] text-[#4f46e5] hover:underline font-medium"
               >
                 Create one →
               </button>
             </div>
           ) : (
-            documents.map((doc) => (
-              <div
-                key={doc.id}
-                onClick={() => handleSelectDoc(doc)}
-                className={`group p-3 border-b border-[#f2f1ee] cursor-pointer transition ${
-                  activeDocId === doc.id ? 'bg-[#ede9fe]' : 'hover:bg-[#f2f1ee]'
-                }`}
-              >
-                <div className="flex items-center justify-between">
-                  <div className="flex items-center gap-2 flex-1 min-w-0">
-                    <FileText size={14} className="text-[#4f46e5] flex-shrink-0" />
-                    <span className="text-[13px] font-medium text-[#0f0f0f] truncate">
-                      {doc.title}
-                    </span>
+            <div className="space-y-1">
+              {documents.map((doc) => (
+                <div
+                  key={doc.id}
+                  onClick={() => handleSelectDoc(doc)}
+                  className={`group p-3 rounded-lg cursor-pointer transition-all ${
+                    activeDocId === doc.id 
+                      ? 'bg-[#ede9fe] border border-[#c4b5fd]' 
+                      : 'hover:bg-[#f9fafb] border border-transparent'
+                  }`}
+                >
+                  <div className="flex items-center justify-between mb-1">
+                    <div className="flex items-center gap-2 flex-1 min-w-0">
+                      <FileText size={13} className="text-[#4f46e5] flex-shrink-0" />
+                      <span className="text-[13px] font-medium text-[#0f0f0f] truncate">
+                        {doc.title}
+                      </span>
+                    </div>
+                    <button
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        handleDeleteDoc(doc.id);
+                      }}
+                      className="opacity-0 group-hover:opacity-100 p-1 rounded hover:bg-red-100 transition flex-shrink-0"
+                    >
+                      <Trash2 size={11} className="text-[#777] hover:text-[#dc2626]" />
+                    </button>
                   </div>
-                  <button
-                    onClick={(e) => {
-                      e.stopPropagation();
-                      handleDeleteDoc(doc.id);
-                    }}
-                    className="opacity-0 group-hover:opacity-100 p-1 rounded hover:bg-red-100 transition flex-shrink-0"
-                  >
-                    <Trash2 size={12} className="text-[#777] hover:text-[#dc2626]" />
-                  </button>
+                  <div className="text-[10px] text-[#777] pl-6">
+                    {doc.word_count} words • {doc.last_edited}
+                  </div>
                 </div>
-                <div className="text-[10px] text-[#777] mt-1">
-                  {doc.wordCount} words • {doc.lastEdited}
-                </div>
-              </div>
-            ))
+              ))}
+            </div>
           )}
         </div>
       </div>
 
-      {/* Editor */}
-      <div className="flex-1 flex flex-col">
-        {activeDoc ? (
+      {/* Editor - IMPROVED LAYOUT & SPACING */}
+      <div className="flex-1 flex flex-col bg-[#f9fafb]">
+        {activeDocId ? (
           <>
-            {/* Toolbar */}
-            <div className="border-b border-[#e8e7e3] bg-white/80 backdrop-blur-sm p-2 flex items-center justify-between flex-wrap gap-2">
+            {/* Toolbar - BETTER CONTAINERIZATION */}
+            <div className="border-b border-[#e8e7e3] bg-white shadow-sm px-4 py-2.5 flex items-center justify-between flex-wrap gap-2">
               <div className="flex items-center gap-2 flex-wrap">
                 {!isFocusMode && !isFullscreen && (
                   <button
@@ -527,7 +427,6 @@ export default function DocsPanel() {
                   {isPreviewMode ? 'Write' : 'Preview'}
                 </button>
                 
-                {/* INTEGRATED DOCS TOOLBOX */}
                 {!isPreviewMode && (
                   <DocsToolbox 
                     onFormat={handleFormat} 
@@ -539,7 +438,7 @@ export default function DocsPanel() {
               </div>
 
               <div className="flex items-center gap-3 flex-wrap">
-                <div className="text-[11px] text-[#aaa] hidden sm:block">
+                <div className="text-[11px] text-[#777] hidden sm:block bg-[#f2f1ee] px-2 py-1 rounded">
                   {wordCount} words • {charCount} chars
                 </div>
                 {isSaving && (
@@ -549,7 +448,6 @@ export default function DocsPanel() {
                 )}
                 <div className="w-px h-5 bg-[#e8e7e3]" />
                 <button
-                  id="copy-btn"
                   onClick={handleCopy}
                   className="p-2 rounded-lg hover:bg-[#f2f1ee] transition text-[#777]"
                   title="Copy"
@@ -574,44 +472,54 @@ export default function DocsPanel() {
               </div>
             </div>
 
-            {/* Title */}
-            <div className="px-6 pt-6">
-              <input
-                type="text"
-                value={docTitle}
-                onChange={(e) => setDocTitle(e.target.value)}
-                className="text-2xl md:text-3xl font-medium text-[#0f0f0f] bg-transparent border-b-2 border-transparent hover:border-[#e8e7e3] focus:border-[#4f46e5] outline-none px-2 py-1 w-full transition"
-                placeholder="Untitled"
-              />
-            </div>
+            {/* Title & Content Area - BETTER SPACING */}
+            <div className="flex-1 overflow-auto">
+              <div className="max-w-4xl mx-auto px-6 md:px-12 py-8">
+                {/* Title Input */}
+                <div className="mb-6 pb-4 border-b border-[#e8e7e3]">
+                  <input
+                    type="text"
+                    value={docTitle}
+                    onChange={(e) => setDocTitle(e.target.value)}
+                    className="text-3xl md:text-4xl font-semibold text-[#0f0f0f] bg-transparent outline-none w-full placeholder:text-[#aaa]"
+                    placeholder="Untitled"
+                  />
+                </div>
 
-            {/* Content */}
-            <div className="flex-1 overflow-auto p-6">
-              {isPreviewMode ? (
-                <div 
-                  className="prose prose-sm max-w-3xl mx-auto bg-white rounded-xl p-8 shadow-sm min-h-[500px]"
-                  dangerouslySetInnerHTML={{ __html: renderMarkdown(docContent) }}
-                />
-              ) : (
-                <div
-                  ref={editorRef}
-                  contentEditable
-                  onInput={(e) => setDocContent(e.currentTarget.innerText)}
-                  className="w-full max-w-3xl mx-auto bg-white rounded-xl p-8 shadow-sm outline-none min-h-[500px] prose prose-sm focus:ring-1 focus:ring-[#4f46e5]"
-                  dangerouslySetInnerHTML={{ __html: docContent.replace(/\n/g, '<br/>') }}
-                />
-              )}
+                {/* Content Editor - FIXED RTL BUG */}
+                {isPreviewMode ? (
+                  <div 
+                    className="prose prose-sm max-w-none bg-white rounded-xl p-8 shadow-sm min-h-[600px] border border-[#e8e7e3]"
+                    dangerouslySetInnerHTML={{ __html: renderMarkdown(docContent) }}
+                  />
+                ) : (
+                  <div
+                    ref={editorRef}
+                    contentEditable
+                    onInput={(e) => {
+                      if (e.currentTarget) {
+                        setDocContent(e.currentTarget.innerText);
+                      }
+                    }}
+                    className="w-full bg-white rounded-xl p-8 shadow-sm outline-none min-h-[600px] prose prose-sm border border-[#e8e7e3] focus:border-[#4f46e5] transition-colors"
+                    dir="ltr"
+                    suppressContentEditableWarning
+                  />
+                )}
+              </div>
             </div>
           </>
         ) : (
-          <div className="flex-1 flex items-center justify-center">
-            <div className="text-center">
-              <FileText size={48} className="text-[#aaa] mx-auto mb-4" />
-              <h3 className="h3 mb-2">No document selected</h3>
-              <p className="body mb-4">Create a new document to start writing</p>
+          <div className="flex-1 flex items-center justify-center bg-white">
+            <div className="text-center max-w-md">
+              <div className="w-20 h-20 rounded-full bg-[#ede9fe] flex items-center justify-center mx-auto mb-4">
+                <FileText size={36} className="text-[#4f46e5]" />
+              </div>
+              <h3 className="text-[20px] font-semibold text-[#0f0f0f] mb-2">No document selected</h3>
+              <p className="text-[13px] text-[#777] mb-6">Create a new document to start writing</p>
               <button
                 onClick={() => setShowNewDocModal(true)}
-                className="px-4 py-2 bg-gradient-to-r from-[#4f46e5] to-[#7c3aed] text-white rounded-lg text-[13px] font-medium hover:from-[#5b21b6] hover:to-[#6d28d9] transition"
+                className="px-5 py-2.5 bg-gradient-to-r from-[#4f46e5] to-[#7c3aed] text-white rounded-lg text-[13px] font-medium hover:from-[#5b21b6] hover:to-[#6d28d9] transition shadow-sm"
               >
                 Create New Document
               </button>
@@ -630,7 +538,7 @@ export default function DocsPanel() {
               value={newDocTitle}
               onChange={(e) => setNewDocTitle(e.target.value)}
               placeholder="Document title"
-              className="w-full px-4 py-2 border border-[#e8e7e3] rounded-lg text-[14px] focus:outline-none focus:border-[#4f46e5] mb-4"
+              className="w-full px-4 py-2.5 border border-[#e8e7e3] rounded-lg text-[14px] focus:outline-none focus:border-[#4f46e5] mb-4 transition"
               autoFocus
               onKeyDown={(e) => e.key === 'Enter' && handleNewDoc()}
             />
@@ -655,15 +563,20 @@ export default function DocsPanel() {
 
       <style>{`
         .focus-mode .w-64 { display: none; }
-        .prose { font-family: 'DM Sans', sans-serif; }
+        .prose { font-family: 'DM Sans', sans-serif; line-height: 1.7; }
         .prose h1 { font-size: 2em; font-weight: 700; margin-top: 1em; margin-bottom: 0.5em; }
         .prose h2 { font-size: 1.5em; font-weight: 600; margin-top: 0.8em; margin-bottom: 0.4em; }
         .prose h3 { font-size: 1.25em; font-weight: 500; margin-top: 0.6em; margin-bottom: 0.3em; }
-        .prose p { margin-bottom: 0.75em; line-height: 1.6; }
+        .prose p { margin-bottom: 0.75em; }
         .prose ul, .prose ol { margin-left: 1.5em; margin-bottom: 0.75em; }
         .prose li { margin-bottom: 0.25em; }
         .prose blockquote { border-left: 3px solid #4f46e5; padding-left: 1em; margin: 1em 0; color: #666; font-style: italic; }
         .prose code { background: #f2f1ee; padding: 0.2em 0.4em; border-radius: 6px; font-size: 0.85em; color: #dc2626; }
+        [contenteditable]:empty:before {
+          content: 'Start writing...';
+          color: #aaa;
+          font-style: italic;
+        }
       `}</style>
     </div>
   );

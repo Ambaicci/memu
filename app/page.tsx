@@ -1,30 +1,43 @@
 'use client';
 
-import { useState, useEffect, useCallback } from 'react';
+import { useState, useEffect, useCallback, Suspense } from 'react';
 import { useRouter, usePathname, useSearchParams } from 'next/navigation';
 import { createClient } from '@/lib/supabase/client';
+import dynamic from 'next/dynamic';
 import Auth from '@/components/Auth';
 import Sidebar from '@/components/Sidebar';
-import InMemusPanel from '@/components/InMemusPanel';
-import OutMemusPanel from '@/components/OutMemusPanel';
-import DraftsPanel from '@/components/DraftsPanel';
-import ConnectionsPanel from '@/components/ConnectionsPanel';
-import HandlesPanel from '@/components/HandlesPanel';
-import CalendarPanel from '@/components/CalendarPanel';
-import ConferPanel from '@/components/ConferPanel';
-import AirSharePanel from '@/components/AirSharePanel';
-import DocsPanel from '@/components/docs/DocsPanel';
-import SlidesPanel from '@/components/slides/SlidesPanel';
-import SheetsPanel from '@/components/sheets/SheetsPanel';
 import ComposePanel from '@/components/ComposePanel';
 import OfficeFAB from '@/components/OfficeFAB';
 import GlobalSearch from '@/components/search/GlobalSearch';
 import NotificationCenter from '@/components/notifications/NotificationCenter';
-import SpacesPanel from '@/components/spaces/SpacesPanel';
-import SpaceView from '@/components/spaces/SpaceView';
 import SplashScreen from '@/components/SplashScreen';
 
-type PanelType = 'inmemus' | 'outmemus' | 'drafts' | 'connections' | 'spaces' | 'confer' | 'calendar' | 'handles' | 'airshare' | 'docs' | 'slides' | 'sheets' | 'space-dashboard';
+// ==========================================
+// PERFORMANCE FIX: Lazy Load Heavy Panels
+// ==========================================
+const InMemusPanel = dynamic(() => import('@/components/InMemusPanel'), { ssr: false });
+const OutMemusPanel = dynamic(() => import('@/components/OutMemusPanel'), { ssr: false });
+const DraftsPanel = dynamic(() => import('@/components/DraftsPanel'), { ssr: false });
+const ConnectionsPanel = dynamic(() => import('@/components/ConnectionsPanel'), { ssr: false });
+const HandlesPanel = dynamic(() => import('@/components/HandlesPanel'), { ssr: false });
+const CalendarPanel = dynamic(() => import('@/components/CalendarPanel'), { ssr: false });
+const ConferPanel = dynamic(() => import('@/components/ConferPanel'), { ssr: false });
+const AirSharePanel = dynamic(() => import('@/components/AirSharePanel'), { ssr: false });
+const DocsPanel = dynamic(() => import('@/components/docs/DocsPanel'), { ssr: false });
+const SlidesPanel = dynamic(() => import('@/components/slides/SlidesPanel'), { ssr: false });
+const SheetsPanel = dynamic(() => import('@/components/sheets/SheetsPanel'), { ssr: false });
+const SpacesPanel = dynamic(() => import('@/components/spaces/SpacesPanel'), { ssr: false });
+const SpaceView = dynamic(() => import('@/components/spaces/SpaceView'), { ssr: false });
+const AnalyticsPanel = dynamic(() => import('@/components/AnalyticsPanel'), { ssr: false });
+const NotesPanel = dynamic(() => import('@/components/office/NotesPanel'), { ssr: false });
+
+const LoadingSkeleton = () => (
+  <div className="flex items-center justify-center h-full">
+    <div className="w-8 h-8 border-2 border-[#4f46e5] border-t-transparent rounded-full animate-spin" />
+  </div>
+);
+
+type PanelType = 'inmemus' | 'outmemus' | 'drafts' | 'connections' | 'spaces' | 'confer' | 'calendar' | 'handles' | 'airshare' | 'docs' | 'slides' | 'sheets' | 'space-dashboard' | 'analytics' | 'notes';
 
 export default function MemuApp() {
   const router = useRouter();
@@ -89,12 +102,10 @@ export default function MemuApp() {
     return () => window.removeEventListener('openCompose', handleOpenComposeEvent as EventListener);
   }, []);
 
-  // Validate panel type
   const isValidPanel = (panel: string): panel is PanelType => {
-    return ['inmemus', 'outmemus', 'drafts', 'connections', 'spaces', 'confer', 'calendar', 'handles', 'airshare', 'docs', 'slides', 'sheets', 'space-dashboard'].includes(panel);
+    return ['inmemus', 'outmemus', 'drafts', 'connections', 'spaces', 'confer', 'calendar', 'handles', 'airshare', 'docs', 'slides', 'sheets', 'space-dashboard', 'analytics', 'notes'].includes(panel);
   };
 
-  // Update URL when panel or space changes
   const updateUrl = useCallback((panel: PanelType, spaceId?: string | null) => {
     const params = new URLSearchParams();
     params.set('panel', panel);
@@ -102,7 +113,6 @@ export default function MemuApp() {
     router.push(`${pathname}?${params.toString()}`, { scroll: false });
   }, [router, pathname]);
 
-  // Handle navigation
   const handleNavigate = useCallback((panel: PanelType, spaceId?: string | null) => {
     setActivePanel(panel);
     updateUrl(panel, spaceId);
@@ -169,6 +179,10 @@ export default function MemuApp() {
         return <SlidesPanel />;
       case 'sheets':
         return <SheetsPanel />;
+      case 'analytics':
+        return <AnalyticsPanel />;
+      case 'notes':
+        return <NotesPanel />;
       default:
         return <InMemusPanel isGuest={!session} requireAuth={requireAuth} />;
     }
@@ -242,18 +256,21 @@ export default function MemuApp() {
             </div>
           </div>
           
-          {renderPanel()}
+          <Suspense fallback={<LoadingSkeleton />}>
+            {renderPanel()}
+          </Suspense>
         </main>
 
         <OfficeFAB 
           isGuest={isGuest}
           requireAuth={requireAuth}
-          onOpenSuite={(suiteId) => {
+          onOpenItem={(suiteId, itemId) => {
             if (suiteId === 'airshare') requireAuth('airshare', () => handleNavigate('airshare'));
             else if (suiteId === 'docs') requireAuth('docs', () => handleNavigate('docs'));
             else if (suiteId === 'slides') requireAuth('slides', () => handleNavigate('slides'));
             else if (suiteId === 'sheets') requireAuth('sheets', () => handleNavigate('sheets'));
-            else alert(`${suiteId} suite coming soon!`);
+            else if (suiteId === 'notes') requireAuth('notes', () => handleNavigate('notes'));
+            // Note: itemId is captured here for future use (e.g., opening a specific file directly)
           }} 
         />
 

@@ -1,30 +1,23 @@
 'use client';
 
 import { useState, useEffect, useCallback } from 'react';
-import { Search, Star, MessageCircle, Clock, ArrowRight, Users, Sparkles, Inbox } from 'lucide-react';
+import { Users, Star, Mail, MessageSquare, Loader2, Search } from 'lucide-react';
 import { createClient } from '@/lib/supabase/client';
 import { useToast } from '@/contexts/ToastContext';
 
 interface Connection {
   id: string;
-  name: string;
-  handle: string;
-  initials: string;
-  color: string;
-  textColor: string;
-  memuCount: number;
-  lastMemuDate: string;
-  lastMemuPreview: string;
-  status: 'active' | 'quiet' | 'new';
-  isStarred?: boolean;
-  userId: string; // The other party's user ID
+  user_id: string;
+  connected_user_id: string;
+  status: string;
+  created_at: string;
+  profile?: {
+    id: string;
+    full_name: string | null;
+    username: string | null;
+    bio: string | null;
+  };
 }
-
-const statusConfig = {
-  active: { label: 'Active', color: 'text-[#059669]', bg: 'bg-[#d1fae5]', dot: 'bg-[#059669]' },
-  quiet: { label: 'Quiet', color: 'text-[#d97706]', bg: 'bg-[#fef3c7]', dot: 'bg-[#d97706]' },
-  new: { label: 'New', color: 'text-[#4f46e5]', bg: 'bg-[#ede9fe]', dot: 'bg-[#4f46e5]' },
-};
 
 interface ConnectionsPanelProps {
   isGuest?: boolean;
@@ -32,11 +25,12 @@ interface ConnectionsPanelProps {
 }
 
 export default function ConnectionsPanel({ isGuest, requireAuth }: ConnectionsPanelProps = {}) {
-  const [searchQuery, setSearchQuery] = useState('');
-  const [filterFavorites, setFilterFavorites] = useState(false);
   const [connections, setConnections] = useState<Connection[]>([]);
   const [loading, setLoading] = useState(true);
   const [currentUserId, setCurrentUserId] = useState<string | null>(null);
+  const [filter, setFilter] = useState<'all' | 'favorites'>('all');
+  const [favorites, setFavorites] = useState<Set<string>>(new Set());
+  const [searchQuery, setSearchQuery] = useState('');
   const { showToast } = useToast();
 
   // Get current user
@@ -49,7 +43,42 @@ export default function ConnectionsPanel({ isGuest, requireAuth }: ConnectionsPa
     getUser();
   }, []);
 
-  // Fetch connections from Supabase (derived from memus table)
+  // Load favorites from localStorage
+  useEffect(() => {
+    try {
+      const saved = localStorage.getItem('memu_favorites');
+      if (saved) {
+        const ids = JSON.parse(saved) as string[];
+        setFavorites(new Set(ids));
+      }
+    } catch (err) {
+      console.error('Failed to load favorites:', err);
+    }
+  }, []);
+
+  // Save favorites to localStorage
+  const saveFavorites = useCallback((ids: Set<string>) => {
+    try {
+      localStorage.setItem('memu_favorites', JSON.stringify(Array.from(ids)));
+    } catch (err) {
+      console.error('Failed to save favorites:', err);
+    }
+  }, []);
+
+  const toggleFavorite = (id: string) => {
+    const newFavorites = new Set(favorites);
+    if (newFavorites.has(id)) {
+      newFavorites.delete(id);
+      showToast('Removed from favorites', 'success');
+    } else {
+      newFavorites.add(id);
+      showToast('Added to favorites', 'success');
+    }
+    setFavorites(newFavorites);
+    saveFavorites(newFavorites);
+  };
+
+  // Fetch connections (Simplified: Just fetch all profiles)
   const fetchConnections = useCallback(async () => {
     if (!currentUserId) {
       setLoading(false);
@@ -60,94 +89,31 @@ export default function ConnectionsPanel({ isGuest, requireAuth }: ConnectionsPa
     const supabase = createClient();
     
     try {
-      // Fetch all memus where current user is sender OR recipient
-      const { data: memus, error } = await supabase
-        .from('memus')
-        .select(`
-          id,
-          sender_id,
-          recipient_id,
-          recipient_email,
-          subject,
-          body,
-          created_at,
-          status,
-          sender:sender_id!inner(full_name, username),
-          recipient:recipient_id(full_name, username)
-        `)
-        .or(`sender_id.eq.${currentUserId},recipient_id.eq.${currentUserId}`)
-        .order('created_at', { ascending: false });
+      // Fetch all profiles except the current user
+      const { data: profilesData, error } = await supabase
+        .from('profiles')
+        .select('id, full_name, username, bio')
+        .neq('id', currentUserId)
+        .order('full_name', { ascending: true });
 
       if (error) {
-        console.error('Error fetching connections:', error);
+        console.error('Error fetching profiles for connections:', error);
         showToast('Failed to load connections', 'error');
-        setLoading(false);
         return;
       }
 
-      // Group memus by the other party (not current user)
-      const connectionMap = new Map<string, {
-        userId: string;
-        name: string;
-        username: string;
-        memus: any[];
-      }>();
+      const fallbackConnections: Connection[] = (profilesData || []).map(p => ({
+        id: p.id,
+        user_id: currentUserId,
+        connected_user_id: p.id,
+        status: 'accepted',
+        created_at: new Date().toISOString(),
+        profile: p,
+      }));
 
-      for (const memu of memus || []) {
-        // Determine the other party
-        const isSender = memu.sender_id === currentUserId;
-        const otherParty = isSender ? memu.recipient : memu.sender;
-        
-        if (!otherParty || !otherParty.username) continue; // Skip external emails for now
-
-        const userId = isSender ? memu.recipient_id : memu.sender_id;
-        const key = userId || otherParty.username; // Fallback to username if no ID
-
-        if (!connectionMap.has(key)) {
-          connectionMap.set(key, {
-            userId: userId || key,
-            name: otherParty.full_name || otherParty.username,
-            username: otherParty.username,
-            memus: [],
-          });
-        }
-        connectionMap.get(key)!.memus.push(memu);
-      }
-
-      // Transform to Connection interface
-      const transformed: Connection[] = Array.from(connectionMap.values()).map(conn => {
-        const memus = conn.memus;
-        const lastMemu = memus[0]; // Most recent first due to order
-        const memuCount = memus.length;
-        
-        // Determine status based on activity
-        let status: 'active' | 'quiet' | 'new' = 'quiet';
-        const lastDate = new Date(lastMemu.created_at);
-        const now = new Date();
-        const diffHours = (now.getTime() - lastDate.getTime()) / 3600000;
-        
-        if (diffHours < 24) status = 'active';
-        if (memuCount === 1 && diffHours < 48) status = 'new';
-
-        return {
-          id: conn.userId,
-          name: conn.name,
-          handle: `@${conn.username}.memu`,
-          initials: getInitials(conn.name),
-          color: stringToColor(conn.userId),
-          textColor: '#1a1a1a',
-          memuCount,
-          lastMemuDate: formatLastMemuDate(lastMemu.created_at),
-          lastMemuPreview: stripHtml(lastMemu.body || '').slice(0, 100),
-          status,
-          isStarred: false, // Would load from user_stars table in Phase 2
-          userId: conn.userId,
-        };
-      });
-
-      setConnections(transformed);
-    } catch (err) {
-      console.error('Unexpected error fetching connections:', err);
+      setConnections(fallbackConnections);
+    } catch (err: any) {
+      console.error('Error fetching connections:', err);
       showToast('Failed to load connections', 'error');
     } finally {
       setLoading(false);
@@ -160,7 +126,16 @@ export default function ConnectionsPanel({ isGuest, requireAuth }: ConnectionsPa
     }
   }, [fetchConnections, currentUserId]);
 
-  // Helper: generate initials
+  const filteredConnections = connections.filter(c => {
+    const matchesFilter = filter === 'all' ? true : favorites.has(c.connected_user_id);
+    const profile = c.profile;
+    const name = profile?.full_name || profile?.username || '';
+    const matchesSearch = searchQuery === '' || 
+                          name.toLowerCase().includes(searchQuery.toLowerCase()) ||
+                          (profile?.bio || '').toLowerCase().includes(searchQuery.toLowerCase());
+    return matchesFilter && matchesSearch;
+  });
+
   const getInitials = (name: string) => {
     return name
       .split(' ')
@@ -170,7 +145,6 @@ export default function ConnectionsPanel({ isGuest, requireAuth }: ConnectionsPa
       .slice(0, 2);
   };
 
-  // Helper: generate consistent color from ID
   const stringToColor = (str: string) => {
     let hash = 0;
     for (let i = 0; i < str.length; i++) {
@@ -180,83 +154,10 @@ export default function ConnectionsPanel({ isGuest, requireAuth }: ConnectionsPa
     return `hsl(${hue}, 60%, 70%)`;
   };
 
-  // Helper: format last memu date
-  const formatLastMemuDate = (timestamp: string) => {
-    const now = new Date();
-    const last = new Date(timestamp);
-    const diffMs = now.getTime() - last.getTime();
-    const diffMins = Math.floor(diffMs / 60000);
-    const diffHours = Math.floor(diffMs / 3600000);
-    const diffDays = Math.floor(diffMs / 86400000);
-
-    if (diffMins < 1) return 'Just now';
-    if (diffMins < 60) return `${diffMins}m ago`;
-    if (diffHours < 24) return `${diffHours}h ago`;
-    if (diffDays < 7) return `${diffDays}d ago`;
-    return last.toLocaleDateString();
-  };
-
-  // Helper: strip HTML tags
-  const stripHtml = (html: string) => html.replace(/<[^>]*>/g, '');
-
-  const filteredConnections = connections.filter(c => {
-    const matchesSearch = c.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
-                          c.handle.toLowerCase().includes(searchQuery.toLowerCase());
-    const matchesFavorite = filterFavorites ? c.isStarred : true;
-    return matchesSearch && matchesFavorite;
-  });
-
-  const toggleFavorite = async (id: string) => {
-    // In Phase 2: save to user_stars table
-    // For now: just toggle local state
-    setConnections(prev => prev.map(c => 
-      c.id === id ? { ...c, isStarred: !c.isStarred } : c
-    ));
-    showToast('Favorite updated', 'success');
-  };
-
-  const openConnection = (connection: Connection) => {
-    if (isGuest && requireAuth) {
-      requireAuth('view conversation', () => {
-        showToast(`Opening conversation with ${connection.name}`, 'success');
-        // In Phase 2: navigate to conversation view
-      });
-    } else {
-      showToast(`Opening conversation with ${connection.name}`, 'success');
-      // In Phase 2: navigate to conversation view
-    }
-  };
-
-  const handleOpenCompose = () => {
-    window.dispatchEvent(new CustomEvent('openCompose'));
-  };
-
-  // Loading state
   if (loading) {
     return (
       <div className="flex items-center justify-center h-full py-20">
-        <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-[#4f46e5]" />
-      </div>
-    );
-  }
-
-  // Empty State
-  if (connections.length === 0) {
-    return (
-      <div className="flex flex-col items-center justify-center h-full py-20 text-center">
-        <div className="w-24 h-24 rounded-full bg-gradient-to-br from-[#f2f1ee] to-[#e8e7e3] flex items-center justify-center mx-auto mb-6">
-          <Users size={36} className="text-[#aaa]" />
-        </div>
-        <h3 className="text-[18px] font-medium text-[#0f0f0f] mb-2">No connections yet</h3>
-        <p className="text-[13px] text-[#777] max-w-sm mb-6">
-          Start a conversation and exchange 4+ memus with someone to build a connection.
-        </p>
-        <button
-          onClick={handleOpenCompose}
-          className="px-5 py-2.5 bg-gradient-to-r from-[#4f46e5] to-[#0891b2] text-white rounded-xl text-[13px] font-medium hover:shadow-lg transition"
-        >
-          ✏️ Write your first memu
-        </button>
+        <Loader2 className="w-8 h-8 animate-spin text-[#4f46e5]" />
       </div>
     );
   }
@@ -267,32 +168,38 @@ export default function ConnectionsPanel({ isGuest, requireAuth }: ConnectionsPa
       <div className="px-4 md:px-8 pt-6 pb-0">
         <h1 className="font-['Playfair_Display'] text-3xl md:text-4xl font-normal tracking-tight text-[#0f0f0f]">Connections</h1>
         <p className="text-[13px] text-[#777] mt-1">
-          {connections.length} active correspondences · {connections.filter(c => c.memuCount >= 10).length} with 10+ memus
+          {connections.length} connections · {favorites.size} favorites
         </p>
       </div>
 
-      {/* Search Bar */}
-      <div className="px-4 md:px-8 py-4">
-        <div className="flex gap-3 items-center">
-          <div className="flex-1 flex items-center gap-2.5 bg-[#f2f1ee] border border-[#e8e7e3] rounded-md px-3.5 py-2">
-            <Search size={15} className="text-[#777]" />
-            <input
-              type="text"
-              value={searchQuery}
-              onChange={(e) => setSearchQuery(e.target.value)}
-              placeholder="Search connections..."
-              className="flex-1 text-[13.5px] outline-none bg-transparent"
-            />
-          </div>
+      {/* Search & Filter Tabs */}
+      <div className="px-4 md:px-8 py-4 flex flex-col md:flex-row gap-3">
+        <div className="flex-1 flex items-center gap-2.5 bg-[#f2f1ee] border border-[#e8e7e3] rounded-md px-3.5 py-2">
+          <Search size={15} className="text-[#777]" />
+          <input
+            type="text"
+            value={searchQuery}
+            onChange={(e) => setSearchQuery(e.target.value)}
+            placeholder="Search connections..."
+            className="flex-1 text-[13.5px] outline-none bg-transparent"
+          />
+        </div>
+        <div className="flex gap-2">
           <button
-            onClick={() => setFilterFavorites(!filterFavorites)}
-            className={`flex items-center gap-2 px-3.5 py-2 rounded-md text-[13px] font-medium transition ${
-              filterFavorites 
-                ? 'bg-[#fef3c7] text-[#d97706] border border-[#fde68a]' 
-                : 'bg-white border border-[#e8e7e3] text-[#3a3a3a] hover:border-[#777]'
+            onClick={() => setFilter('all')}
+            className={`px-4 py-2 rounded-lg text-[13px] font-medium transition ${
+              filter === 'all' ? 'bg-[#0f0f0f] text-white' : 'bg-white border border-[#e8e7e3] text-[#777] hover:border-[#777]'
             }`}
           >
-            <Star size={14} className={filterFavorites ? 'fill-[#d97706]' : ''} />
+            All
+          </button>
+          <button
+            onClick={() => setFilter('favorites')}
+            className={`px-4 py-2 rounded-lg text-[13px] font-medium transition flex items-center gap-2 ${
+              filter === 'favorites' ? 'bg-[#d97706] text-white' : 'bg-white border border-[#e8e7e3] text-[#777] hover:border-[#777]'
+            }`}
+          >
+            <Star size={14} className={filter === 'favorites' ? 'fill-white' : ''} />
             Favorites
           </button>
         </div>
@@ -303,104 +210,72 @@ export default function ConnectionsPanel({ isGuest, requireAuth }: ConnectionsPa
         {filteredConnections.length === 0 ? (
           <div className="flex flex-col items-center justify-center py-16 text-center">
             <div className="w-16 h-16 rounded-full bg-[#f2f1ee] flex items-center justify-center mb-4">
-              <Search size={28} className="text-[#aaa]" />
+              <Users size={28} className="text-[#aaa]" />
             </div>
-            <h3 className="text-[15px] font-medium text-[#0f0f0f] mb-1">No matching connections</h3>
-            <p className="text-[13px] text-[#777]">Try a different search or filter</p>
+            <h3 className="text-[15px] font-medium text-[#0f0f0f] mb-1">
+              {filter === 'favorites' ? 'No favorite connections' : 'No connections found'}
+            </h3>
+            <p className="text-[13px] text-[#777]">
+              {filter === 'favorites' ? 'Star some connections to see them here' : 'Try a different search'}
+            </p>
           </div>
         ) : (
-          <div className="grid grid-cols-1 lg:grid-cols-2 xl:grid-cols-3 gap-4">
-            {filteredConnections.map((connection) => (
-              <div
-                key={connection.id}
-                onClick={() => openConnection(connection)}
-                className="bg-white border border-[#e8e7e3] rounded-xl p-5 cursor-pointer transition-all duration-200 hover:shadow-md hover:-translate-y-0.5 hover:border-[#d0cfc9]"
-              >
-                {/* Header with Avatar and Name */}
-                <div className="flex items-start gap-3 mb-3">
+          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+            {filteredConnections.map((connection) => {
+              const profile = connection.profile;
+              const name = profile?.full_name || profile?.username || 'Unknown';
+              const initials = getInitials(name);
+              const color = stringToColor(connection.connected_user_id);
+
+              return (
+                <div
+                  key={connection.id}
+                  className="bg-white border border-[#e8e7e3] rounded-xl p-5 hover:shadow-md transition-all duration-200"
+                >
+                  {/* Avatar */}
                   <div
-                    className="w-12 h-12 rounded-full flex items-center justify-center text-[14px] font-medium shadow-sm flex-shrink-0"
-                    style={{ background: connection.color, color: connection.textColor }}
+                    className="w-11 h-11 rounded-full flex items-center justify-center text-base font-medium mb-3 shadow-sm"
+                    style={{ background: color }}
                   >
-                    {connection.initials}
+                    {initials}
                   </div>
-                  <div className="flex-1 min-w-0">
-                    <div className="flex items-center gap-2 flex-wrap">
-                      <h3 className="text-[15px] font-semibold text-[#0f0f0f]">{connection.name}</h3>
-                      {connection.isStarred && (
-                        <Star size={12} className="fill-[#d97706] text-[#d97706]" />
+
+                  {/* Info */}
+                  <div className="flex items-start justify-between mb-3">
+                    <div className="flex-1">
+                      <div className="text-[14px] font-medium text-[#0f0f0f] mb-0.5">{name}</div>
+                      {profile?.username && (
+                        <div className="text-[12px] text-[#4f46e5] font-medium mb-2">@{profile.username}</div>
+                      )}
+                      {profile?.bio && (
+                        <div className="text-[12px] text-[#777] line-clamp-2">{profile.bio}</div>
                       )}
                     </div>
-                    <p className="text-[12px] text-[#4f46e5] font-medium">{connection.handle}</p>
-                  </div>
-                </div>
-
-                {/* Memu Stats */}
-                <div className="flex items-center gap-3 mb-3 pb-3 border-b border-[#f2f1ee]">
-                  <div className="flex items-center gap-1.5">
-                    <MessageCircle size={12} className="text-[#777]" />
-                    <span className="text-[13px] font-medium text-[#0f0f0f]">{connection.memuCount}</span>
-                    <span className="text-[11px] text-[#777]">memus</span>
-                  </div>
-                  <div className="w-1 h-1 rounded-full bg-[#ddd]" />
-                  <div className="flex items-center gap-1.5">
-                    <Clock size={12} className="text-[#777]" />
-                    <span className="text-[11px] text-[#777]">{connection.lastMemuDate}</span>
-                  </div>
-                </div>
-
-                {/* Last Memu Preview */}
-                <div className="mb-3">
-                  <p className="text-[12px] text-[#777] line-clamp-2 italic">
-                    "{connection.lastMemuPreview}"
-                  </p>
-                </div>
-
-                {/* Footer with Status and Action */}
-                <div className="flex items-center justify-between">
-                  <div className={`flex items-center gap-1.5 px-2 py-1 rounded-full ${statusConfig[connection.status].bg}`}>
-                    <div className={`w-1.5 h-1.5 rounded-full ${statusConfig[connection.status].dot}`} />
-                    <span className={`text-[10px] font-medium ${statusConfig[connection.status].color}`}>
-                      {statusConfig[connection.status].label}
-                    </span>
-                  </div>
-                  
-                  <div className="flex items-center gap-2">
                     <button
-                      onClick={(e) => {
-                        e.stopPropagation();
-                        toggleFavorite(connection.id);
-                      }}
-                      className="p-1.5 rounded-md hover:bg-[#f2f1ee] transition"
+                      onClick={() => toggleFavorite(connection.connected_user_id)}
+                      className="p-1.5 rounded-md hover:bg-[#f2f1ee] transition flex-shrink-0"
                     >
-                      <Star size={14} className={connection.isStarred ? 'fill-[#d97706] text-[#d97706]' : 'text-[#aaa]'} />
+                      <Star size={14} className={favorites.has(connection.connected_user_id) ? 'fill-[#d97706] text-[#d97706]' : 'text-[#aaa]'} />
                     </button>
-                    <button
-                      onClick={(e) => {
-                        e.stopPropagation();
-                        openConnection(connection);
-                      }}
-                      className="flex items-center gap-1 text-[11px] font-medium text-[#4f46e5] hover:gap-2 transition-all"
-                    >
-                      View Conversation
-                      <ArrowRight size={12} />
+                  </div>
+
+                  {/* Actions */}
+                  <div className="flex gap-2">
+                    <button className="flex-1 flex items-center justify-center gap-1.5 bg-[#0f0f0f] text-white rounded-md py-2 text-[11.5px] font-medium hover:bg-[#2a2a2a] transition">
+                      <Mail size={12} />
+                      Write
+                    </button>
+                    <button className="flex-1 flex items-center justify-center gap-1.5 bg-[#4f46e5] text-white rounded-md py-2 text-[11.5px] font-medium hover:bg-[#4338ca] transition">
+                      <MessageSquare size={12} />
+                      Memo
                     </button>
                   </div>
                 </div>
-              </div>
-            ))}
+              );
+            })}
           </div>
         )}
       </div>
-
-      <style>{`
-        .line-clamp-2 {
-          display: -webkit-box;
-          -webkit-line-clamp: 2;
-          -webkit-box-orient: vertical;
-          overflow: hidden;
-        }
-      `}</style>
     </div>
   );
 }

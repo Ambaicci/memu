@@ -3,7 +3,8 @@
 import { useState, useEffect, useCallback } from 'react';
 import { 
   Menu, Inbox, Send, FileText, Users, Video, Calendar, User, Sparkles, 
-  ChevronLeft, ChevronRight, X, LogIn, Edit2, Trash2, Check, Plus, MessageSquare
+  ChevronLeft, ChevronRight, X, LogIn, Edit2, Trash2, Check, Plus, MessageSquare,
+  Home, Bell, PenSquare, TrendingUp
 } from 'lucide-react';
 import { createClient } from '@/lib/supabase/client';
 import { useToast } from '@/contexts/ToastContext';
@@ -24,7 +25,7 @@ interface Space {
 }
 
 interface SidebarProps {
-  onNavigate: (panel: 'inmemus' | 'outmemus' | 'drafts' | 'connections' | 'spaces' | 'confer' | 'calendar' | 'handles') => void;
+  onNavigate: (panel: 'inmemus' | 'outmemus' | 'drafts' | 'connections' | 'spaces' | 'confer' | 'calendar' | 'handles' | 'analytics') => void;
   activePanel: string;
   onOpenSpace: (spaceId: string) => void;
   onOpenCompose: () => void;
@@ -59,25 +60,20 @@ export default function Sidebar({
   const [newSpaceColor, setNewSpaceColor] = useState('#8b5cf6');
   const [currentUserId, setCurrentUserId] = useState<string | null>(null);
   
-  // Direct Memos State
   const [isInboxOpen, setIsInboxOpen] = useState(false);
   const [unreadMemoCount, setUnreadMemoCount] = useState(0);
 
   const { showToast } = useToast();
 
-  // Get current user
   useEffect(() => {
     const getUser = async () => {
       const supabase = createClient();
       const { data: { user } } = await supabase.auth.getUser();
-      if (user) {
-        setCurrentUserId(user.id);
-      }
+      if (user) setCurrentUserId(user.id);
     };
     getUser();
   }, []);
 
-  // Fetch unread memo count
   useEffect(() => {
     if (!currentUserId) return;
     const supabase = createClient();
@@ -89,30 +85,21 @@ export default function Sidebar({
         .eq('recipient_id', currentUserId)
         .eq('is_read', false);
         
-      if (!error && count !== null) {
-        setUnreadMemoCount(count);
-      }
+      if (!error && count !== null) setUnreadMemoCount(count);
     };
     
     fetchUnread();
     
-    // Listen for real-time updates on the direct_memos table
     const channel = supabase
       .channel('memo-notifications')
       .on('postgres_changes', { event: 'INSERT', schema: 'public', table: 'direct_memos' }, fetchUnread)
       .subscribe();
 
-    return () => {
-      supabase.removeChannel(channel);
-    };
+    return () => { supabase.removeChannel(channel); };
   }, [currentUserId]);
 
-  // Fetch spaces from Supabase
   const fetchSpaces = useCallback(async () => {
-    if (!currentUserId) {
-      setLoadingSpaces(false);
-      return;
-    }
+    if (!currentUserId) { setLoadingSpaces(false); return; }
 
     setLoadingSpaces(true);
     const supabase = createClient();
@@ -124,7 +111,6 @@ export default function Sidebar({
         .eq('user_id', currentUserId);
       
       if (memError) throw memError;
-
       if (!memberships || memberships.length === 0) {
         setSpaces([]);
         setLoadingSpaces(false);
@@ -154,9 +140,7 @@ export default function Sidebar({
   }, [currentUserId, showToast]);
 
   useEffect(() => {
-    if (currentUserId) {
-      fetchSpaces();
-    }
+    if (currentUserId) fetchSpaces();
   }, [fetchSpaces, currentUserId]);
 
   const toggleSidebar = () => {
@@ -167,22 +151,14 @@ export default function Sidebar({
 
   const handleRenameSpace = async (spaceId: string, newName: string) => {
     const supabase = createClient();
-    const { error } = await supabase
-      .from('spaces')
-      .update({ name: newName })
-      .eq('id', spaceId);
-    
-    if (error) {
-      showToast('Failed to rename space', 'error');
-    } else {
-      showToast('Space renamed', 'success');
-      fetchSpaces();
-    }
+    const { error } = await supabase.from('spaces').update({ name: newName }).eq('id', spaceId);
+    if (error) showToast('Failed to rename space', 'error');
+    else { showToast('Space renamed', 'success'); fetchSpaces(); }
   };
 
   const handleDeleteSpace = async (space: Space) => {
     if (spaces.length === 1) {
-      showToast('You must have at least one space. Create a new space before deleting this one.', 'error');
+      showToast('You must have at least one space.', 'error');
       return;
     }
     setSpaceToDelete(space);
@@ -190,48 +166,26 @@ export default function Sidebar({
 
   const confirmDelete = async () => {
     if (!spaceToDelete) return;
-    
     const supabase = createClient();
-    const { error } = await supabase
-      .from('spaces')
-      .delete()
-      .eq('id', spaceToDelete.id);
-    
-    if (error) {
-      showToast('Failed to delete space', 'error');
-    } else {
-      showToast('Space deleted', 'success');
-      fetchSpaces();
-    }
+    const { error } = await supabase.from('spaces').delete().eq('id', spaceToDelete.id);
+    if (error) showToast('Failed to delete space', 'error');
+    else { showToast('Space deleted', 'success'); fetchSpaces(); }
     setSpaceToDelete(null);
   };
 
   const handleCreateSpace = async () => {
     if (!newSpaceName.trim() || !currentUserId) return;
-    
     const supabase = createClient();
-    
     try {
       const { data: newSpace, error: spaceError } = await supabase
         .from('spaces')
-        .insert({
-          name: newSpaceName.trim(),
-          color: newSpaceColor,
-          created_by: currentUserId,
-        })
-        .select()
-        .single();
-      
+        .insert({ name: newSpaceName.trim(), color: newSpaceColor, created_by: currentUserId })
+        .select().single();
       if (spaceError) throw spaceError;
 
-      const { error: memberError } = await supabase
-        .from('space_members')
-        .insert({
-          space_id: newSpace.id,
-          user_id: currentUserId,
-          role: 'admin',
-        });
-      
+      const { error: memberError } = await supabase.from('space_members').insert({
+        space_id: newSpace.id, user_id: currentUserId, role: 'admin',
+      });
       if (memberError) throw memberError;
 
       setNewSpaceName('');
@@ -251,9 +205,7 @@ export default function Sidebar({
   };
 
   const saveRename = () => {
-    if (editingSpaceId && editingName.trim()) {
-      handleRenameSpace(editingSpaceId, editingName.trim());
-    }
+    if (editingSpaceId && editingName.trim()) handleRenameSpace(editingSpaceId, editingName.trim());
     setEditingSpaceId(null);
     setEditingName('');
   };
@@ -268,20 +220,20 @@ export default function Sidebar({
     else if (e.key === 'Escape') cancelRename();
   };
 
-  const navItemClass = (panel: string) => `flex items-center gap-3 px-4 py-2.5 text-[13.5px] font-medium rounded-lg transition-all duration-200 cursor-pointer ${activePanel === panel ? 'bg-white/60 text-[#1a1a1a] shadow-sm' : 'text-[#686868] hover:bg-white/40 hover:text-[#1a1a1a]'}`;
+  const navItemClass = (panel: string) => `flex items-center gap-3 px-4 py-3 text-[14px] font-medium rounded-lg transition-all duration-200 cursor-pointer min-h-[44px] ${activePanel === panel ? 'bg-white/60 text-[#1a1a1a] shadow-sm' : 'text-[#686868] hover:bg-white/40 hover:text-[#1a1a1a]'}`;
 
   const renderSpacesList = (isMobile: boolean = false) => {
     if (loadingSpaces) return <div className="px-4 py-2 space-y-2">{[1, 2, 3].map(i => <div key={i} className="h-8 bg-white/40 rounded-lg animate-pulse" />)}</div>;
 
     return (
       <>
-        <div onClick={() => { onNavigate('spaces'); closeMobileMenu(); }} className="flex items-center gap-3 px-4 py-2 rounded-lg text-[13.5px] font-medium transition-all duration-200 cursor-pointer hover:bg-white/40 text-[#686868] hover:text-[#1a1a1a]">
+        <div onClick={() => { onNavigate('spaces'); closeMobileMenu(); }} className="flex items-center gap-3 px-4 py-3 rounded-lg text-[14px] font-medium transition-all duration-200 cursor-pointer hover:bg-white/40 text-[#686868] hover:text-[#1a1a1a] min-h-[44px]">
           <Users size={16} className="opacity-70 flex-shrink-0" />
           {(!isCollapsed && !isMobile) || isMobile && <span>All Spaces</span>}
         </div>
         <div className="my-2 border-t border-[#e8e7e3]/30 mx-4"></div>
         {spaces.map((space) => (
-          <div key={space.id} className="group relative flex items-center gap-3 px-4 py-2 rounded-lg text-[13.5px] font-medium transition-all duration-200 cursor-pointer hover:bg-white/40 text-[#686868] hover:text-[#1a1a1a]">
+          <div key={space.id} className="group relative flex items-center gap-3 px-4 py-3 rounded-lg text-[14px] font-medium transition-all duration-200 cursor-pointer hover:bg-white/40 text-[#686868] hover:text-[#1a1a1a] min-h-[44px]">
             <div className="w-2 h-2 rounded-full flex-shrink-0" style={{ background: space.color }} />
             {editingSpaceId === space.id ? (
               <div className="flex-1 flex items-center gap-1">
@@ -300,7 +252,7 @@ export default function Sidebar({
             )}
           </div>
         ))}
-        <div onClick={() => setShowCreateModal(true)} className="flex items-center gap-3 px-4 py-2 rounded-lg text-[13.5px] font-medium transition-all duration-200 cursor-pointer hover:bg-white/40 text-[#8a8a8a] hover:text-[#4f46e5]">
+        <div onClick={() => setShowCreateModal(true)} className="flex items-center gap-3 px-4 py-3 rounded-lg text-[14px] font-medium transition-all duration-200 cursor-pointer hover:bg-white/40 text-[#8a8a8a] hover:text-[#4f46e5] min-h-[44px]">
           <Plus size={14} className="opacity-70 flex-shrink-0" />
           {(!isCollapsed && !isMobile) || isMobile && <span>New Space</span>}
         </div>
@@ -348,6 +300,14 @@ export default function Sidebar({
               <div onClick={() => { onNavigate('handles'); closeMobileMenu(); }} className={navItemClass('handles')}><User size={16} className="opacity-70 flex-shrink-0" />{!isCollapsed && <span>Handles</span>}</div>
             </div>
           </NavSection>
+          <NavSection title="Insights" colorBar="bg-[#8b5cf6]" isCollapsed={isCollapsed}>
+            <div className="space-y-0.5">
+              <div onClick={() => { onNavigate('analytics'); closeMobileMenu(); }} className={navItemClass('analytics')}>
+                <TrendingUp size={16} className="opacity-70 flex-shrink-0" />
+                {!isCollapsed && <span>Analytics</span>}
+              </div>
+            </div>
+          </NavSection>
           <div>
             <div className="text-[11px] font-semibold tracking-wide text-[#8a8a8a] px-4 pb-2 uppercase flex items-center gap-2"><div className="w-1 h-4 bg-[#dc2626] rounded-full"></div>My Spaces</div>
             <div className="space-y-1">{renderSpacesList(false)}</div>
@@ -355,18 +315,15 @@ export default function Sidebar({
         </nav>
       </div>
 
-      {/* ============================================ */}
-      {/* DIRECT MEMOS SECTION (Above User Profile)    */}
-      {/* ============================================ */}
       {!isCollapsed && (
         <div className="px-3 pb-2 flex-shrink-0">
           <button
             onClick={() => setIsInboxOpen(true)}
-            className="w-full flex items-center justify-between px-3 py-2.5 rounded-lg hover:bg-white/40 transition text-[#686868] hover:text-[#1a1a1a] group"
+            className="w-full flex items-center justify-between px-3 py-3 rounded-lg hover:bg-white/40 transition text-[#686868] hover:text-[#1a1a1a] group min-h-[44px]"
           >
             <div className="flex items-center gap-3">
               <MessageSquare size={16} className="opacity-70 flex-shrink-0 group-hover:text-[#4f46e5] transition" />
-              <span className="text-[13.5px] font-medium">Direct Memos</span>
+              <span className="text-[14px] font-medium">Direct Memos</span>
             </div>
             {unreadMemoCount > 0 && (
               <span className="bg-[#dc2626] text-white text-[10px] font-bold px-1.5 py-0.5 rounded-full min-w-[20px] text-center shadow-sm">
@@ -399,11 +356,13 @@ export default function Sidebar({
     <>
       <aside className={`hidden lg:flex h-screen bg-gradient-to-b from-[#fafaf8] to-[#f2f1ee] border-r border-[#e8e7e3]/60 flex-col shadow-sm transition-all duration-300 relative ${isCollapsed ? 'w-16' : 'w-64'}`}>{sidebarContent}</aside>
       <button onClick={toggleSidebar} className="hidden lg:flex fixed top-20 z-50 items-center justify-center w-6 h-6 rounded-full bg-white shadow-md border border-[#e8e7e3] hover:bg-[#f2f1ee] hover:border-[#4f46e5] transition-all duration-200" style={{ left: isCollapsed ? 'calc(4rem - 6px)' : 'calc(16rem - 6px)' }} title={isCollapsed ? 'Expand sidebar' : 'Collapse sidebar'}>{isCollapsed ? <ChevronRight size={12} className="text-[#686868]" /> : <ChevronLeft size={12} className="text-[#686868]" />}</button>
+      
       <button onClick={() => setIsMobileMenuOpen(true)} className="lg:hidden fixed top-4 left-4 z-50 p-2 rounded-lg bg-white/80 backdrop-blur-sm shadow-sm border border-[#e8e7e3] active:scale-95 transition-transform" aria-label="Open menu"><Menu size={20} className="text-[#1a1a1a]" /></button>
+      
       {isMobileMenuOpen && (
         <>
           <div className="fixed inset-0 bg-black/40 z-40 lg:hidden animate-fadeIn" onClick={() => setIsMobileMenuOpen(false)} />
-          <aside className="fixed left-0 top-0 w-72 h-full bg-gradient-to-b from-[#fafaf8] to-[#f2f1ee] shadow-xl z-50 lg:hidden animate-slideIn">
+          <aside className="fixed left-0 top-0 w-80 max-w-[85vw] h-full bg-gradient-to-b from-[#fafaf8] to-[#f2f1ee] shadow-xl z-50 lg:hidden animate-slideIn">
             <div className="flex flex-col h-full">
               <SidebarLogo onMobileClose={closeMobileMenu} />
               <ComposeButton onClick={onOpenCompose} />
@@ -428,6 +387,13 @@ export default function Sidebar({
                       <div onClick={() => { onNavigate('handles'); closeMobileMenu(); }} className={navItemClass('handles')}><User size={16} className="opacity-70" /> <span>Handles</span></div>
                     </div>
                   </NavSection>
+                  <NavSection title="Insights" colorBar="bg-[#8b5cf6]" isCollapsed={false}>
+                    <div className="space-y-0.5">
+                      <div onClick={() => { onNavigate('analytics'); closeMobileMenu(); }} className={navItemClass('analytics')}>
+                        <TrendingUp size={16} className="opacity-70" /> <span>Analytics</span>
+                      </div>
+                    </div>
+                  </NavSection>
                   <div>
                     <div className="text-[11px] font-semibold tracking-wide text-[#8a8a8a] px-4 pb-2 uppercase flex items-center gap-2"><div className="w-1 h-4 bg-[#dc2626] rounded-full"></div>My Spaces</div>
                     <div className="space-y-1">{renderSpacesList(true)}</div>
@@ -435,15 +401,14 @@ export default function Sidebar({
                 </nav>
               </div>
               
-              {/* Mobile Direct Memos Button */}
               <div className="px-3 pb-2 flex-shrink-0 border-t border-[#e8e7e3]/50 pt-2">
                 <button
                   onClick={() => { setIsInboxOpen(true); closeMobileMenu(); }}
-                  className="w-full flex items-center justify-between px-3 py-2.5 rounded-lg hover:bg-white/40 transition text-[#686868] hover:text-[#1a1a1a]"
+                  className="w-full flex items-center justify-between px-3 py-3 rounded-lg hover:bg-white/40 transition text-[#686868] hover:text-[#1a1a1a] min-h-[44px]"
                 >
                   <div className="flex items-center gap-3">
                     <MessageSquare size={16} className="opacity-70" />
-                    <span className="text-[13.5px] font-medium">Direct Memos</span>
+                    <span className="text-[14px] font-medium">Direct Memos</span>
                   </div>
                   {unreadMemoCount > 0 && (
                     <span className="bg-[#dc2626] text-white text-[10px] font-bold px-1.5 py-0.5 rounded-full min-w-[20px] text-center">
@@ -459,12 +424,72 @@ export default function Sidebar({
         </>
       )}
       
+      {/* Mobile Bottom Navigation Bar */}
+      <nav className="lg:hidden fixed bottom-0 left-0 right-0 bg-white border-t border-[#e8e7e3] z-40 shadow-lg safe-area-bottom">
+        <div className="flex items-center justify-around px-2 py-1">
+          <button
+            onClick={() => onNavigate('inmemus')}
+            className={`flex flex-col items-center gap-1 px-3 py-2 rounded-lg transition min-w-[60px] ${
+              activePanel === 'inmemus' ? 'text-[#4f46e5]' : 'text-[#777]'
+            }`}
+          >
+            <Home size={20} />
+            <span className="text-[10px] font-medium">Home</span>
+          </button>
+          
+          <button
+            onClick={() => onNavigate('connections')}
+            className={`flex flex-col items-center gap-1 px-3 py-2 rounded-lg transition min-w-[60px] ${
+              activePanel === 'connections' ? 'text-[#4f46e5]' : 'text-[#777]'
+            }`}
+          >
+            <Users size={20} />
+            <span className="text-[10px] font-medium">Network</span>
+          </button>
+          
+          <button
+            onClick={onOpenCompose}
+            className="flex flex-col items-center justify-center w-12 h-12 -mt-4 bg-gradient-to-r from-[#4f46e5] to-[#7c3aed] text-white rounded-full shadow-lg active:scale-95 transition-transform"
+          >
+            <PenSquare size={20} />
+          </button>
+          
+          <button
+            onClick={() => onNavigate('handles')}
+            className={`flex flex-col items-center gap-1 px-3 py-2 rounded-lg transition min-w-[60px] ${
+              activePanel === 'handles' ? 'text-[#4f46e5]' : 'text-[#777]'
+            }`}
+          >
+            <User size={20} />
+            <span className="text-[10px] font-medium">Handles</span>
+          </button>
+          
+          <button
+            onClick={() => setIsInboxOpen(true)}
+            className="flex flex-col items-center gap-1 px-3 py-2 rounded-lg transition min-w-[60px] text-[#777] relative"
+          >
+            <Bell size={20} />
+            <span className="text-[10px] font-medium">Alerts</span>
+            {unreadMemoCount > 0 && (
+              <span className="absolute top-1 right-1 w-4 h-4 bg-[#dc2626] text-white text-[9px] font-bold rounded-full flex items-center justify-center">
+                {unreadMemoCount > 9 ? '9+' : unreadMemoCount}
+              </span>
+            )}
+          </button>
+        </div>
+      </nav>
+
       {spaceToDelete && <DeleteConfirmModal spaceName={spaceToDelete.name} onConfirm={confirmDelete} onCancel={() => setSpaceToDelete(null)} />}
       
-      {/* Render the Direct Memo Inbox Slide-Over */}
       {isInboxOpen && <DirectMemoInbox onClose={() => setIsInboxOpen(false)} />}
 
-      <style>{`@keyframes slideIn { from { transform: translateX(-100%); } to { transform: translateX(0); } } @keyframes fadeIn { from { opacity: 0; } to { opacity: 1; } } .animate-slideIn { animation: slideIn 0.3s ease-out; } .animate-fadeIn { animation: fadeIn 0.2s ease-out; }`}</style>
+      <style>{`
+        @keyframes slideIn { from { transform: translateX(-100%); } to { transform: translateX(0); } }
+        @keyframes fadeIn { from { opacity: 0; } to { opacity: 1; } }
+        .animate-slideIn { animation: slideIn 0.3s ease-out; }
+        .animate-fadeIn { animation: fadeIn 0.2s ease-out; }
+        .safe-area-bottom { padding-bottom: env(safe-area-inset-bottom, 0); }
+      `}</style>
     </>
   );
 }

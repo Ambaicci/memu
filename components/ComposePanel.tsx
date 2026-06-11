@@ -163,9 +163,6 @@ export default function ComposePanel({ isOpen, onClose, onSend, prefilledTo, edi
     return null;
   };
 
-  // ============================================
-  // SMART PENDING MEMUS LOGIC
-  // ============================================
   const handleSend = async () => {
     if (to.length === 0) {
       showToast('Please add at least one recipient', 'error');
@@ -189,121 +186,116 @@ export default function ComposePanel({ isOpen, onClose, onSend, prefilledTo, edi
     
     setSending(true);
     
-    try {
-      const supabase = createClient();
-      const { data: { user } } = await supabase.auth.getUser();
-      
-      if (!user) {
-        showToast('You must be signed in to send a memu', 'error');
-        return;
-      }
-
-      let sentCount = 0;
-      let pendingCount = 0;
-      let failedCount = 0;
-
-      // Process each recipient
-      for (const recipient of to) {
-        try {
-          // Check if recipient exists in profiles (Handles)
-          const handleName = recipient.replace('@', '').replace('.memu', '');
-          const { data: profile, error: profileError } = await supabase
-            .from('profiles')
-            .select('id')
-            .eq('username', handleName)
-            .maybeSingle();
-
-          if (profileError) {
-            console.warn('Profile lookup error:', profileError);
-          }
-
-          const recipientId = profile?.id || null;
-          const memoStatus = recipientId ? 'sent' : 'pending';
-
-          // Insert into database
-          const insertData: any = {
-            sender_id: user.id,
-            recipient_id: recipientId,
-            subject: subject.trim(),
-            body: body.trim(),
-            nature: nature,
-            status: memoStatus,
-          };
-
-          // Only add recipient_email if it's an actual email
-          if (isEmailAddress(recipient)) {
-            insertData.recipient_email = recipient;
-          }
-
-          const { error: dbError } = await supabase.from('memus').insert(insertData);
-
-          if (dbError) {
-            console.error('Database insert error:', JSON.stringify(dbError, null, 2));
-            throw dbError;
-          }
-
-          // If recipient exists and is an email, try to send via Resend
-          if (recipientId && isEmailAddress(recipient)) {
-            try {
-              const res = await fetch('/api/send-email', {
-                method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({
-                  to: recipient,
-                  subject: subject.trim(),
-                  body: { text: body.trim(), nature: nature },
-                }),
-              });
-              if (res.ok) {
-                sentCount++;
-              } else {
-                console.warn('Email send failed:', res.status);
-                failedCount++;
-              }
-            } catch (err) {
-              console.error('Email send error:', err);
-              failedCount++;
-            }
-          } else if (recipientId) {
-            sentCount++;
-          } else {
-            pendingCount++;
-          }
-        } catch (err: any) {
-          console.error(`Failed to process memu for ${recipient}:`, err);
-          failedCount++;
-        }
-      }
-
-      // Show smart summary toast
-      const messages: string[] = [];
-      if (sentCount > 0) messages.push(`${sentCount} sent`);
-      if (pendingCount > 0) messages.push(`${pendingCount} pending (delivers when they join)`);
-      if (failedCount > 0) messages.push(`${failedCount} failed`);
-      
-      const summary = messages.join(' • ');
-      const toastType = failedCount > 0 && sentCount === 0 ? 'error' : 'success';
-      showToast(summary || 'Memu processed', toastType);
-
-      // Call the onSend callback
-      onSend({ to, subject, nature, body });
-      
-      // Reset form
-      setTo([]);
-      setSubject('');
-      setNature('decide');
-      setBody('');
-      setToInput('');
-      setValidationStatus({});
-      
-    } catch (err: any) {
-      console.error('Critical error in handleSend:', err);
-      showToast('Failed to send memu. Please try again.', 'error');
-    } finally {
-      // ALWAYS reset sending state
+    const supabase = createClient();
+    const { data: { user } } = await supabase.auth.getUser();
+    
+    if (!user) {
+      showToast('You must be signed in to send a memu', 'error');
       setSending(false);
-      onClose();
+      return;
     }
+
+    let sentCount = 0;
+    let pendingCount = 0;
+    let failedCount = 0;
+
+    // Process each recipient
+    for (const recipient of to) {
+      try {
+        // Check if recipient exists in profiles (Handles)
+        const handleName = recipient.replace('@', '').replace('.memu', '');
+        const { data: profile, error: profileError } = await supabase
+          .from('profiles')
+          .select('id')
+          .eq('username', handleName)
+          .maybeSingle();
+
+        if (profileError) {
+          console.error('Profile lookup error:', profileError);
+        }
+
+        const recipientId = profile?.id || null;
+        const memoStatus = recipientId ? 'sent' : 'pending';
+
+        console.log(`Processing ${recipient}:`, { recipientId, memoStatus });
+
+                // Insert into database
+        const insertData = {
+          sender_id: user.id,
+          recipient_id: recipientId,
+          // Store the handle OR email so we can deliver later when they register
+          recipient_email: recipient, // Always store the recipient string (handle or email)
+          subject: subject.trim(),
+          body: body.trim(),
+          nature: nature,
+          status: memoStatus,
+        };
+        
+        console.log('Inserting memu:', insertData);
+
+        const { data: insertResult, error: dbError } = await supabase
+          .from('memus')
+          .insert(insertData)
+          .select();
+
+        if (dbError) {
+          console.error('Database insert error:', JSON.stringify(dbError, null, 2));
+          throw dbError;
+        }
+
+        console.log('✅ Memu inserted:', insertResult);
+
+        // If recipient exists, try to send via Resend (if configured)
+        if (recipientId && isEmailAddress(recipient)) {
+          try {
+            const res = await fetch('/api/send-email', {
+              method: 'POST',
+              headers: { 'Content-Type': 'application/json' },
+              body: JSON.stringify({
+                to: recipient,
+                subject: subject.trim(),
+                body: { text: body.trim(), nature: nature },
+              }),
+            });
+            if (res.ok) sentCount++;
+            else failedCount++;
+          } catch (err) {
+            console.error(`Email send error for ${recipient}:`, err);
+            failedCount++;
+          }
+        } else if (recipientId) {
+          sentCount++;
+        } else {
+          pendingCount++;
+        }
+      } catch (err: any) {
+        console.error(`❌ Failed to process memu for ${recipient}:`, JSON.stringify(err, null, 2));
+        failedCount++;
+      }
+    }
+
+    // Show smart summary toast
+    const messages: string[] = [];
+    if (sentCount > 0) messages.push(`${sentCount} sent`);
+    if (pendingCount > 0) messages.push(`${pendingCount} pending (delivers when they join)`);
+    if (failedCount > 0) messages.push(`${failedCount} failed`);
+    
+    const summary = messages.join(' • ');
+    const toastType = failedCount > 0 && sentCount === 0 ? 'error' : 'success';
+    showToast(summary, toastType);
+
+    // Call the onSend callback (for parent component updates)
+    onSend({ to, subject, nature, body });
+    
+    // Reset form
+    setTo([]);
+    setSubject('');
+    setNature('decide');
+    setBody('');
+    setToInput('');
+    setValidationStatus({});
+    setSending(false);
+    onClose();
   };
 
   const isEmail = (handle: string) => {

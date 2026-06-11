@@ -43,8 +43,7 @@ export default function SpacesList({
             onOpenSpace={onOpenSpace}
             onRenameSpace={onRenameSpace}
             onDeleteSpace={onDeleteSpace}
-            isCollapsed={isCollapsed}
-          />
+            />
         ))}
         
         {/* Add New Space Button */}

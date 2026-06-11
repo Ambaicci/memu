@@ -7,7 +7,7 @@ import {
   ArrowLeft, Users, MessageSquare, Settings, Plus, 
   Loader2, Hash, AtSign, Calendar
 } from 'lucide-react';
-import BoardView from './BoardView';
+import BoardView from '../boards/BoardView';
 
 interface Member {
   id: string;
@@ -133,7 +133,7 @@ export default function SpaceView({ spaceId }: SpaceViewProps) {
 
     return (
       <BoardView
-        board={boardViewData}
+        board={boardViewData as any}
         onBack={() => setSelectedBoard(null)}
         currentUser="You"
       />

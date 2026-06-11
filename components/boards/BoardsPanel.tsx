@@ -5,8 +5,9 @@ import { createClient } from '@/lib/supabase/client';
 import { useToast } from '@/contexts/ToastContext';
 import { 
   Layout, Plus, Search, Loader2, MoreVertical, 
-  Edit2, Trash2, Check, X
+  Edit2, Trash2, Check, X, ArrowLeft
 } from 'lucide-react';
+import BoardView from './BoardView';
 
 interface Member {
   id: string;
@@ -35,6 +36,7 @@ export default function BoardsPanel() {
   const [newBoardName, setNewBoardName] = useState('');
   const [editingBoard, setEditingBoard] = useState<string | null>(null);
   const [editName, setEditName] = useState('');
+  const [selectedBoard, setSelectedBoard] = useState<Board | null>(null);
   const [currentUserId, setCurrentUserId] = useState<string | null>(null);
   const { showToast } = useToast();
 
@@ -174,6 +176,17 @@ export default function BoardsPanel() {
     b.name.toLowerCase().includes(searchQuery.toLowerCase())
   );
 
+  // BoardView Render
+  if (selectedBoard) {
+    return (
+      <BoardView
+        board={selectedBoard as any}
+        onBack={() => setSelectedBoard(null)}
+        currentUser="You"
+      />
+    );
+  }
+
   if (loading) {
     return (
       <div className="flex items-center justify-center h-full">
@@ -244,6 +257,7 @@ export default function BoardsPanel() {
             {filteredBoards.map((board) => (
               <div
                 key={board.id}
+                onClick={() => setSelectedBoard(board)}
                 className="group bg-white border border-[#e8e7e3] rounded-xl p-5 hover:shadow-lg transition-all duration-200 cursor-pointer"
               >
                 <div className="flex items-start justify-between mb-3">

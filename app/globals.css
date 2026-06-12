@@ -8,6 +8,9 @@
   --paper: #fafaf8;
   --paper2: #f2f1ee;
   --paper3: #e8e7e3;
+  --purple: #4f46e5;
+  --blue: #0891b2;
+  --teal: #06b6d4;
 }
 
 * {
@@ -15,103 +18,124 @@
 }
 
 body {
-  font-family: 'DM Sans', sans-serif;
+  font-family: -apple-system, BlinkMacSystemFont, "SF Pro Text", "DM Sans", system-ui, sans-serif;
   background: var(--paper);
   color: var(--ink);
   -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+  font-size: 15px;
+  line-height: 1.5;
+  letter-spacing: -0.011em;
 }
 
-/* Simple scrollbar */
+/* Headings – Playfair Display for elegance */
+h1, h2, h3, .heading-serif {
+  font-family: "Playfair Display", Georgia, serif;
+  font-weight: 500;
+  letter-spacing: -0.02em;
+}
+
+/* Gradient text for main page titles (purple → ink) */
+.heading-gradient {
+  background: linear-gradient(135deg, var(--ink), var(--purple));
+  background-clip: text;
+  color: transparent;
+  -webkit-background-clip: text;
+}
+
+/* Large title (Apple's "Large Title" style) */
+.title-large {
+  font-size: 34px;
+  font-weight: 600;
+  letter-spacing: -0.003em;
+  line-height: 1.2;
+}
+
+/* Responsive heading sizes */
+@media (max-width: 768px) {
+  .title-large {
+    font-size: 28px;
+  }
+}
+
+/* Subtle text for metadata */
+.text-meta {
+  font-size: 12px;
+  color: var(--ink3);
+  letter-spacing: -0.01em;
+}
+
+/* Scrollbar */
 ::-webkit-scrollbar {
-  width: 4px;
+  width: 5px;
+  height: 5px;
 }
-
 ::-webkit-scrollbar-track {
   background: transparent;
 }
-
 ::-webkit-scrollbar-thumb {
   background: var(--paper3);
-  border-radius: 2px;
+  border-radius: 8px;
+}
+::-webkit-scrollbar-thumb:hover {
+  background: var(--ink4);
 }
 
-/* Basic animations */
+/* Cards */
+.card {
+  background: white;
+  border: 1px solid var(--paper3);
+  border-radius: 14px;
+  transition: all 0.2s ease;
+}
+.card:hover {
+  border-color: #d0cfc9;
+  box-shadow: 0 8px 20px rgba(0,0,0,0.04);
+  transform: translateY(-2px);
+}
+
+/* Buttons */
+.btn-primary {
+  background: linear-gradient(135deg, var(--purple), var(--blue));
+  color: white;
+  border-radius: 10px;
+  font-weight: 500;
+  font-size: 14px;
+  padding: 8px 16px;
+  transition: all 0.2s;
+}
+.btn-primary:hover {
+  transform: translateY(-1px);
+  box-shadow: 0 6px 14px rgba(79,70,229,0.25);
+}
+
+.btn-secondary {
+  background: white;
+  border: 1px solid var(--paper3);
+  color: var(--ink3);
+  border-radius: 10px;
+  padding: 8px 16px;
+  font-size: 14px;
+  transition: all 0.2s;
+}
+.btn-secondary:hover {
+  border-color: var(--ink3);
+  color: var(--ink);
+  background: var(--paper2);
+}
+
+/* Animations */
 @keyframes spin {
   from { transform: rotate(0deg); }
   to { transform: rotate(360deg); }
 }
-
 .animate-spin {
   animation: spin 1s linear infinite;
 }
 
-/* ========== CONSISTENT CARD STYLES ========== */
-
-.card {
-  background: white;
-  border: 1px solid #e8e7e3;
-  border-radius: 12px;
-  transition: all 0.2s ease;
-}
-
-.card:hover {
-  border-color: #d0cfc9;
-  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.05);
-  transform: translateY(-1px);
-}
-
-.card-interactive {
-  cursor: pointer;
-}
-
-.card-interactive:active {
-  transform: translateY(0);
-}
-
-/* Card variants */
-.card-elevated {
-  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.05);
-}
-
-.card-compact {
-  padding: 12px;
-}
-
-.card-default {
-  padding: 16px;
-}
-
-.card-large {
-  padding: 20px;
-}
-
-/* Card header */
-.card-header {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  margin-bottom: 12px;
-}
-
-.card-title {
-  font-family: 'DM Sans', sans-serif;
-  font-size: 15px;
-  font-weight: 500;
-  color: #0f0f0f;
-}
-
-.card-subtitle {
-  font-size: 12px;
-  color: #777;
-  margin-top: 4px;
-}
-
-/* Card footer */
-.card-footer {
-  margin-top: 16px;
-  padding-top: 12px;
-  border-top: 1px solid #f2f1ee;
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
+.line-clamp-3 {
+  display: -webkit-box;
+  -webkit-line-clamp: 3;
+  -webkit-box-orient: vertical;
+  overflow: hidden;
 }

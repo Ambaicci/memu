@@ -1,12 +1,12 @@
-
 'use client';
 
 import { useState, useEffect, useRef, useCallback } from 'react';
 import { createClient } from '@/lib/supabase/client';
+import { useToast } from '@/contexts/ToastContext';
 import { 
   Video, Mic, MicOff, VideoOff, PhoneOff, Phone, Users, 
   Calendar, Clock, ChevronRight, Share2, MessageSquare, 
-  Camera, Volume2, Copy, CheckCircle, X 
+  Camera, Volume2, Copy, CheckCircle, X, Sparkles
 } from 'lucide-react';
 
 // ---------- Types ----------
@@ -41,11 +41,13 @@ export default function ConferPanel() {
   const [showJoinInput, setShowJoinInput] = useState(false);
   const [copied, setCopied] = useState(false);
   const [callError, setCallError] = useState<string | null>(null);
+  const [isConnecting, setIsConnecting] = useState(false);
   
   const localVideoRef = useRef<HTMLVideoElement>(null);
   const peerConnectionsRef = useRef<Map<string, RTCPeerConnection>>(new Map());
   const channelRef = useRef<any>(null);
   const currentUserId = useRef<string>('');
+  const { showToast } = useToast();
 
   // Get current user name from Supabase auth
   useEffect(() => {
@@ -53,16 +55,13 @@ export default function ConferPanel() {
       const supabase = createClient();
       const { data: { user } } = await supabase.auth.getUser();
       if (user) {
-        // Get profile to show name
         const { data: profile } = await supabase
           .from('profiles')
           .select('full_name')
           .eq('id', user.id)
           .single();
         currentUserId.current = user.id;
-        // Store name in participant list
         const userName = profile?.full_name || user.email?.split('@')[0] || 'Anonymous';
-        // We'll use this when adding self later
         (window as any).__conferUserName = userName;
       }
     };
@@ -91,6 +90,7 @@ export default function ConferPanel() {
     } catch (err) {
       console.error('Media error:', err);
       setCallError('Could not access camera/microphone. Please check permissions.');
+      showToast('Camera/microphone access denied', 'error');
       return null;
     }
   };
@@ -99,15 +99,18 @@ export default function ConferPanel() {
   const startNewCall = async () => {
     const newRoomId = generateRoomId();
     const userName = (window as any).__conferUserName || 'You';
+    setIsConnecting(true);
     const stream = await getLocalMedia();
-    if (!stream) return;
+    if (!stream) {
+      setIsConnecting(false);
+      return;
+    }
 
     setRoomId(newRoomId);
     setCallTitle(`Call ${newRoomId}`);
     setIsInCall(true);
     setParticipants([{ id: currentUserId.current, name: userName, videoEnabled: true, audioEnabled: true }]);
 
-    // Join Realtime channel
     const supabase = createClient();
     const channel = supabase.channel(`call:${newRoomId}`, {
       config: { broadcast: { self: true } }
@@ -119,7 +122,6 @@ export default function ConferPanel() {
       if (fromId === currentUserId.current) return;
       let pc = peerConnectionsRef.current.get(fromId);
       if (!pc && signal.type === 'offer') {
-        // Create answer
         pc = new RTCPeerConnection({ iceServers: [{ urls: 'stun:stun.l.google.com:19302' }] });
         peerConnectionsRef.current.set(fromId, pc);
         pc.onicecandidate = (event) => {
@@ -129,8 +131,7 @@ export default function ConferPanel() {
         };
         pc.ontrack = (event) => {
           setParticipants(prev => {
-            const existing = prev.find(p => p.id === fromId);
-            if (existing) return prev;
+            if (prev.find(p => p.id === fromId)) return prev;
             return [...prev, { id: fromId, name: `Guest ${fromId.slice(0,4)}`, stream: event.streams[0], videoEnabled: true, audioEnabled: true }];
           });
         };
@@ -149,15 +150,23 @@ export default function ConferPanel() {
     });
 
     await channel.subscribe();
-
-    // Announce self presence
     channel.send({ type: 'broadcast', event: 'signal', payload: { fromId: currentUserId.current, signal: { type: 'new-participant' } } });
+    setIsConnecting(false);
+    showToast(`Call started – Room ID: ${newRoomId}`, 'success');
   };
 
   // Join existing call with room ID
   const joinCall = async (joinId: string) => {
+    if (!joinId.trim()) {
+      showToast('Please enter a room ID', 'error');
+      return;
+    }
+    setIsConnecting(true);
     const stream = await getLocalMedia();
-    if (!stream) return;
+    if (!stream) {
+      setIsConnecting(false);
+      return;
+    }
     const userName = (window as any).__conferUserName || 'You';
     setRoomId(joinId);
     setCallTitle(`Call ${joinId}`);
@@ -175,7 +184,6 @@ export default function ConferPanel() {
       if (fromId === currentUserId.current) return;
       let pc = peerConnectionsRef.current.get(fromId);
       if (!pc && signal.type === 'offer') {
-        // Answer
         pc = new RTCPeerConnection({ iceServers: [{ urls: 'stun:stun.l.google.com:19302' }] });
         peerConnectionsRef.current.set(fromId, pc);
         pc.onicecandidate = (event) => {
@@ -197,7 +205,7 @@ export default function ConferPanel() {
         await pc.setLocalDescription(answer);
         channel.send({ type: 'broadcast', event: 'signal', payload: { fromId: currentUserId.current, signal: answer } });
       } else if (signal.type === 'offer' && pc) {
-        // If we're the caller, we already created an offer; ignore
+        // ignore
       } else if (signal.type === 'answer' && pc) {
         await pc.setRemoteDescription(new RTCSessionDescription(signal));
       } else if (signal.type === 'candidate' && pc) {
@@ -207,7 +215,6 @@ export default function ConferPanel() {
 
     await channel.subscribe();
 
-    // Send offer to all existing participants after a short delay
     setTimeout(async () => {
       for (const [id, pc] of peerConnectionsRef.current) {
         if (id !== currentUserId.current) {
@@ -217,6 +224,8 @@ export default function ConferPanel() {
         }
       }
     }, 500);
+    setIsConnecting(false);
+    showToast(`Joined room ${joinId}`, 'success');
   };
 
   const toggleMute = () => {
@@ -225,6 +234,7 @@ export default function ConferPanel() {
         track.enabled = !track.enabled;
       });
       setIsMuted(!isMuted);
+      showToast(isMuted ? 'Microphone on' : 'Microphone muted', 'info');
     }
   };
 
@@ -234,6 +244,7 @@ export default function ConferPanel() {
         track.enabled = !track.enabled;
       });
       setIsVideoOff(!isVideoOff);
+      showToast(isVideoOff ? 'Camera on' : 'Camera off', 'info');
     }
   };
 
@@ -250,44 +261,60 @@ export default function ConferPanel() {
     setRoomId('');
     setParticipants([]);
     setCallError(null);
+    showToast('Call ended', 'info');
   };
 
   const copyRoomId = () => {
     navigator.clipboard.writeText(roomId);
     setCopied(true);
+    showToast('Room ID copied', 'success');
     setTimeout(() => setCopied(false), 2000);
   };
 
   // ----- Render lobby (not in call) -----
   if (!isInCall) {
     return (
-      <div className="flex flex-col h-full overflow-y-auto bg-gradient-to-br from-[#fafaf8] to-[#f2f1ee]">
-        <div className="flex flex-col items-center justify-center py-16 px-4 text-center">
-          <div className="w-20 h-20 rounded-full bg-[#0f0f0f] flex items-center justify-center mb-6">
+      <div className="flex flex-col h-full overflow-y-auto bg-[#fafaf8]">
+        <div className="flex flex-col items-center justify-center py-16 px-4 text-center max-w-lg mx-auto">
+          <div className="w-20 h-20 rounded-full bg-gradient-to-r from-[#4f46e5] to-[#0891b2] flex items-center justify-center mb-6 shadow-lg">
             <Video size={36} className="text-white" />
           </div>
-          <h1 className="font-['Playfair_Display'] text-4xl font-normal text-[#0f0f0f] mb-3">
-            memu<span className="text-[#4f46e5] italic">-confer</span>
+          <h1 className="heading-gradient font-['Playfair_Display'] text-4xl font-medium tracking-tight mb-3">
+            memu<span className="text-[#4f46e5]">-confer</span>
           </h1>
-          <p className="max-w-md mb-8 text-[#777]">Crystal-clear conversations — video, voice, or text.</p>
-          <div className="flex gap-3">
-            <button onClick={startNewCall} className="flex items-center gap-2 bg-[#0f0f0f] text-white rounded-md px-6 py-3 text-sm font-medium hover:bg-[#2a2a2a] transition shadow-md">
-              <Phone size={16} /> Start a Call
+          <p className="text-[#777] mb-8">Crystal-clear conversations — video, voice, or text.</p>
+          <div className="flex flex-col sm:flex-row gap-3">
+            <button 
+              onClick={startNewCall} 
+              disabled={isConnecting}
+              className="flex items-center gap-2 px-5 py-2.5 bg-gradient-to-r from-[#4f46e5] to-[#0891b2] text-white rounded-full text-sm font-medium hover:from-[#5b21b6] hover:to-[#06b6d4] transition shadow-sm disabled:opacity-50"
+            >
+              {isConnecting ? <div className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin" /> : <Phone size={16} />}
+              {isConnecting ? 'Connecting...' : 'Start a Call'}
             </button>
-            <button onClick={() => setShowJoinInput(!showJoinInput)} className="flex items-center gap-2 bg-white border border-[#e8e7e3] rounded-md px-6 py-3 text-sm font-medium hover:border-[#777] transition">
+            <button 
+              onClick={() => setShowJoinInput(!showJoinInput)} 
+              className="flex items-center gap-2 px-5 py-2.5 bg-white border border-[#e8e7e3] rounded-full text-sm font-medium text-[#777] hover:border-[#4f46e5] hover:text-[#4f46e5] transition"
+            >
               <Video size={16} /> Join with Code
             </button>
           </div>
           {showJoinInput && (
-            <div className="mt-6 flex gap-2">
+            <div className="mt-6 flex gap-2 w-full max-w-sm">
               <input
                 type="text"
                 value={joinRoomId}
                 onChange={(e) => setJoinRoomId(e.target.value)}
                 placeholder="Enter room ID"
-                className="border border-[#e8e7e3] rounded-md px-3 py-2 text-sm"
+                className="flex-1 border border-[#e8e7e3] rounded-full px-4 py-2 text-sm focus:outline-none focus:border-[#4f46e5] transition"
               />
-              <button onClick={() => joinCall(joinRoomId)} className="bg-[#4f46e5] text-white px-4 py-2 rounded-md text-sm">Join</button>
+              <button 
+                onClick={() => joinCall(joinRoomId)} 
+                disabled={isConnecting}
+                className="bg-gradient-to-r from-[#4f46e5] to-[#0891b2] text-white px-5 py-2 rounded-full text-sm font-medium hover:from-[#5b21b6] hover:to-[#06b6d4] transition disabled:opacity-50"
+              >
+                Join
+              </button>
             </div>
           )}
           {callError && <p className="mt-4 text-red-500 text-sm">{callError}</p>}
@@ -296,56 +323,92 @@ export default function ConferPanel() {
     );
   }
 
-  // ----- In call UI -----
+  // ----- In call UI (polished, lighter, with purple accents) -----
   return (
-    <div className="flex flex-col h-full bg-[#1a1a1a]">
+    <div className="flex flex-col h-full bg-gradient-to-br from-[#1a1a1a] to-[#0f0f0f]">
+      {/* Header */}
+      <div className="px-4 py-3 bg-black/40 backdrop-blur-sm flex items-center justify-between border-b border-white/10">
+        <div className="flex items-center gap-2">
+          <div className="w-2 h-2 rounded-full bg-[#10b981] animate-pulse" />
+          <span className="text-white/70 text-xs font-medium">Live</span>
+          <span className="text-white/40 text-xs ml-2">Room: {roomId}</span>
+        </div>
+        <div className="flex items-center gap-3">
+          <button onClick={copyRoomId} className="flex items-center gap-1 text-white/60 hover:text-white transition text-xs">
+            {copied ? <CheckCircle size={14} className="text-[#10b981]" /> : <Copy size={14} />}
+            {copied ? 'Copied' : 'Copy ID'}
+          </button>
+          <button onClick={endCall} className="flex items-center gap-1 bg-red-500/80 hover:bg-red-600 text-white rounded-full px-3 py-1 text-xs transition">
+            <PhoneOff size={12} /> Leave
+          </button>
+        </div>
+      </div>
+
       {/* Video grid */}
       <div className="flex-1 p-4 overflow-y-auto">
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
           {/* Self video */}
-          <div className="relative bg-[#2a2a2a] rounded-xl overflow-hidden aspect-video">
+          <div className="relative bg-[#2a2a2a] rounded-2xl overflow-hidden aspect-video shadow-lg ring-1 ring-white/10">
             <video ref={localVideoRef} autoPlay muted playsInline className="w-full h-full object-cover" />
-            {!localStream && <div className="absolute inset-0 flex items-center justify-center text-white">Connecting...</div>}
-            <div className="absolute bottom-2 left-2 bg-black/50 backdrop-blur-sm rounded-md px-2 py-1 text-white text-xs">You {isVideoOff && '(cam off)'}</div>
+            {!localStream && <div className="absolute inset-0 flex items-center justify-center text-white/60">Connecting...</div>}
+            <div className="absolute bottom-2 left-2 bg-black/50 backdrop-blur-sm rounded-full px-3 py-1 text-white text-xs flex items-center gap-1">
+              <Sparkles size={10} className="text-[#4f46e5]" />
+              You {isVideoOff && '(cam off)'}
+            </div>
           </div>
           {/* Remote participants */}
           {participants.filter(p => p.id !== currentUserId.current).map(p => (
-            <div key={p.id} className="relative bg-[#2a2a2a] rounded-xl overflow-hidden aspect-video">
+            <div key={p.id} className="relative bg-[#2a2a2a] rounded-2xl overflow-hidden aspect-video shadow-lg ring-1 ring-white/10">
               {p.stream ? (
                 <video autoPlay playsInline className="w-full h-full object-cover" ref={el => { if (el && p.stream) el.srcObject = p.stream; }} />
               ) : (
                 <div className="absolute inset-0 flex items-center justify-center">
                   <div className="text-center">
-                    <div className="w-16 h-16 rounded-full bg-[#777] flex items-center justify-center mx-auto mb-2">
-                      <span className="text-white text-lg font-medium">{p.name.charAt(0)}</span>
+                    <div className="w-16 h-16 rounded-full bg-gradient-to-r from-[#4f46e5] to-[#0891b2] flex items-center justify-center mx-auto mb-2 shadow-md">
+                      <span className="text-white text-lg font-medium">{p.name.charAt(0).toUpperCase()}</span>
                     </div>
-                    <p className="text-white/80 text-sm">{p.name}</p>
+                    <p className="text-white/80 text-sm font-medium">{p.name}</p>
                   </div>
                 </div>
               )}
-              <div className="absolute bottom-2 left-2 bg-black/50 backdrop-blur-sm rounded-md px-2 py-1 text-white text-xs">{p.name}</div>
+              <div className="absolute bottom-2 left-2 bg-black/50 backdrop-blur-sm rounded-full px-3 py-1 text-white text-xs">{p.name}</div>
             </div>
           ))}
         </div>
       </div>
 
-      {/* Controls */}
-      <div className="bg-[#0f0f0f] border-t border-[#2a2a2a] py-4 px-3">
-        <div className="flex items-center justify-center gap-4">
-          <button onClick={toggleMute} className={`w-12 h-12 rounded-full flex items-center justify-center transition ${isMuted ? 'bg-red-600 hover:bg-red-700' : 'bg-[#2a2a2a] hover:bg-[#3a3a3a]'}`}>
-            {isMuted ? <MicOff size={20} className="text-white" /> : <Mic size={20} className="text-white" />}
+      {/* Controls - Apple‑style pill */}
+      <div className="pb-6 pt-2 px-4">
+        <div className="flex items-center justify-center gap-4 bg-black/40 backdrop-blur-md rounded-full w-fit mx-auto px-4 py-2 border border-white/10 shadow-lg">
+          <button 
+            onClick={toggleMute} 
+            className={`w-10 h-10 rounded-full flex items-center justify-center transition-all ${
+              isMuted ? 'bg-red-500 hover:bg-red-600' : 'bg-white/10 hover:bg-white/20'
+            }`}
+          >
+            {isMuted ? <MicOff size={18} className="text-white" /> : <Mic size={18} className="text-white" />}
           </button>
-          <button onClick={toggleVideo} className={`w-12 h-12 rounded-full flex items-center justify-center transition ${isVideoOff ? 'bg-red-600 hover:bg-red-700' : 'bg-[#2a2a2a] hover:bg-[#3a3a3a]'}`}>
-            {isVideoOff ? <VideoOff size={20} className="text-white" /> : <Video size={20} className="text-white" />}
+          <button 
+            onClick={toggleVideo} 
+            className={`w-10 h-10 rounded-full flex items-center justify-center transition-all ${
+              isVideoOff ? 'bg-red-500 hover:bg-red-600' : 'bg-white/10 hover:bg-white/20'
+            }`}
+          >
+            {isVideoOff ? <VideoOff size={18} className="text-white" /> : <Video size={18} className="text-white" />}
           </button>
-          <button onClick={copyRoomId} className="w-12 h-12 rounded-full bg-[#2a2a2a] hover:bg-[#3a3a3a] flex items-center justify-center transition relative">
-            {copied ? <CheckCircle size={20} className="text-green-400" /> : <Share2 size={20} className="text-white" />}
+          <button 
+            onClick={copyRoomId} 
+            className="w-10 h-10 rounded-full bg-white/10 hover:bg-white/20 flex items-center justify-center transition-all"
+          >
+            <Share2 size={18} className="text-white" />
           </button>
-          <button onClick={endCall} className="w-12 h-12 rounded-full bg-red-600 hover:bg-red-700 flex items-center justify-center transition">
-            <PhoneOff size={20} className="text-white" />
+          <button 
+            onClick={endCall} 
+            className="w-10 h-10 rounded-full bg-red-500 hover:bg-red-600 flex items-center justify-center transition-all"
+          >
+            <PhoneOff size={18} className="text-white" />
           </button>
         </div>
-        <div className="text-center mt-3 text-white/60 text-xs">Room ID: {roomId} {copied && '(copied)'}</div>
       </div>
     </div>
   );

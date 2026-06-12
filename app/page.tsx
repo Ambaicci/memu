@@ -11,27 +11,26 @@ import OfficeFAB from '@/components/OfficeFAB';
 import GlobalSearch from '@/components/search/GlobalSearch';
 import NotificationCenter from '@/components/notifications/NotificationCenter';
 import SplashScreen from '@/components/SplashScreen';
+import { ChevronLeft, Home } from 'lucide-react';
 
-// ==========================================
-// PERFORMANCE FIX: Lazy Load Heavy Panels
-// ==========================================
-const InMemusPanel = dynamic(() => import('@/components/InMemusPanel'), { ssr: false });
-const OutMemusPanel = dynamic(() => import('@/components/OutMemusPanel'), { ssr: false });
-const DraftsPanel = dynamic(() => import('@/components/DraftsPanel'), { ssr: false });
-const ConnectionsPanel = dynamic(() => import('@/components/ConnectionsPanel'), { ssr: false });
-const HandlesPanel = dynamic(() => import('@/components/HandlesPanel'), { ssr: false });
-const CalendarPanel = dynamic(() => import('@/components/CalendarPanel'), { ssr: false });
-const ConferPanel = dynamic(() => import('@/components/ConferPanel'), { ssr: false });
-const AirSharePanel = dynamic(() => import('@/components/AirSharePanel'), { ssr: false });
-const DocsPanel = dynamic(() => import('@/components/docs/DocsPanel'), { ssr: false });
-const SlidesPanel = dynamic(() => import('@/components/slides/SlidesPanel'), { ssr: false });
-const SheetsPanel = dynamic(() => import('@/components/sheets/SheetsPanel'), { ssr: false });
-const SpacesPanel = dynamic(() => import('@/components/spaces/SpacesPanel'), { ssr: false });
-const SpaceView = dynamic(() => import('@/components/spaces/SpaceView'), { ssr: false });
-const AnalyticsPanel = dynamic(() => import('@/components/AnalyticsPanel'), { ssr: false });
-const NotesPanel = dynamic(() => import('@/components/office/NotesPanel'), { ssr: false });
+// Lazy loaded panels
+const InMemusPanel = dynamic(() => import('@/components/InMemusPanel'), { ssr: false, loading: () => <PanelSkeleton /> });
+const OutMemusPanel = dynamic(() => import('@/components/OutMemusPanel'), { ssr: false, loading: () => <PanelSkeleton /> });
+const DraftsPanel = dynamic(() => import('@/components/DraftsPanel'), { ssr: false, loading: () => <PanelSkeleton /> });
+const ConnectionsPanel = dynamic(() => import('@/components/ConnectionsPanel'), { ssr: false, loading: () => <PanelSkeleton /> });
+const HandlesPanel = dynamic(() => import('@/components/HandlesPanel'), { ssr: false, loading: () => <PanelSkeleton /> });
+const CalendarPanel = dynamic(() => import('@/components/CalendarPanel'), { ssr: false, loading: () => <PanelSkeleton /> });
+const ConferPanel = dynamic(() => import('@/components/ConferPanel'), { ssr: false, loading: () => <PanelSkeleton /> });
+const AirSharePanel = dynamic(() => import('@/components/AirSharePanel'), { ssr: false, loading: () => <PanelSkeleton /> });
+const DocsPanel = dynamic(() => import('@/components/docs/DocsPanel'), { ssr: false, loading: () => <PanelSkeleton /> });
+const SlidesPanel = dynamic(() => import('@/components/slides/SlidesPanel'), { ssr: false, loading: () => <PanelSkeleton /> });
+const SheetsPanel = dynamic(() => import('@/components/sheets/SheetsPanel'), { ssr: false, loading: () => <PanelSkeleton /> });
+const SpacesPanel = dynamic(() => import('@/components/spaces/SpacesPanel'), { ssr: false, loading: () => <PanelSkeleton /> });
+const SpaceView = dynamic(() => import('@/components/spaces/SpaceView'), { ssr: false, loading: () => <PanelSkeleton /> });
+const AnalyticsPanel = dynamic(() => import('@/components/AnalyticsPanel'), { ssr: false, loading: () => <PanelSkeleton /> });
+const NotesPanel = dynamic(() => import('@/components/office/NotesPanel'), { ssr: false, loading: () => <PanelSkeleton /> });
 
-const LoadingSkeleton = () => (
+const PanelSkeleton = () => (
   <div className="flex items-center justify-center h-full">
     <div className="w-8 h-8 border-2 border-[#4f46e5] border-t-transparent rounded-full animate-spin" />
   </div>
@@ -49,13 +48,24 @@ export default function MemuApp() {
   const [composeToHandle, setComposeToHandle] = useState<string | null>(null);
   const [editingDraft, setEditingDraft] = useState<any>(null);
   const [showSplash, setShowSplash] = useState(true);
-  
   const [session, setSession] = useState<any>(null);
   const [loading, setLoading] = useState(true);
   const [showAuthModal, setShowAuthModal] = useState(false);
   const [pendingAction, setPendingAction] = useState<string | null>(null);
+  const [isOnline, setIsOnline] = useState(typeof navigator !== 'undefined' ? navigator.onLine : true);
+  const [replyToMemuId, setReplyToMemuId] = useState<string | null>(null);
 
-  // Initialize auth
+  useEffect(() => {
+    const handleOnline = () => setIsOnline(true);
+    const handleOffline = () => setIsOnline(false);
+    window.addEventListener('online', handleOnline);
+    window.addEventListener('offline', handleOffline);
+    return () => {
+      window.removeEventListener('online', handleOnline);
+      window.removeEventListener('offline', handleOffline);
+    };
+  }, []);
+
   useEffect(() => {
     const getSession = async () => {
       const supabase = createClient();
@@ -76,7 +86,6 @@ export default function MemuApp() {
     };
   }, []);
 
-  // Sync UI from URL params
   useEffect(() => {
     const panelParam = searchParams.get('panel') as PanelType | null;
     if (panelParam && isValidPanel(panelParam)) {
@@ -84,7 +93,6 @@ export default function MemuApp() {
     }
   }, [searchParams]);
 
-  // Listen for custom navigate events
   useEffect(() => {
     const handleNavigateEvent = (e: CustomEvent) => {
       handleNavigate(e.detail.panel, e.detail.spaceId);
@@ -93,7 +101,6 @@ export default function MemuApp() {
     return () => window.removeEventListener('navigate', handleNavigateEvent as EventListener);
   }, []);
 
-  // Listen for open compose event
   useEffect(() => {
     const handleOpenComposeEvent = () => {
       setIsComposeOpen(true);
@@ -144,6 +151,7 @@ export default function MemuApp() {
     setIsComposeOpen(false);
     setComposeToHandle(null);
     setEditingDraft(null);
+    setReplyToMemuId(null);
   }, []);
 
   const handleSendMemu = useCallback((memu: any) => {
@@ -151,40 +159,34 @@ export default function MemuApp() {
     handleCloseCompose();
   }, [handleCloseCompose]);
 
+  // Reply event listener - placed after handleOpenCompose is defined
+  useEffect(() => {
+    const handleReplyEvent = (e: CustomEvent) => {
+      setReplyToMemuId(e.detail.memuId);
+      handleOpenCompose();
+    };
+    window.addEventListener('replyToMemu', handleReplyEvent as EventListener);
+    return () => window.removeEventListener('replyToMemu', handleReplyEvent as EventListener);
+  }, [handleOpenCompose]);
+
   const renderPanel = useCallback(() => {
     switch (activePanel) {
-      case 'inmemus':
-        return <InMemusPanel isGuest={!session} requireAuth={requireAuth} />;
-      case 'outmemus':
-        return <OutMemusPanel isGuest={!session} requireAuth={requireAuth} />;
-      case 'drafts':
-        return <DraftsPanel isGuest={!session} requireAuth={requireAuth} onEditDraft={(draft) => handleOpenCompose(undefined, draft)} />;
-      case 'connections':
-        return <ConnectionsPanel isGuest={!session} requireAuth={requireAuth} />;
-      case 'spaces':
-        return <SpacesPanel />;
-      case 'space-dashboard':
-        return <SpaceView />;
-      case 'handles':
-        return <HandlesPanel isGuest={!session} requireAuth={requireAuth} onComposeToHandle={(handle) => handleOpenCompose(handle)} />;
-      case 'calendar':
-        return <CalendarPanel isGuest={!session} requireAuth={requireAuth} />;
-      case 'confer':
-        return <ConferPanel />;
-      case 'airshare':
-        return <AirSharePanel />;
-      case 'docs':
-        return <DocsPanel />;
-      case 'slides':
-        return <SlidesPanel />;
-      case 'sheets':
-        return <SheetsPanel />;
-      case 'analytics':
-        return <AnalyticsPanel />;
-      case 'notes':
-        return <NotesPanel />;
-      default:
-        return <InMemusPanel isGuest={!session} requireAuth={requireAuth} />;
+      case 'inmemus': return <InMemusPanel isGuest={!session} requireAuth={requireAuth} />;
+      case 'outmemus': return <OutMemusPanel isGuest={!session} requireAuth={requireAuth} />;
+      case 'drafts': return <DraftsPanel isGuest={!session} requireAuth={requireAuth} onEditDraft={(draft) => handleOpenCompose(undefined, draft)} />;
+      case 'connections': return <ConnectionsPanel isGuest={!session} requireAuth={requireAuth} />;
+      case 'spaces': return <SpacesPanel />;
+      case 'space-dashboard': return <SpaceView />;
+      case 'handles': return <HandlesPanel isGuest={!session} requireAuth={requireAuth} onComposeToHandle={(handle) => handleOpenCompose(handle)} />;
+      case 'calendar': return <CalendarPanel isGuest={!session} requireAuth={requireAuth} />;
+      case 'confer': return <ConferPanel />;
+      case 'airshare': return <AirSharePanel isGuest={!session} requireAuth={requireAuth} />;
+      case 'docs': return <DocsPanel />;
+      case 'slides': return <SlidesPanel />;
+      case 'sheets': return <SheetsPanel />;
+      case 'analytics': return <AnalyticsPanel />;
+      case 'notes': return <NotesPanel />;
+      default: return <InMemusPanel isGuest={!session} requireAuth={requireAuth} />;
     }
   }, [activePanel, session, requireAuth, handleOpenCompose]);
 
@@ -193,20 +195,18 @@ export default function MemuApp() {
   }
 
   if (loading) {
-    return (
-      <div className="flex items-center justify-center h-screen bg-[#fafaf8]">
-        <div className="text-center">
-          <div className="w-12 h-12 border-2 border-[#4f46e5] border-t-transparent rounded-full animate-spin mx-auto mb-4" />
-          <p className="text-[#777]">Loading...</p>
-        </div>
-      </div>
-    );
+    return <PanelSkeleton />;
   }
 
   const isGuest = !session;
 
   return (
     <>
+      {!isOnline && (
+        <div className="fixed top-0 left-0 right-0 bg-red-500 text-white text-center py-1 text-xs z-50">
+          You are offline. Some features may be unavailable.
+        </div>
+      )}
       <div className="flex h-screen overflow-hidden bg-[#fafaf8]">
         <Sidebar 
           onNavigate={handleNavigate} 
@@ -236,17 +236,22 @@ export default function MemuApp() {
               <div className="flex items-center gap-2">
                 <button
                   onClick={() => { if (window.history.length > 1) window.history.back(); else handleNavigate('inmemus'); }}
-                  className="p-1.5 rounded-md hover:bg-[#e8e7e3] transition text-[#3a3a3a]"
+                  className="p-1.5 rounded-full hover:bg-[#e8e7e3] transition text-[#3a3a3a] hover:text-[#4f46e5]"
+                  aria-label="Go back"
                 >
-                  <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M15 18l-6-6 6-6" strokeLinecap="round"/></svg>
+                  <ChevronLeft size={18} />
                 </button>
-                <button onClick={() => handleNavigate('inmemus')} className="p-1.5 rounded-md hover:bg-[#e8e7e3] transition text-[#3a3a3a]">
-                  <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M3 9l9-7 9 7v11a2 2 0 0 1-2 2h-5v-8H7v8H5a2 2 0 0 1-2-2z"/></svg>
+                <button
+                  onClick={() => handleNavigate('inmemus')}
+                  className="p-1.5 rounded-full hover:bg-[#e8e7e3] transition text-[#3a3a3a] hover:text-[#4f46e5]"
+                  aria-label="Home"
+                >
+                  <Home size={18} />
                 </button>
-                <div className="flex items-center gap-1.5 text-[11px] md:text-[13px] ml-2">
-                  <span className="text-[#777]">memu</span>
+                <div className="flex items-center gap-1.5 text-[11px] md:text-[13px] ml-1">
+                  <span className="text-[#777] font-medium">memu</span>
                   <span className="text-[#aaa]">/</span>
-                  <span className="font-medium text-[#0f0f0f] capitalize">{activePanel.replace('-', ' ')}</span>
+                  <span className="heading-gradient font-medium capitalize">{activePanel.replace('-', ' ')}</span>
                 </div>
               </div>
               <div className="flex items-center gap-2">
@@ -256,7 +261,7 @@ export default function MemuApp() {
             </div>
           </div>
           
-          <Suspense fallback={<LoadingSkeleton />}>
+          <Suspense fallback={<PanelSkeleton />}>
             {renderPanel()}
           </Suspense>
         </main>
@@ -270,7 +275,6 @@ export default function MemuApp() {
             else if (suiteId === 'slides') requireAuth('slides', () => handleNavigate('slides'));
             else if (suiteId === 'sheets') requireAuth('sheets', () => handleNavigate('sheets'));
             else if (suiteId === 'notes') requireAuth('notes', () => handleNavigate('notes'));
-            // Note: itemId is captured here for future use (e.g., opening a specific file directly)
           }} 
         />
 
@@ -280,6 +284,7 @@ export default function MemuApp() {
           onSend={handleSendMemu}
           prefilledTo={composeToHandle ? [composeToHandle] : undefined}
           editingDraft={editingDraft}
+          replyToMemuId={replyToMemuId}
         />
       </div>
 

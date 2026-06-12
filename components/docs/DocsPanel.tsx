@@ -5,7 +5,7 @@ import { createClient } from '@/lib/supabase/client';
 import { useToast } from '@/contexts/ToastContext';
 import { 
   FileText, Trash2, Plus, Eye, EyeOff, Download, Copy, 
-  Maximize2, Minimize2, Loader2, Cloud
+  Maximize2, Minimize2, Loader2, Cloud, Search, Filter, ChevronDown
 } from 'lucide-react';
 import DocsToolbox from './DocsToolbox';
 
@@ -33,6 +33,11 @@ function renderMarkdown(text: string): string {
     .replace(/\n/gim, '<br />');
 }
 
+const filterOptions = [
+  { id: 'all', label: 'All documents', icon: <FileText size={12} /> },
+  { id: 'recent', label: 'Recently edited', icon: <Cloud size={12} /> },
+];
+
 export default function DocsPanel() {
   const [documents, setDocuments] = useState<Document[]>([]);
   const [activeDocId, setActiveDocId] = useState<string | null>(null);
@@ -48,12 +53,25 @@ export default function DocsPanel() {
   const [isFullscreen, setIsFullscreen] = useState(false);
   const [loading, setLoading] = useState(true);
   const [currentUserId, setCurrentUserId] = useState<string | null>(null);
+  const [searchQuery, setSearchQuery] = useState('');
+  const [filter, setFilter] = useState<'all' | 'recent'>('all');
+  const [isFilterOpen, setIsFilterOpen] = useState(false);
+  const filterRef = useRef<HTMLDivElement>(null);
   
   const editorRef = useRef<HTMLDivElement>(null);
   const saveTimeoutRef = useRef<NodeJS.Timeout | null>(null);
   const { showToast } = useToast();
 
-  // Get current user
+  useEffect(() => {
+    const handleClickOutside = (e: MouseEvent) => {
+      if (filterRef.current && !filterRef.current.contains(e.target as Node)) {
+        setIsFilterOpen(false);
+      }
+    };
+    document.addEventListener('mousedown', handleClickOutside);
+    return () => document.removeEventListener('mousedown', handleClickOutside);
+  }, []);
+
   useEffect(() => {
     const getUser = async () => {
       const supabase = createClient();
@@ -68,7 +86,6 @@ export default function DocsPanel() {
     getUser();
   }, []);
 
-  // Fetch all documents
   const fetchDocuments = async (userId: string) => {
     setLoading(true);
     const supabase = createClient();
@@ -95,14 +112,12 @@ export default function DocsPanel() {
     setLoading(false);
   };
 
-  // FIX: Only update editor content when switching docs or modes (not on every keystroke)
   useEffect(() => {
     if (editorRef.current && !isPreviewMode && activeDocId) {
       editorRef.current.innerHTML = docContent.replace(/\n/g, '<br/>');
     }
   }, [activeDocId, isPreviewMode]);
 
-  // Update word/char count
   useEffect(() => {
     const words = docContent.trim() ? docContent.trim().split(/\s+/).length : 0;
     const chars = docContent.length;
@@ -110,7 +125,6 @@ export default function DocsPanel() {
     setCharCount(chars);
   }, [docContent]);
 
-  // Auto-save with debouncing
   const handleAutoSave = useCallback(async () => {
     if (!activeDocId || !currentUserId) return;
     
@@ -136,7 +150,6 @@ export default function DocsPanel() {
         console.error('Save error:', error);
         showToast('Failed to save document', 'error');
       } else {
-        // Update local state to reflect the save
         setDocuments(docs => docs.map(d => 
           d.id === activeDocId 
             ? { ...d, title: docTitle, content: docContent, word_count: wordCount, char_count: charCount, last_edited: 'Just now' }
@@ -153,7 +166,6 @@ export default function DocsPanel() {
     }
   }, [docContent, docTitle, activeDocId, handleAutoSave]);
 
-  // Create new doc - FIXED
   const handleNewDoc = async () => {
     if (!newDocTitle.trim() || !currentUserId) return;
     
@@ -179,7 +191,6 @@ export default function DocsPanel() {
     }
 
     if (data) {
-      // Add to local state immediately
       setDocuments(prev => [data, ...prev]);
       setActiveDocId(data.id);
       setDocTitle(data.title);
@@ -193,7 +204,6 @@ export default function DocsPanel() {
     showToast('Document created', 'success');
   };
 
-  // Delete doc
   const handleDeleteDoc = async (id: string) => {
     if (!currentUserId) return;
     
@@ -289,101 +299,131 @@ export default function DocsPanel() {
     }
   };
 
-  // Keyboard shortcuts
-  useEffect(() => {
-    const handleKeyDown = (e: KeyboardEvent) => {
-      if (e.ctrlKey || e.metaKey) {
-        if (e.key === 's') { e.preventDefault(); handleAutoSave(); }
-        if (e.key === 'p') { e.preventDefault(); window.print(); }
-        if (e.key === 'f') { e.preventDefault(); setIsFocusMode(!isFocusMode); }
-        if (e.key === 'b') { e.preventDefault(); handleFormat('bold'); }
-        if (e.key === 'i') { e.preventDefault(); handleFormat('italic'); }
-        if (e.key === 'u') { e.preventDefault(); handleFormat('underline'); }
-      }
-    };
-    window.addEventListener('keydown', handleKeyDown);
-    return () => window.removeEventListener('keydown', handleKeyDown);
-  }, [isFocusMode, handleAutoSave]);
+  const filteredDocs = documents.filter(doc => {
+    if (searchQuery && !doc.title.toLowerCase().includes(searchQuery.toLowerCase())) return false;
+    if (filter === 'recent') {
+      const sevenDaysAgo = new Date();
+      sevenDaysAgo.setDate(sevenDaysAgo.getDate() - 7);
+      return new Date(doc.updated_at) > sevenDaysAgo;
+    }
+    return true;
+  });
+
+  const formatDate = (dateStr: string) => {
+    const date = new Date(dateStr);
+    const now = new Date();
+    const diffMs = now.getTime() - date.getTime();
+    const mins = Math.floor(diffMs / 60000);
+    const hours = Math.floor(diffMs / 3600000);
+    const days = Math.floor(diffMs / 86400000);
+    if (mins < 1) return 'Just now';
+    if (mins < 60) return `${mins}m ago`;
+    if (hours < 24) return `${hours}h ago`;
+    if (days < 7) return `${days}d ago`;
+    return date.toLocaleDateString();
+  };
+
+  const currentFilterLabel = filter === 'all' ? 'All documents' : 'Recently edited';
 
   if (loading) {
     return (
       <div className="flex items-center justify-center h-full">
-        <div className="text-center">
-          <Loader2 className="w-8 h-8 animate-spin text-[#4f46e5] mx-auto mb-3" />
-          <p className="text-[#777]">Loading documents...</p>
-        </div>
+        <Loader2 className="w-8 h-8 animate-spin text-[#4f46e5]" />
       </div>
     );
   }
 
   return (
     <div className={`${isFullscreen ? 'fixed inset-0 z-50' : 'flex h-full'} bg-[#fafaf8] transition-all duration-300 ${isFocusMode ? 'focus-mode' : ''}`}>
-      {/* Sidebar - IMPROVED STRUCTURE */}
+      {/* Sidebar */}
       <div className="w-64 border-r border-[#e8e7e3] bg-white flex flex-col shadow-sm">
         <div className="px-4 pt-6 pb-4 border-b border-[#f2f1ee]">
-          <div className="flex items-center justify-between mb-1">
-            <h1 className="text-[18px] font-semibold text-[#0f0f0f]">memu Docs</h1>
-            <div className="p-1.5 rounded-full bg-[#d1fae5] text-[#059669]" title="Synced to cloud">
-              <Cloud size={14} />
-            </div>
+          <h1 className="heading-gradient font-['Playfair_Display'] text-xl font-medium tracking-tight">memu Docs</h1>
+          <div className="flex flex-wrap gap-1.5 mt-2">
+            <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full bg-[#f2f1ee] text-[11px] text-[#777]">
+              <FileText size={10} /> {documents.length} total
+            </span>
           </div>
-          <p className="text-[11px] text-[#777]">Write, edit, and format</p>
         </div>
         
         <div className="p-3">
           <button
             onClick={() => setShowNewDocModal(true)}
-            className="w-full flex items-center justify-center gap-2 py-2.5 bg-gradient-to-r from-[#4f46e5] to-[#7c3aed] text-white rounded-lg text-[13px] font-medium hover:from-[#5b21b6] hover:to-[#6d28d9] transition shadow-sm"
+            className="w-full flex items-center justify-center gap-2 py-2.5 btn-primary text-white rounded-lg text-[13px] font-medium"
           >
             <Plus size={14} />
             New Document
           </button>
         </div>
+
+        {/* Search & Filter inside sidebar */}
+        <div className="px-3 pb-2 space-y-2">
+          <div className="flex items-center gap-2 bg-[#f2f1ee] rounded-lg px-3 py-1.5">
+            <Search size={12} className="text-[#777]" />
+            <input
+              type="text"
+              value={searchQuery}
+              onChange={(e) => setSearchQuery(e.target.value)}
+              placeholder="Search docs..."
+              className="flex-1 text-[12px] outline-none bg-transparent"
+            />
+          </div>
+          <div className="relative" ref={filterRef}>
+            <button
+              onClick={() => setIsFilterOpen(!isFilterOpen)}
+              className="w-full flex items-center justify-between gap-2 bg-white border border-[#e8e7e3] rounded-lg px-3 py-1.5 text-[12px] text-[#777] hover:border-[#4f46e5] transition"
+            >
+              <span className="flex items-center gap-1"><Filter size={10} /> {currentFilterLabel}</span>
+              <ChevronDown size={10} />
+            </button>
+            {isFilterOpen && (
+              <div className="absolute left-0 right-0 mt-1 bg-white rounded-lg shadow-xl border border-[#e8e7e3] z-20">
+                {filterOptions.map((opt) => (
+                  <button
+                    key={opt.id}
+                    onClick={() => { setFilter(opt.id as any); setIsFilterOpen(false); }}
+                    className={`w-full flex items-center gap-2 px-3 py-2 text-[12px] transition ${filter === opt.id ? 'bg-[#ede9fe] text-[#4f46e5]' : 'text-[#777] hover:bg-[#fafaf8]'}`}
+                  >
+                    {opt.icon}
+                    {opt.label}
+                  </button>
+                ))}
+              </div>
+            )}
+          </div>
+        </div>
         
         <div className="flex-1 overflow-y-auto px-2 pb-4">
-          {documents.length === 0 ? (
+          {filteredDocs.length === 0 ? (
             <div className="p-6 text-center">
               <FileText size={32} className="text-[#aaa] mx-auto mb-3" />
-              <p className="text-[12px] text-[#777] mb-2">No documents yet</p>
-              <button
-                onClick={() => setShowNewDocModal(true)}
-                className="text-[11px] text-[#4f46e5] hover:underline font-medium"
-              >
-                Create one →
-              </button>
+              <p className="text-[12px] text-[#777] mb-2">No documents found</p>
             </div>
           ) : (
             <div className="space-y-1">
-              {documents.map((doc) => (
+              {filteredDocs.map((doc) => (
                 <div
                   key={doc.id}
                   onClick={() => handleSelectDoc(doc)}
                   className={`group p-3 rounded-lg cursor-pointer transition-all ${
                     activeDocId === doc.id 
-                      ? 'bg-[#ede9fe] border border-[#c4b5fd]' 
-                      : 'hover:bg-[#f9fafb] border border-transparent'
+                      ? 'bg-[#ede9fe] ring-1 ring-[#4f46e5]/40' 
+                      : 'hover:bg-[#f9fafb]'
                   }`}
                 >
                   <div className="flex items-center justify-between mb-1">
                     <div className="flex items-center gap-2 flex-1 min-w-0">
                       <FileText size={13} className="text-[#4f46e5] flex-shrink-0" />
-                      <span className="text-[13px] font-medium text-[#0f0f0f] truncate">
-                        {doc.title}
-                      </span>
+                      <span className="text-[13px] font-medium text-[#0f0f0f] truncate">{doc.title}</span>
                     </div>
                     <button
-                      onClick={(e) => {
-                        e.stopPropagation();
-                        handleDeleteDoc(doc.id);
-                      }}
-                      className="opacity-0 group-hover:opacity-100 p-1 rounded hover:bg-red-100 transition flex-shrink-0"
+                      onClick={(e) => { e.stopPropagation(); handleDeleteDoc(doc.id); }}
+                      className="opacity-0 group-hover:opacity-100 p-1 rounded hover:bg-red-100 transition"
                     >
                       <Trash2 size={11} className="text-[#777] hover:text-[#dc2626]" />
                     </button>
                   </div>
-                  <div className="text-[10px] text-[#777] pl-6">
-                    {doc.word_count} words • {doc.last_edited}
-                  </div>
+                  <div className="text-[10px] text-[#777] pl-6">{doc.word_count} words • {formatDate(doc.updated_at)}</div>
                 </div>
               ))}
             </div>
@@ -391,120 +431,42 @@ export default function DocsPanel() {
         </div>
       </div>
 
-      {/* Editor - IMPROVED LAYOUT & SPACING */}
+      {/* Editor Area */}
       <div className="flex-1 flex flex-col bg-[#f9fafb]">
         {activeDocId ? (
           <>
-            {/* Toolbar - BETTER CONTAINERIZATION */}
             <div className="border-b border-[#e8e7e3] bg-white shadow-sm px-4 py-2.5 flex items-center justify-between flex-wrap gap-2">
               <div className="flex items-center gap-2 flex-wrap">
                 {!isFocusMode && !isFullscreen && (
-                  <button
-                    onClick={() => setIsFocusMode(true)}
-                    className="p-2 rounded-lg hover:bg-[#f2f1ee] transition text-[#777]"
-                    title="Focus Mode (Ctrl+F)"
-                  >
-                    <Eye size={16} />
-                  </button>
+                  <button onClick={() => setIsFocusMode(true)} className="p-2 rounded-lg hover:bg-[#f2f1ee] transition text-[#777]" title="Focus Mode"><Eye size={16} /></button>
                 )}
                 {isFocusMode && (
-                  <button
-                    onClick={() => setIsFocusMode(false)}
-                    className="p-2 rounded-lg hover:bg-[#f2f1ee] transition text-[#4f46e5]"
-                    title="Exit Focus Mode"
-                  >
-                    <EyeOff size={16} />
-                  </button>
+                  <button onClick={() => setIsFocusMode(false)} className="p-2 rounded-lg hover:bg-[#f2f1ee] transition text-[#4f46e5]" title="Exit Focus Mode"><EyeOff size={16} /></button>
                 )}
                 <div className="w-px h-5 bg-[#e8e7e3]" />
-                
-                <button
-                  onClick={() => setIsPreviewMode(!isPreviewMode)}
-                  className={`px-3 py-1.5 rounded-lg text-[12px] font-medium transition ${
-                    isPreviewMode ? 'bg-[#4f46e5] text-white' : 'text-[#777] hover:bg-[#f2f1ee]'
-                  }`}
-                >
+                <button onClick={() => setIsPreviewMode(!isPreviewMode)} className={`px-3 py-1.5 rounded-lg text-[12px] font-medium transition ${isPreviewMode ? 'btn-primary' : 'text-[#777] hover:bg-[#f2f1ee]'}`}>
                   {isPreviewMode ? 'Write' : 'Preview'}
                 </button>
-                
-                {!isPreviewMode && (
-                  <DocsToolbox 
-                    onFormat={handleFormat} 
-                    onInsert={handleInsert}
-                    wordCount={wordCount}
-                    charCount={charCount}
-                  />
-                )}
+                {!isPreviewMode && <DocsToolbox onFormat={handleFormat} onInsert={handleInsert} wordCount={wordCount} charCount={charCount} />}
               </div>
-
-              <div className="flex items-center gap-3 flex-wrap">
-                <div className="text-[11px] text-[#777] hidden sm:block bg-[#f2f1ee] px-2 py-1 rounded">
-                  {wordCount} words • {charCount} chars
-                </div>
-                {isSaving && (
-                  <div className="text-[10px] text-[#059669] animate-pulse flex items-center gap-1">
-                    <Loader2 size={10} className="animate-spin" /> Saving...
-                  </div>
-                )}
-                <div className="w-px h-5 bg-[#e8e7e3]" />
-                <button
-                  onClick={handleCopy}
-                  className="p-2 rounded-lg hover:bg-[#f2f1ee] transition text-[#777]"
-                  title="Copy"
-                >
-                  <Copy size={14} />
-                </button>
-                <button
-                  onClick={() => handleExport('md')}
-                  className="p-2 rounded-lg hover:bg-[#f2f1ee] transition text-[#777]"
-                  title="Export as Markdown"
-                >
-                  <Download size={14} />
-                </button>
-                
-                <button
-                  onClick={() => setIsFullscreen(!isFullscreen)}
-                  className="p-2 rounded-lg hover:bg-[#f2f1ee] transition text-[#4f46e5]"
-                  title={isFullscreen ? 'Exit Fullscreen' : 'Fullscreen'}
-                >
-                  {isFullscreen ? <Minimize2 size={16} /> : <Maximize2 size={16} />}
-                </button>
+              <div className="flex items-center gap-3">
+                <div className="text-[11px] text-[#777] hidden sm:block bg-[#f2f1ee] px-2 py-1 rounded">{wordCount} words • {charCount} chars</div>
+                {isSaving && <div className="text-[10px] text-[#059669] animate-pulse flex items-center gap-1"><Loader2 size={10} className="animate-spin" /> Saving...</div>}
+                <button onClick={handleCopy} className="p-2 rounded-lg hover:bg-[#f2f1ee] transition text-[#777]" title="Copy"><Copy size={14} /></button>
+                <button onClick={() => handleExport('md')} className="p-2 rounded-lg hover:bg-[#f2f1ee] transition text-[#777]" title="Export as Markdown"><Download size={14} /></button>
+                <button onClick={() => setIsFullscreen(!isFullscreen)} className="p-2 rounded-lg hover:bg-[#f2f1ee] transition text-[#4f46e5]">{isFullscreen ? <Minimize2 size={16} /> : <Maximize2 size={16} />}</button>
               </div>
             </div>
 
-            {/* Title & Content Area - BETTER SPACING */}
             <div className="flex-1 overflow-auto">
               <div className="max-w-4xl mx-auto px-6 md:px-12 py-8">
-                {/* Title Input */}
                 <div className="mb-6 pb-4 border-b border-[#e8e7e3]">
-                  <input
-                    type="text"
-                    value={docTitle}
-                    onChange={(e) => setDocTitle(e.target.value)}
-                    className="text-3xl md:text-4xl font-semibold text-[#0f0f0f] bg-transparent outline-none w-full placeholder:text-[#aaa]"
-                    placeholder="Untitled"
-                  />
+                  <input type="text" value={docTitle} onChange={(e) => setDocTitle(e.target.value)} className="text-3xl md:text-4xl font-semibold text-[#0f0f0f] bg-transparent outline-none w-full placeholder:text-[#aaa]" placeholder="Untitled" />
                 </div>
-
-                {/* Content Editor - FIXED RTL BUG */}
                 {isPreviewMode ? (
-                  <div 
-                    className="prose prose-sm max-w-none bg-white rounded-xl p-8 shadow-sm min-h-[600px] border border-[#e8e7e3]"
-                    dangerouslySetInnerHTML={{ __html: renderMarkdown(docContent) }}
-                  />
+                  <div className="prose prose-sm max-w-none bg-white rounded-xl p-8 shadow-sm min-h-[600px] border border-[#e8e7e3]" dangerouslySetInnerHTML={{ __html: renderMarkdown(docContent) }} />
                 ) : (
-                  <div
-                    ref={editorRef}
-                    contentEditable
-                    onInput={(e) => {
-                      if (e.currentTarget) {
-                        setDocContent(e.currentTarget.innerText);
-                      }
-                    }}
-                    className="w-full bg-white rounded-xl p-8 shadow-sm outline-none min-h-[600px] prose prose-sm border border-[#e8e7e3] focus:border-[#4f46e5] transition-colors"
-                    dir="ltr"
-                    suppressContentEditableWarning
-                  />
+                  <div ref={editorRef} contentEditable onInput={(e) => setDocContent(e.currentTarget.innerText)} className="w-full bg-white rounded-xl p-8 shadow-sm outline-none min-h-[600px] prose prose-sm border border-[#e8e7e3] focus:border-[#4f46e5] transition-colors" dir="ltr" suppressContentEditableWarning />
                 )}
               </div>
             </div>
@@ -512,50 +474,23 @@ export default function DocsPanel() {
         ) : (
           <div className="flex-1 flex items-center justify-center bg-white">
             <div className="text-center max-w-md">
-              <div className="w-20 h-20 rounded-full bg-[#ede9fe] flex items-center justify-center mx-auto mb-4">
-                <FileText size={36} className="text-[#4f46e5]" />
-              </div>
+              <div className="w-20 h-20 rounded-full bg-[#ede9fe] flex items-center justify-center mx-auto mb-4"><FileText size={36} className="text-[#4f46e5]" /></div>
               <h3 className="text-[20px] font-semibold text-[#0f0f0f] mb-2">No document selected</h3>
               <p className="text-[13px] text-[#777] mb-6">Create a new document to start writing</p>
-              <button
-                onClick={() => setShowNewDocModal(true)}
-                className="px-5 py-2.5 bg-gradient-to-r from-[#4f46e5] to-[#7c3aed] text-white rounded-lg text-[13px] font-medium hover:from-[#5b21b6] hover:to-[#6d28d9] transition shadow-sm"
-              >
-                Create New Document
-              </button>
+              <button onClick={() => setShowNewDocModal(true)} className="btn-primary">Create New Document</button>
             </div>
           </div>
         )}
       </div>
 
-      {/* New Document Modal */}
       {showNewDocModal && (
         <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50" onClick={() => setShowNewDocModal(false)}>
           <div className="bg-white rounded-2xl w-[400px] max-w-[90%] p-6 shadow-2xl" onClick={(e) => e.stopPropagation()}>
             <h3 className="text-[18px] font-semibold text-[#0f0f0f] mb-4">New Document</h3>
-            <input
-              type="text"
-              value={newDocTitle}
-              onChange={(e) => setNewDocTitle(e.target.value)}
-              placeholder="Document title"
-              className="w-full px-4 py-2.5 border border-[#e8e7e3] rounded-lg text-[14px] focus:outline-none focus:border-[#4f46e5] mb-4 transition"
-              autoFocus
-              onKeyDown={(e) => e.key === 'Enter' && handleNewDoc()}
-            />
+            <input type="text" value={newDocTitle} onChange={(e) => setNewDocTitle(e.target.value)} placeholder="Document title" className="w-full px-4 py-2.5 border border-[#e8e7e3] rounded-lg text-[14px] focus:outline-none focus:border-[#4f46e5] mb-4 transition" autoFocus onKeyDown={(e) => e.key === 'Enter' && handleNewDoc()} />
             <div className="flex gap-3 justify-end">
-              <button
-                onClick={() => setShowNewDocModal(false)}
-                className="px-4 py-2 rounded-lg text-[13px] text-[#777] hover:bg-[#f2f1ee] transition"
-              >
-                Cancel
-              </button>
-              <button
-                onClick={handleNewDoc}
-                disabled={!newDocTitle.trim()}
-                className="px-4 py-2 rounded-lg text-[13px] font-medium bg-gradient-to-r from-[#4f46e5] to-[#7c3aed] text-white hover:from-[#5b21b6] hover:to-[#6d28d9] transition disabled:opacity-50"
-              >
-                Create
-              </button>
+              <button onClick={() => setShowNewDocModal(false)} className="px-4 py-2 rounded-lg text-[13px] text-[#777] hover:bg-[#f2f1ee] transition">Cancel</button>
+              <button onClick={handleNewDoc} disabled={!newDocTitle.trim()} className="btn-primary disabled:opacity-50">Create</button>
             </div>
           </div>
         </div>
@@ -572,11 +507,7 @@ export default function DocsPanel() {
         .prose li { margin-bottom: 0.25em; }
         .prose blockquote { border-left: 3px solid #4f46e5; padding-left: 1em; margin: 1em 0; color: #666; font-style: italic; }
         .prose code { background: #f2f1ee; padding: 0.2em 0.4em; border-radius: 6px; font-size: 0.85em; color: #dc2626; }
-        [contenteditable]:empty:before {
-          content: 'Start writing...';
-          color: #aaa;
-          font-style: italic;
-        }
+        [contenteditable]:empty:before { content: 'Start writing...'; color: #aaa; font-style: italic; }
       `}</style>
     </div>
   );

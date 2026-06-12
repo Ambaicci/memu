@@ -2,7 +2,7 @@
 
 import { useState, useEffect, useCallback } from 'react';
 import { createClient } from '@/lib/supabase/client';
-import { X, Inbox, Send, Reply, CheckCheck, Check, Loader2, User } from 'lucide-react';
+import { X, Inbox, Send, Reply, CheckCheck, Check, Loader2, User, Sparkles } from 'lucide-react';
 import DirectMemoComposer from './DirectMemoComposer';
 
 interface Profile {
@@ -35,7 +35,6 @@ export default function DirectMemoInbox({ onClose }: DirectMemoInboxProps) {
   const [composerOpen, setComposerOpen] = useState(false);
   const [replyTo, setReplyTo] = useState<{ id: string; name: string } | null>(null);
 
-  // Get current user
   useEffect(() => {
     const getUser = async () => {
       const supabase = createClient();
@@ -50,7 +49,6 @@ export default function DirectMemoInbox({ onClose }: DirectMemoInboxProps) {
     getUser();
   }, []);
 
-  // Fetch memos and enrich with profile names
   const fetchMemos = useCallback(async (userId: string) => {
     setLoading(true);
     const supabase = createClient();
@@ -64,7 +62,6 @@ export default function DirectMemoInbox({ onClose }: DirectMemoInboxProps) {
 
       if (error) throw error;
 
-      // Extract unique user IDs to fetch names safely
       const userIds = [...new Set((rawMemos || []).flatMap(m => [m.sender_id, m.recipient_id]).filter(id => id !== userId))];
       
       let profiles: Record<string, Profile> = {};
@@ -79,7 +76,6 @@ export default function DirectMemoInbox({ onClose }: DirectMemoInboxProps) {
         }
       }
 
-      // Map and enrich
       const enrichedMemos: Memo[] = (rawMemos || []).map(m => ({
         ...m,
         sender: m.sender_id === userId ? undefined : (profiles[m.sender_id] || { id: m.sender_id, full_name: 'Colleague', username: null }),
@@ -94,7 +90,6 @@ export default function DirectMemoInbox({ onClose }: DirectMemoInboxProps) {
     }
   }, []);
 
-  // Mark as read when inbox opens or memo is clicked
   const markAsRead = async (memoId: string) => {
     const memo = memos.find(m => m.id === memoId);
     if (!memo || memo.is_read || memo.recipient_id !== currentUserId) return;
@@ -134,35 +129,46 @@ export default function DirectMemoInbox({ onClose }: DirectMemoInboxProps) {
     activeTab === 'inbox' ? m.recipient_id === currentUserId : m.sender_id === currentUserId
   );
 
+  const unreadCount = memos.filter(m => m.recipient_id === currentUserId && !m.is_read).length;
+
   return (
     <>
-      {/* Inbox Slide-Over */}
-      <div className="fixed inset-y-0 right-0 w-96 bg-[#fafaf8] shadow-2xl z-50 flex flex-col border-l border-[#e8e7e3] animate-slideIn">
-        {/* Header */}
-        <div className="flex items-center justify-between px-6 py-4 border-b border-[#e8e7e3] bg-white">
-          <h3 className="text-[14px] font-semibold text-[#0f0f0f] flex items-center gap-2">
-            <Inbox size={16} className="text-[#4f46e5]" />
-            Direct Memos
-          </h3>
-          <button onClick={onClose} className="p-1.5 rounded-lg hover:bg-[#e8e7e3] transition text-[#777]">
-            <X size={18} />
-          </button>
+      {/* Apple‑inspired Slide-Over */}
+      <div className="fixed inset-y-0 right-0 w-96 bg-white shadow-2xl z-50 flex flex-col rounded-l-2xl border-l border-[#e8e7e3] animate-slideIn">
+        {/* Header with gradient */}
+        <div className="px-5 py-4 border-b border-[#f2f1ee] bg-gradient-to-r from-white to-[#fafaf8]">
+          <div className="flex items-center justify-between">
+            <div className="flex items-center gap-2">
+              <div className="w-7 h-7 rounded-full bg-gradient-to-r from-[#4f46e5] to-[#0891b2] flex items-center justify-center">
+                <Sparkles size={14} className="text-white" />
+              </div>
+              <h3 className="text-[15px] font-semibold text-[#1a1a1a]">Direct Memos</h3>
+            </div>
+            <button onClick={onClose} className="p-1.5 rounded-full hover:bg-[#f2f1ee] transition text-[#777]">
+              <X size={18} />
+            </button>
+          </div>
+          <p className="text-[11px] text-[#777] mt-1">Private conversations</p>
         </div>
 
-        {/* Tabs */}
-        <div className="flex border-b border-[#e8e7e3] bg-white">
+        {/* Tabs - pill style */}
+        <div className="flex gap-1 p-3 bg-white border-b border-[#f2f1ee]">
           <button
             onClick={() => setActiveTab('inbox')}
-            className={`flex-1 py-3 text-[12px] font-medium transition-colors ${
-              activeTab === 'inbox' ? 'text-[#4f46e5] border-b-2 border-[#4f46e5] bg-[#ede9fe]/30' : 'text-[#777] hover:bg-[#f2f1ee]'
+            className={`flex-1 py-2 rounded-full text-[12px] font-medium transition-all ${
+              activeTab === 'inbox'
+                ? 'bg-gradient-to-r from-[#4f46e5] to-[#0891b2] text-white shadow-sm'
+                : 'text-[#777] hover:bg-[#f2f1ee]'
             }`}
           >
-            Inbox ({memos.filter(m => m.recipient_id === currentUserId && !m.is_read).length})
+            Inbox {unreadCount > 0 && `(${unreadCount})`}
           </button>
           <button
             onClick={() => setActiveTab('sent')}
-            className={`flex-1 py-3 text-[12px] font-medium transition-colors ${
-              activeTab === 'sent' ? 'text-[#4f46e5] border-b-2 border-[#4f46e5] bg-[#ede9fe]/30' : 'text-[#777] hover:bg-[#f2f1ee]'
+            className={`flex-1 py-2 rounded-full text-[12px] font-medium transition-all ${
+              activeTab === 'sent'
+                ? 'bg-gradient-to-r from-[#4f46e5] to-[#0891b2] text-white shadow-sm'
+                : 'text-[#777] hover:bg-[#f2f1ee]'
             }`}
           >
             Sent
@@ -185,7 +191,7 @@ export default function DirectMemoInbox({ onClose }: DirectMemoInboxProps) {
               </p>
             </div>
           ) : (
-            <div className="divide-y divide-[#e8e7e3]/50">
+            <div className="divide-y divide-[#f2f1ee]">
               {filteredMemos.map((memo) => {
                 const isMine = memo.sender_id === currentUserId;
                 const otherUser = isMine ? memo.recipient : memo.sender;
@@ -195,18 +201,18 @@ export default function DirectMemoInbox({ onClose }: DirectMemoInboxProps) {
                   <div
                     key={memo.id}
                     onClick={() => !isMine && markAsRead(memo.id)}
-                    className={`p-4 hover:bg-[#f2f1ee] transition cursor-pointer group ${
-                      !isMine && !memo.is_read ? 'bg-[#ede9fe]/20' : 'bg-white'
+                    className={`p-4 hover:bg-[#fafaf8] transition cursor-pointer group ${
+                      !isMine && !memo.is_read ? 'bg-gradient-to-r from-[#ede9fe]/30 to-transparent' : 'bg-white'
                     }`}
                   >
                     <div className="flex items-start gap-3">
-                      <div className="w-8 h-8 rounded-full bg-[#4f46e5]/10 flex items-center justify-center text-[#4f46e5] text-[10px] font-bold flex-shrink-0">
+                      <div className="w-9 h-9 rounded-full bg-gradient-to-br from-[#4f46e5] to-[#0891b2] flex items-center justify-center text-white text-[10px] font-bold shadow-sm flex-shrink-0">
                         {displayName.split(' ').map(n => n[0]).join('').substring(0, 2).toUpperCase()}
                       </div>
                       
                       <div className="flex-1 min-w-0">
                         <div className="flex items-center justify-between mb-1">
-                          <span className={`text-[13px] font-semibold ${!isMine && !memo.is_read ? 'text-[#0f0f0f]' : 'text-[#3a3a3a]'}`}>
+                          <span className={`text-[13px] font-semibold ${!isMine && !memo.is_read ? 'text-[#1a1a1a]' : 'text-[#3a3a3a]'}`}>
                             {displayName}
                           </span>
                           <span className="text-[10px] text-[#777]">
@@ -214,36 +220,34 @@ export default function DirectMemoInbox({ onClose }: DirectMemoInboxProps) {
                           </span>
                         </div>
                         
-                        <p className={`text-[12px] leading-relaxed mb-2 ${!isMine && !memo.is_read ? 'text-[#0f0f0f] font-medium' : 'text-[#555]'}`}>
+                        <p className={`text-[12px] leading-relaxed mb-2 ${!isMine && !memo.is_read ? 'text-[#1a1a1a] font-medium' : 'text-[#555]'}`}>
                           {memo.content}
                         </p>
 
-                        {/* Read Receipt / Status */}
                         <div className="flex items-center justify-between">
                           <div className="flex items-center gap-1 text-[10px] text-[#aaa]">
                             {isMine ? (
                               memo.is_read ? (
                                 <>
-                                  <CheckCheck size={10} className="text-[#4f46e5]" />
-                                  Read {memo.read_at ? formatTime(memo.read_at) : 'recently'}
+                                  <CheckCheck size={10} className="text-[#059669]" />
+                                  <span>Read {memo.read_at ? formatTime(memo.read_at) : ''}</span>
                                 </>
                               ) : (
                                 <>
-                                  <Check size={10} />
-                                  Delivered
+                                  <Check size={10} className="text-[#777]" />
+                                  <span>Delivered</span>
                                 </>
                               )
                             ) : (
-                              memo.is_read && <span className="text-[#4f46e5]">Read {memo.read_at ? formatTime(memo.read_at) : ''}</span>
+                              memo.is_read && <span className="text-[#059669]">Read {memo.read_at ? formatTime(memo.read_at) : ''}</span>
                             )}
                           </div>
 
-                          {/* Reply Button (Only on hover for inbox items) */}
                           {!isMine && (
                             <button
                               onClick={(e) => { e.stopPropagation(); handleReply(memo); }}
-                              className="opacity-0 group-hover:opacity-100 p-1.5 rounded-md hover:bg-[#e8e7e3] text-[#777] hover:text-[#4f46e5] transition"
-                              title="Reply with a new memo"
+                              className="opacity-0 group-hover:opacity-100 p-1.5 rounded-full hover:bg-white shadow-sm text-[#777] hover:text-[#4f46e5] transition"
+                              title="Reply"
                             >
                               <Reply size={12} />
                             </button>
@@ -258,11 +262,11 @@ export default function DirectMemoInbox({ onClose }: DirectMemoInboxProps) {
           )}
         </div>
 
-        {/* Footer: New Memo Button */}
-        <div className="p-4 border-t border-[#e8e7e3] bg-white">
+        {/* Footer: New Memo Button (gradient) */}
+        <div className="p-4 border-t border-[#f2f1ee] bg-white">
           <button
             onClick={() => { setReplyTo(null); setComposerOpen(true); }}
-            className="w-full flex items-center justify-center gap-2 py-2.5 bg-[#4f46e5] text-white rounded-lg text-[13px] font-medium hover:bg-[#4338ca] transition shadow-sm"
+            className="w-full flex items-center justify-center gap-2 py-2.5 bg-gradient-to-r from-[#4f46e5] to-[#0891b2] text-white rounded-full text-[13px] font-medium hover:from-[#5b21b6] hover:to-[#06b6d4] transition shadow-sm"
           >
             New Direct Memo
             <Send size={14} />
@@ -285,7 +289,7 @@ export default function DirectMemoInbox({ onClose }: DirectMemoInboxProps) {
           from { transform: translateX(100%); }
           to { transform: translateX(0); }
         }
-        .animate-slideIn { animation: slideIn 0.25s ease-out; }
+        .animate-slideIn { animation: slideIn 0.3s cubic-bezier(0.2, 0.9, 0.4, 1.1); }
       `}</style>
     </>
   );

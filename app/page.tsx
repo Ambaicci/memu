@@ -11,6 +11,7 @@ import OfficeFAB from '@/components/OfficeFAB';
 import GlobalSearch from '@/components/search/GlobalSearch';
 import NotificationCenter from '@/components/notifications/NotificationCenter';
 import SplashScreen from '@/components/SplashScreen';
+import HomeDashboard from '@/components/HomeDashboard';
 import { ChevronLeft, Home } from 'lucide-react';
 
 // Lazy loaded panels
@@ -36,14 +37,14 @@ const PanelSkeleton = () => (
   </div>
 );
 
-type PanelType = 'inmemus' | 'outmemus' | 'drafts' | 'connections' | 'spaces' | 'confer' | 'calendar' | 'handles' | 'airshare' | 'docs' | 'slides' | 'sheets' | 'space-dashboard' | 'analytics' | 'notes';
+type PanelType = 'home' | 'inmemus' | 'outmemus' | 'drafts' | 'connections' | 'spaces' | 'confer' | 'calendar' | 'handles' | 'airshare' | 'docs' | 'slides' | 'sheets' | 'space-dashboard' | 'analytics' | 'notes';
 
 export default function MemuApp() {
   const router = useRouter();
   const pathname = usePathname();
   const searchParams = useSearchParams();
   
-  const [activePanel, setActivePanel] = useState<PanelType>('inmemus');
+  const [activePanel, setActivePanel] = useState<PanelType>('home');
   const [isComposeOpen, setIsComposeOpen] = useState(false);
   const [composeToHandle, setComposeToHandle] = useState<string | null>(null);
   const [editingDraft, setEditingDraft] = useState<any>(null);
@@ -110,7 +111,7 @@ export default function MemuApp() {
   }, []);
 
   const isValidPanel = (panel: string): panel is PanelType => {
-    return ['inmemus', 'outmemus', 'drafts', 'connections', 'spaces', 'confer', 'calendar', 'handles', 'airshare', 'docs', 'slides', 'sheets', 'space-dashboard', 'analytics', 'notes'].includes(panel);
+    return ['home', 'inmemus', 'outmemus', 'drafts', 'connections', 'spaces', 'confer', 'calendar', 'handles', 'airshare', 'docs', 'slides', 'sheets', 'space-dashboard', 'analytics', 'notes'].includes(panel);
   };
 
   const updateUrl = useCallback((panel: PanelType, spaceId?: string | null) => {
@@ -171,6 +172,7 @@ export default function MemuApp() {
 
   const renderPanel = useCallback(() => {
     switch (activePanel) {
+      case 'home': return <HomeDashboard />;
       case 'inmemus': return <InMemusPanel isGuest={!session} requireAuth={requireAuth} />;
       case 'outmemus': return <OutMemusPanel isGuest={!session} requireAuth={requireAuth} />;
       case 'drafts': return <DraftsPanel isGuest={!session} requireAuth={requireAuth} onEditDraft={(draft) => handleOpenCompose(undefined, draft)} />;
@@ -186,7 +188,7 @@ export default function MemuApp() {
       case 'sheets': return <SheetsPanel />;
       case 'analytics': return <AnalyticsPanel />;
       case 'notes': return <NotesPanel />;
-      default: return <InMemusPanel isGuest={!session} requireAuth={requireAuth} />;
+      default: return <HomeDashboard />;
     }
   }, [activePanel, session, requireAuth, handleOpenCompose]);
 
@@ -235,14 +237,14 @@ export default function MemuApp() {
             <div className="flex items-center justify-between">
               <div className="flex items-center gap-2">
                 <button
-                  onClick={() => { if (window.history.length > 1) window.history.back(); else handleNavigate('inmemus'); }}
+                  onClick={() => { if (window.history.length > 1) window.history.back(); else handleNavigate('home'); }}
                   className="p-1.5 rounded-full hover:bg-[#e8e7e3] transition text-[#3a3a3a] hover:text-[#4f46e5]"
                   aria-label="Go back"
                 >
                   <ChevronLeft size={18} />
                 </button>
                 <button
-                  onClick={() => handleNavigate('inmemus')}
+                  onClick={() => handleNavigate('home')}
                   className="p-1.5 rounded-full hover:bg-[#e8e7e3] transition text-[#3a3a3a] hover:text-[#4f46e5]"
                   aria-label="Home"
                 >

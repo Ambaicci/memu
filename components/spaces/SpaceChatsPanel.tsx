@@ -1,9 +1,9 @@
 'use client';
 
 import { useState, useEffect, useRef } from 'react';
+import { createClient } from '@/lib/supabase/client';
 import { useToast } from '@/contexts/ToastContext';
-import { Send, Paperclip, Smile, Sparkles } from 'lucide-react';
-import { Member, Message } from './types'; // We will use local interfaces for now
+import { Send, Paperclip, Smile, Sparkles, Loader2 } from 'lucide-react';
 
 interface SpaceChatsPanelProps {
   space: any;
@@ -13,43 +13,93 @@ interface SpaceChatsPanelProps {
 export default function SpaceChatsPanel({ space, currentUserId }: SpaceChatsPanelProps) {
   const [message, setMessage] = useState('');
   const [messages, setMessages] = useState<any[]>([]);
-  const [showDemoMessages, setShowDemoMessages] = useState(false);
+  const [loading, setLoading] = useState(true);
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const { showToast } = useToast();
 
   useEffect(() => {
-    if (space && space.members.length > 0 && !showDemoMessages) {
-      const timer = setTimeout(() => {
-        setMessages([
-          { id: '1', text: 'Hey everyone! Excited to be in this space 🚀', user: space.members[0], timestamp: new Date(Date.now() - 3600000) },
-          { id: '2', text: 'Welcome! Let\'s build something amazing together.', user: space.members[Math.min(1, space.members.length - 1)], timestamp: new Date(Date.now() - 1800000) },
-        ]);
-        setShowDemoMessages(true);
-      }, 1000);
-      return () => clearTimeout(timer);
+    if (space) {
+      fetchMessages();
     }
   }, [space]);
 
   useEffect(() => {
-    if (showDemoMessages && messages.length > 0) {
-      messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
-    }
-  }, [messages, showDemoMessages]);
+    messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
+  }, [messages]);
 
-  const handleSendMessage = () => {
-    if (message.trim() && space && currentUserId) {
-      const currentUser = space.members.find((m: any) => m.id === currentUserId);
-      if (currentUser) {
-        setMessages(prev => [...prev, {
-          id: Date.now().toString(),
-          text: message.trim(),
-          user: currentUser,
-          timestamp: new Date(),
-        }]);
-        setMessage('');
-        showToast('Message sent! (demo)', 'success');
-        setTimeout(() => messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' }), 100);
-      }
+  const fetchMessages = async () => {
+    setLoading(true);
+    const supabase = createClient();
+    
+    // We only select '*' because we already have the member details in 'space.members'
+    const { data, error } = await supabase
+      .from('space_messages')
+      .select('*') 
+      .eq('space_id', space.id)
+      .order('created_at', { ascending: true });
+
+    if (!error && data) {
+      const formattedMessages = data.map((msg: any, idx: number) => {
+        // Match the message to the space member we already fetched!
+        const member = space.members.find((m: any) => m.id === msg.user_id) || {
+          id: msg.user_id,
+          name: 'Unknown User',
+          handle: '@unknown',
+          initials: '??',
+          color: ['#4f46e5', '#059669', '#d97706', '#dc2626', '#8b5cf6'][idx % 5],
+          textColor: '#ffffff',
+        };
+        return {
+          id: msg.id,
+          text: msg.message,         
+          user: member,
+          timestamp: new Date(msg.created_at),
+        };
+      });
+      setMessages(formattedMessages);
+    } else if (error) {
+      console.error('Error fetching messages:', error.message, error.details);
+    }
+    setLoading(false);
+  };
+
+  const handleSendMessage = async () => {
+    if (!message.trim() || !space || !currentUserId) return;
+    
+    const supabase = createClient();
+    const currentUser = space.members.find((m: any) => m.id === currentUserId) || {
+      id: currentUserId,
+      name: 'You',
+      handle: '@you',
+      initials: 'ME',
+      color: '#4f46e5',
+      textColor: '#ffffff',
+    };
+    
+    // We only select '*' because we already have the current user's details
+    const { data, error } = await supabase
+      .from('space_messages')
+      .insert({
+        space_id: space.id,
+        user_id: currentUserId,
+        message: message.trim(),
+      })
+      .select() 
+      .single();
+
+    if (!error && data) {
+      const newMsg = {
+        id: data.id,
+        text: data.message,
+        user: currentUser,
+        timestamp: new Date(data.created_at),
+      };
+      setMessages(prev => [...prev, newMsg]);
+      setMessage('');
+      showToast('Message sent!', 'success');
+    } else {
+      console.error('Error sending message:', error?.message, error?.details);
+      showToast('Failed to send message', 'error');
     }
   };
 
@@ -62,13 +112,24 @@ export default function SpaceChatsPanel({ space, currentUserId }: SpaceChatsPane
 
   const formatTime = (date: Date) => date.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
 
+  if (loading) {
+    return (
+      <div className="flex items-center justify-center h-full min-h-[500px]">
+        <div className="relative">
+          <div className="absolute inset-0 rounded-full bg-indigo-500 blur-xl opacity-20 animate-pulse"></div>
+          <Loader2 className="w-8 h-8 animate-spin text-indigo-600 relative z-10" />
+        </div>
+      </div>
+    );
+  }
+
   return (
     <div className="flex flex-col h-full min-h-[500px]">
-      <div className="flex-1 space-y-4 mb-6">
-        {showDemoMessages && messages.length > 0 ? (
+      <div className="flex-1 space-y-4 mb-6 overflow-y-auto pr-2">
+        {messages.length > 0 ? (
           <div className="space-y-4 animate-in slide-in-from-bottom-2 duration-500">
             {messages.map((msg, idx) => (
-              <div key={msg.id} className="flex gap-3 group animate-in fade-in slide-in-from-bottom-2 duration-300" style={{ animationDelay: `${idx * 100}ms` }}>
+              <div key={msg.id} className="flex gap-3 group animate-in fade-in slide-in-from-bottom-2 duration-300" style={{ animationDelay: `${idx * 50}ms` }}>
                 <div className="w-9 h-9 rounded-full flex items-center justify-center text-xs font-bold shadow-sm flex-shrink-0" style={{ backgroundColor: msg.user.color, color: msg.user.textColor }}>
                   {msg.user.initials}
                 </div>

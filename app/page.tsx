@@ -176,7 +176,7 @@ export default function MemuApp() {
       case 'drafts': return <DraftsPanel isGuest={!session} requireAuth={requireAuth} onEditDraft={(draft) => handleOpenCompose(undefined, draft)} />;
       case 'connections': return <ConnectionsPanel isGuest={!session} requireAuth={requireAuth} />;
       case 'spaces': return <SpacesPanel />;
-      case 'space-dashboard': return <SpaceView />;
+      case 'space-dashboard': return <SpaceView spaceId={searchParams.get('space') || undefined} />;
       case 'handles': return <HandlesPanel isGuest={!session} requireAuth={requireAuth} onComposeToHandle={(handle) => handleOpenCompose(handle)} />;
       case 'calendar': return <CalendarPanel isGuest={!session} requireAuth={requireAuth} />;
       case 'confer': return <ConferPanel />;

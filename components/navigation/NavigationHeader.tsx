@@ -29,7 +29,17 @@ export default function NavigationHeader({
     if (onBack) {
       onBack();
     } else {
-      router.back();
+      // Logical back: go to the previous breadcrumb, or home if at the root
+      if (breadcrumbs.length > 1) {
+        const previousCrumb = breadcrumbs[breadcrumbs.length - 2];
+        if (previousCrumb.href) {
+          router.push(previousCrumb.href);
+        } else {
+          router.push('/');
+        }
+      } else {
+        router.push('/');
+      }
     }
   };
 

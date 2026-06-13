@@ -17,12 +17,67 @@ export default function SpaceChatsPanel({ space, currentUserId }: SpaceChatsPane
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const { showToast } = useToast();
 
+  // 1. Fetch initial messages when the space loads
   useEffect(() => {
     if (space) {
       fetchMessages();
     }
   }, [space]);
 
+  // 2. THE MAGIC: Setup Realtime Subscription
+  useEffect(() => {
+    if (!space) return;
+
+    const supabase = createClient();
+    
+    // Listen specifically for new messages in THIS space
+    const channel = supabase
+      .channel(`space-chat-${space.id}`)
+      .on(
+        'postgres_changes',
+        {
+          event: 'INSERT',
+          schema: 'public',
+          table: 'space_messages',
+          filter: `space_id=eq.${space.id}`,
+        },
+        (payload) => {
+          const newMsg = payload.new as any;
+          
+          setMessages((prev) => {
+            // Prevent duplicates just in case
+            if (prev.some(m => m.id === newMsg.id)) return prev;
+
+            const member = space.members.find((m: any) => m.id === newMsg.user_id) || {
+              id: newMsg.user_id,
+              name: 'Unknown User',
+              handle: '@unknown',
+              initials: '??',
+              color: '#4f46e5',
+              textColor: '#ffffff',
+            };
+
+            return [
+              ...prev,
+              {
+                id: newMsg.id,
+                text: newMsg.message,
+                user: member,
+                timestamp: new Date(newMsg.created_at),
+              },
+            ];
+          });
+        }
+      )
+      .subscribe();
+
+    // Clean up the listener when we leave the space
+    return () => {
+      supabase.removeChannel(channel);
+    };
+  }, [space]);
+
+  // 3. Auto-scroll to bottom when new messages arrive
   useEffect(() => {
     messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
   }, [messages]);
@@ -31,7 +86,6 @@ export default function SpaceChatsPanel({ space, currentUserId }: SpaceChatsPane
     setLoading(true);
     const supabase = createClient();
     
-    // We only select '*' because we already have the member details in 'space.members'
     const { data, error } = await supabase
       .from('space_messages')
       .select('*') 
@@ -40,7 +94,6 @@ export default function SpaceChatsPanel({ space, currentUserId }: SpaceChatsPane
 
     if (!error && data) {
       const formattedMessages = data.map((msg: any, idx: number) => {
-        // Match the message to the space member we already fetched!
         const member = space.members.find((m: any) => m.id === msg.user_id) || {
           id: msg.user_id,
           name: 'Unknown User',
@@ -51,7 +104,7 @@ export default function SpaceChatsPanel({ space, currentUserId }: SpaceChatsPane
         };
         return {
           id: msg.id,
-          text: msg.message,         
+          text: msg.message,
           user: member,
           timestamp: new Date(msg.created_at),
         };
@@ -67,39 +120,25 @@ export default function SpaceChatsPanel({ space, currentUserId }: SpaceChatsPane
     if (!message.trim() || !space || !currentUserId) return;
     
     const supabase = createClient();
-    const currentUser = space.members.find((m: any) => m.id === currentUserId) || {
-      id: currentUserId,
-      name: 'You',
-      handle: '@you',
-      initials: 'ME',
-      color: '#4f46e5',
-      textColor: '#ffffff',
-    };
+    const currentText = message.trim();
+    setMessage(''); // Clear input immediately for good UX
     
-    // We only select '*' because we already have the current user's details
-    const { data, error } = await supabase
+    // Insert into DB. We don't manually update the UI here anymore!
+    // The Realtime listener above will catch it and update the screen instantly.
+    const { error } = await supabase
       .from('space_messages')
       .insert({
         space_id: space.id,
         user_id: currentUserId,
-        message: message.trim(),
-      })
-      .select() 
-      .single();
+        message: currentText,
+      });
 
-    if (!error && data) {
-      const newMsg = {
-        id: data.id,
-        text: data.message,
-        user: currentUser,
-        timestamp: new Date(data.created_at),
-      };
-      setMessages(prev => [...prev, newMsg]);
-      setMessage('');
-      showToast('Message sent!', 'success');
-    } else {
+    if (error) {
       console.error('Error sending message:', error?.message, error?.details);
       showToast('Failed to send message', 'error');
+      setMessage(currentText); // Restore text if it failed
+    } else {
+      showToast('Message sent!', 'success');
     }
   };
 

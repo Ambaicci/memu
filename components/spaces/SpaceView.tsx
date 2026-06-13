@@ -8,6 +8,7 @@ import {
   Loader2, AtSign, KanbanSquare, CheckSquare, Send, Paperclip, Smile,
   Crown, Shield, Sparkles, Image, Mic, MoreHorizontal
 } from 'lucide-react';
+import BoardsPanel from '../boards/BoardsPanel';
 
 interface Member {
   id: string;
@@ -358,30 +359,14 @@ export default function SpaceView({ spaceId }: SpaceViewProps) {
             </div>
           )}
 
-          {/* BOARDS TAB - Enhanced */}
+          {/* BOARDS TAB - Fully Functional & Integrated */}
           {activeTab === 'boards' && (
-            <div className="flex items-center justify-center py-20">
-              <div className="text-center max-w-md animate-in zoom-in-95 duration-500">
-                <div className="relative mx-auto w-28 h-28 mb-6">
-                  <div className="absolute inset-0 bg-gradient-to-br from-emerald-100 to-teal-100 rounded-2xl blur-2xl animate-pulse"></div>
-                  <div className="relative bg-gradient-to-br from-emerald-50 to-teal-50 rounded-2xl w-28 h-28 flex items-center justify-center shadow-inner">
-                    <KanbanSquare size={40} className="text-emerald-500" />
-                  </div>
-                </div>
-                <h3 className="text-xl font-semibold text-gray-800 mb-2">No boards yet</h3>
-                <p className="text-sm text-gray-500 mb-8 leading-relaxed max-w-sm mx-auto">
-                  Create a board to organize tasks, track projects, and visualize your workflow with drag-and-drop cards.
-                </p>
-                <button className="inline-flex items-center gap-2 px-6 py-3 bg-gradient-to-r from-emerald-600 to-teal-600 text-white rounded-xl text-sm font-medium hover:shadow-lg hover:-translate-y-0.5 transition-all duration-200">
-                  <Plus size={16} /> Create Board
-                </button>
-              </div>
-            </div>
+            <BoardsPanel spaceId={space.id} />
           )}
 
-          {/* TASKS TAB - Enhanced */}
+          {/* TASKS TAB - Enhanced & Perfectly Centered */}
           {activeTab === 'tasks' && (
-            <div className="flex items-center justify-center py-20">
+            <div className="flex flex-col items-center justify-center min-h-[60vh] py-12">
               <div className="text-center max-w-md animate-in zoom-in-95 duration-500">
                 <div className="relative mx-auto w-28 h-28 mb-6">
                   <div className="absolute inset-0 bg-gradient-to-br from-purple-100 to-pink-100 rounded-2xl blur-2xl animate-pulse"></div>

@@ -1,7 +1,6 @@
 'use client';
 
 import React from 'react';
-import { cn } from '@/lib/utils'; // Note: If you don't have cn utility, see note below*
 
 /* ==========================================
    MEMU DESIGN SYSTEM - PRIMITIVES
@@ -87,7 +86,7 @@ interface AvatarProps {
 export function Avatar({ name, size = 'md', className }: AvatarProps) {
   const initials = name
     .split(' ')
-    .map(n => n[0])
+    .map((n: string) => n[0])
     .join('')
     .toUpperCase()
     .slice(0, 2);

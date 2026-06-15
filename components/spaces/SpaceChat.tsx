@@ -12,6 +12,7 @@ interface Message {
   sender_name: string;
   sender_initials: string;
   sender_color: string;
+  sender_avatar_url?: string;
   is_mine: boolean;
 }
 
@@ -26,17 +27,71 @@ export default function SpaceChat({ spaceId }: SpaceChatProps) {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [currentUserId, setCurrentUserId] = useState<string | null>(null);
+  const [currentUserProfile, setCurrentUserProfile] = useState<any>(null);
   const messagesEndRef = useRef<HTMLDivElement>(null);
 
-  // Get current user
+  // Get current user and profile
   useEffect(() => {
     const getUser = async () => {
       const supabase = createClient();
       const { data: { user } } = await supabase.auth.getUser();
-      if (user) setCurrentUserId(user.id);
+      if (user) {
+        setCurrentUserId(user.id);
+        // Fetch current user's profile
+        const { data: profile } = await supabase
+          .from('profiles')
+          .select('full_name, username, avatar_url')
+          .eq('id', user.id)
+          .single();
+        setCurrentUserProfile(profile);
+      }
     };
     getUser();
   }, []);
+
+  // Helper to enrich a message with sender data
+  const enrichMessage = useCallback(async (msg: any): Promise<Message> => {
+    const supabase = createClient();
+    const isMine = msg.sender_id === currentUserId;
+    
+    let senderName = 'Member';
+    let senderInitials = 'MB';
+    let senderColor = '#777';
+    let senderAvatarUrl: string | undefined;
+
+    if (isMine && currentUserProfile) {
+      senderName = 'You';
+      senderInitials = (currentUserProfile.full_name || currentUserProfile.username || 'YO').substring(0, 2).toUpperCase();
+      senderColor = '#4f46e5';
+      senderAvatarUrl = currentUserProfile.avatar_url;
+    } else {
+      // Fetch sender's profile
+      const { data: senderProfile } = await supabase
+        .from('profiles')
+        .select('full_name, username, avatar_url')
+        .eq('id', msg.sender_id)
+        .single();
+
+      if (senderProfile) {
+        senderName = senderProfile.full_name || senderProfile.username || 'Member';
+        senderInitials = (senderProfile.full_name || senderProfile.username || 'MB').substring(0, 2).toUpperCase();
+        senderColor = '#059669';
+        senderAvatarUrl = senderProfile.avatar_url;
+      }
+    }
+
+    return {
+      id: msg.id,
+      content: msg.content,
+      sender_id: msg.sender_id,
+      created_at: msg.created_at,
+      sender_name: senderName,
+      sender_initials: senderInitials,
+      sender_color: senderColor,
+      sender_avatar_url: senderAvatarUrl,
+      is_mine: isMine,
+    };
+  }, [currentUserId, currentUserProfile]);
 
   // Fetch messages
   const fetchMessages = useCallback(async () => {
@@ -46,7 +101,6 @@ export default function SpaceChat({ spaceId }: SpaceChatProps) {
     
     const supabase = createClient();
     try {
-      // Try to fetch from space_messages table
       const { data, error } = await supabase
         .from('space_messages')
         .select('id, content, sender_id, created_at')
@@ -54,7 +108,6 @@ export default function SpaceChat({ spaceId }: SpaceChatProps) {
         .order('created_at', { ascending: true });
 
       if (error) {
-        // If table doesn't exist yet (Phase 1), show graceful empty state
         if (error.code === '42P01') {
           setError('CHAT_COMING_SOON');
           setLoading(false);
@@ -63,15 +116,8 @@ export default function SpaceChat({ spaceId }: SpaceChatProps) {
         throw error;
       }
 
-      // Enrich with sender info (simplified for now)
-      const enriched: Message[] = (data || []).map(msg => ({
-        ...msg,
-        sender_name: msg.sender_id === currentUserId ? 'You' : 'Member',
-        sender_initials: msg.sender_id === currentUserId ? 'YO' : 'MB',
-        sender_color: msg.sender_id === currentUserId ? '#4f46e5' : '#777',
-        is_mine: msg.sender_id === currentUserId,
-      }));
-
+      // Enrich all messages with sender data
+      const enriched: Message[] = await Promise.all((data || []).map(enrichMessage));
       setMessages(enriched);
     } catch (err: any) {
       console.error('Failed to fetch messages:', err);
@@ -79,11 +125,11 @@ export default function SpaceChat({ spaceId }: SpaceChatProps) {
     } finally {
       setLoading(false);
     }
-  }, [spaceId, currentUserId]);
+  }, [spaceId, currentUserId, enrichMessage]);
 
   useEffect(() => {
-    if (currentUserId) fetchMessages();
-  }, [fetchMessages, currentUserId]);
+    if (currentUserId && currentUserProfile) fetchMessages();
+  }, [fetchMessages, currentUserId, currentUserProfile]);
 
   // Real-time subscription for new messages
   useEffect(() => {
@@ -93,23 +139,15 @@ export default function SpaceChat({ spaceId }: SpaceChatProps) {
       .channel(`space-chat-${spaceId}`)
       .on('postgres_changes', 
         { event: 'INSERT', schema: 'public', table: 'space_messages', filter: `space_id=eq.${spaceId}` },
-        (payload) => {
+        async (payload) => {
           const newMsg = payload.new as any;
-          setMessages(prev => [...prev, {
-            id: newMsg.id,
-            content: newMsg.content,
-            sender_id: newMsg.sender_id,
-            created_at: newMsg.created_at,
-            sender_name: newMsg.sender_id === currentUserId ? 'You' : 'Member',
-            sender_initials: newMsg.sender_id === currentUserId ? 'YO' : 'MB',
-            sender_color: newMsg.sender_id === currentUserId ? '#4f46e5' : '#777',
-            is_mine: newMsg.sender_id === currentUserId,
-          }]);
+          const enrichedMsg = await enrichMessage(newMsg);
+          setMessages(prev => [...prev, enrichedMsg]);
         }
       )
       .subscribe();
     return () => { supabase.removeChannel(channel); };
-  }, [spaceId, currentUserId]);
+  }, [spaceId, currentUserId, enrichMessage]);
 
   // Auto-scroll to bottom on new messages
   useEffect(() => {
@@ -148,7 +186,6 @@ export default function SpaceChat({ spaceId }: SpaceChatProps) {
     }
   };
 
-  // Loading state
   if (loading) {
     return (
       <div className="flex items-center justify-center h-64">
@@ -157,7 +194,6 @@ export default function SpaceChat({ spaceId }: SpaceChatProps) {
     );
   }
 
-  // Table not ready yet (Phase 1 graceful state)
   if (error === 'CHAT_COMING_SOON') {
     return (
       <div className="flex flex-col items-center justify-center h-64 text-center p-6">
@@ -172,7 +208,6 @@ export default function SpaceChat({ spaceId }: SpaceChatProps) {
     );
   }
 
-  // Error state
   if (error) {
     return (
       <div className="flex flex-col items-center justify-center h-64 text-center p-6">
@@ -185,7 +220,6 @@ export default function SpaceChat({ spaceId }: SpaceChatProps) {
     );
   }
 
-  // Empty state
   if (messages.length === 0) {
     return (
       <div className="flex flex-col items-center justify-center h-64 text-center p-6">
@@ -198,7 +232,7 @@ export default function SpaceChat({ spaceId }: SpaceChatProps) {
   return (
     <div className="flex flex-col h-full max-h-[calc(100vh-12rem)]">
       {/* Messages List */}
-      <div className="flex-1 overflow-y-auto space-y-4 p-4">
+      <div className="flex-1 overflow-y-auto space-y-4 p-4 no-scrollbar">
         {messages.map((msg) => (
           <div key={msg.id} className={`flex ${msg.is_mine ? 'justify-end' : 'justify-start'}`}>
             <div className={`max-w-[70%] rounded-2xl px-4 py-2.5 ${
@@ -207,9 +241,13 @@ export default function SpaceChat({ spaceId }: SpaceChatProps) {
                 : 'bg-white border border-[#e8e7e3] text-[#0f0f0f] rounded-bl-none'
             }`}>
               <div className="flex items-center gap-2 mb-1">
-                <div className="w-5 h-5 rounded-full flex items-center justify-center text-[9px] font-medium" style={{ background: msg.sender_color, color: msg.is_mine ? '#fff' : '#fff' }}>
-                  {msg.sender_initials}
-                </div>
+                {msg.sender_avatar_url ? (
+                  <img src={msg.sender_avatar_url} alt={msg.sender_name} className="w-5 h-5 rounded-full object-cover" />
+                ) : (
+                  <div className="w-5 h-5 rounded-full flex items-center justify-center text-[9px] font-medium" style={{ background: msg.sender_color, color: '#fff' }}>
+                    {msg.sender_initials}
+                  </div>
+                )}
                 <span className="text-[11px] opacity-75">{msg.sender_name}</span>
               </div>
               <p className="text-[13.5px] leading-relaxed whitespace-pre-wrap">{msg.content}</p>

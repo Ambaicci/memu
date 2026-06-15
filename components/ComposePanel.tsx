@@ -1,7 +1,7 @@
 'use client';
 
 import { useState, useEffect, useRef } from 'react';
-import { X, Paperclip, Mic, Calendar as CalendarIcon, Mail, Maximize2, Minimize2, Users, CheckCircle, AlertCircle, Send, Search, Loader2, Clock } from 'lucide-react';
+import { X, Paperclip, Mic, Calendar as CalendarIcon, Mail, Maximize2, Minimize2, Users, CheckCircle, AlertCircle, Send, Search, Loader2, Clock, UserPlus, Check } from 'lucide-react';
 import { useToast } from '@/contexts/ToastContext';
 import { createClient } from '@/lib/supabase/client';
 
@@ -50,6 +50,11 @@ export default function ComposePanel({ isOpen, onClose, onSend, prefilledTo, edi
   const [searchingHandles, setSearchingHandles] = useState(false);
   const [currentUserId, setCurrentUserId] = useState<string | null>(null);
   
+  // NEW: Saved handles tracking
+  const [savedHandles, setSavedHandles] = useState<string[]>([]);
+  const [unsavedHandle, setUnsavedHandle] = useState<string | null>(null);
+  const [isSavingHandle, setIsSavingHandle] = useState(false);
+  
   // Scheduling state
   const [showSchedulePicker, setShowSchedulePicker] = useState(false);
   const [scheduledDate, setScheduledDate] = useState('');
@@ -80,7 +85,17 @@ export default function ComposePanel({ isOpen, onClose, onSend, prefilledTo, edi
     const getCurrentUser = async () => {
       const supabase = createClient();
       const { data: { user } } = await supabase.auth.getUser();
-      if (user) setCurrentUserId(user.id);
+      if (user) {
+        setCurrentUserId(user.id);
+        // Fetch saved handles
+        const { data } = await supabase
+          .from('handles')
+          .select('username')
+          .eq('user_id', user.id);
+        if (data) {
+          setSavedHandles(data.map((h: any) => h.username));
+        }
+      }
     };
     getCurrentUser();
   }, []);
@@ -128,6 +143,7 @@ export default function ComposePanel({ isOpen, onClose, onSend, prefilledTo, edi
       setNature(editingDraft.nature || 'decide');
       setBody(editingDraft.body || '');
       setToInput('');
+      setUnsavedHandle(null);
       editingDraft.toHandles?.forEach(h => checkAndSetValidation(h));
     } else if (prefilledTo && prefilledTo.length > 0) {
       setTo(prefilledTo);
@@ -135,6 +151,7 @@ export default function ComposePanel({ isOpen, onClose, onSend, prefilledTo, edi
       setNature('decide');
       setBody('');
       setToInput('');
+      setUnsavedHandle(null);
       prefilledTo.forEach(h => checkAndSetValidation(h));
     } else {
       setTo([]);
@@ -142,6 +159,7 @@ export default function ComposePanel({ isOpen, onClose, onSend, prefilledTo, edi
       setNature('decide');
       setBody('');
       setToInput('');
+      setUnsavedHandle(null);
     }
   }, [editingDraft, prefilledTo]);
 
@@ -162,9 +180,55 @@ export default function ComposePanel({ isOpen, onClose, onSend, prefilledTo, edi
     if (!to.includes(handle)) {
       setTo([...to, handle]);
       checkAndSetValidation(handle);
+      
+      // NEW: Check if this handle is saved
+      const handleName = handle.replace('@', '').replace('.memu', '');
+      if (!savedHandles.includes(handleName)) {
+        setUnsavedHandle(handleName); // Trigger the prompt
+      }
     }
     setToInput('');
     setTimeout(() => toInputRef.current?.focus(), 0);
+  };
+
+  const handleSaveUnsavedHandle = async () => {
+    if (!unsavedHandle) return;
+    setIsSavingHandle(true);
+
+    try {
+      // 1. Validate it exists
+      const res = await fetch('/api/handles/validate', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ handle: unsavedHandle }),
+      });
+      const data = await res.json();
+
+      if (data.valid) {
+        // 2. Save to database
+        const supabase = createClient();
+        const { data: { user } } = await supabase.auth.getUser();
+        
+        await supabase.from('handles').insert({
+          user_id: user?.id,
+          contact_id: data.user.id,
+          username: data.user.username,
+          full_name: data.user.full_name,
+          avatar_url: data.user.avatar_url,
+        });
+
+        setSavedHandles([...savedHandles, unsavedHandle]);
+        showToast(`@${unsavedHandle}.memu saved to contacts!`, 'success');
+      } else {
+        showToast('Handle does not exist on Memu.', 'error');
+      }
+    } catch (err) {
+      console.error(err);
+      showToast('Failed to save handle.', 'error');
+    } finally {
+      setIsSavingHandle(false);
+      setUnsavedHandle(null);
+    }
   };
 
   const handleSelectProfile = (profile: any) => {
@@ -274,7 +338,7 @@ export default function ComposePanel({ isOpen, onClose, onSend, prefilledTo, edi
           nature: nature,
           status: memoStatus,
           scheduled_for: scheduledFor,
-          attachments: attachments, // store attachments as JSONB
+          attachments: attachments,
         };
         const { error: dbError } = await supabase.from('memus').insert(insertData);
         if (dbError) throw dbError;
@@ -304,6 +368,7 @@ export default function ComposePanel({ isOpen, onClose, onSend, prefilledTo, edi
     setTo([]); setSubject(''); setNature('decide'); setBody(''); setToInput(''); setValidationStatus({});
     setShowSchedulePicker(false); setScheduledDate(''); setScheduledTime('09:00');
     setAttachments([]);
+    setUnsavedHandle(null);
     setSending(false);
     onClose();
   };
@@ -357,6 +422,34 @@ export default function ComposePanel({ isOpen, onClose, onSend, prefilledTo, edi
           </div>
         </div>
       </div>
+
+      {/* NEW: Save Handle Prompt */}
+      {unsavedHandle && (
+        <div className="px-4 md:px-5 py-3 border-b border-[#f2f1ee] bg-[#fef3c7]/50 animate-fadeIn">
+          <div className="flex items-center justify-between gap-3">
+            <div className="flex items-center gap-2 text-xs text-[#92400e]">
+              <UserPlus size={14} />
+              <span>You haven't saved <strong>@{unsavedHandle}.memu</strong> to your contacts yet.</span>
+            </div>
+            <div className="flex items-center gap-2">
+              <button 
+                onClick={() => setUnsavedHandle(null)}
+                className="px-2.5 py-1 text-[11px] font-medium text-[#777] hover:bg-[#fef3c7] rounded-md transition"
+              >
+                No
+              </button>
+              <button 
+                onClick={handleSaveUnsavedHandle}
+                disabled={isSavingHandle}
+                className="flex items-center gap-1 px-2.5 py-1 text-[11px] font-medium text-white bg-[#d97706] hover:bg-[#b45309] rounded-md transition disabled:opacity-50"
+              >
+                {isSavingHandle ? <Loader2 size={10} className="animate-spin" /> : <Check size={10} />}
+                Save
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
 
       {/* Handle Selector */}
       {showHandleSelector && (

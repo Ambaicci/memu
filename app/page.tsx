@@ -12,9 +12,8 @@ import GlobalSearch from '@/components/search/GlobalSearch';
 import NotificationCenter from '@/components/notifications/NotificationCenter';
 import SplashScreen from '@/components/SplashScreen';
 import HomeDashboard from '@/components/HomeDashboard';
-import { ChevronLeft, Home } from 'lucide-react';
+import { ChevronLeft, Home, Sparkles } from 'lucide-react';
 
-// Lazy loaded panels
 const InMemusPanel = dynamic(() => import('@/components/InMemusPanel'), { ssr: false, loading: () => <PanelSkeleton /> });
 const OutMemusPanel = dynamic(() => import('@/components/OutMemusPanel'), { ssr: false, loading: () => <PanelSkeleton /> });
 const DraftsPanel = dynamic(() => import('@/components/DraftsPanel'), { ssr: false, loading: () => <PanelSkeleton /> });
@@ -30,6 +29,7 @@ const SpacesPanel = dynamic(() => import('@/components/spaces/SpacesPanel'), { s
 const SpaceView = dynamic(() => import('@/components/spaces/SpaceView'), { ssr: false, loading: () => <PanelSkeleton /> });
 const AnalyticsPanel = dynamic(() => import('@/components/AnalyticsPanel'), { ssr: false, loading: () => <PanelSkeleton /> });
 const NotesPanel = dynamic(() => import('@/components/office/NotesPanel'), { ssr: false, loading: () => <PanelSkeleton /> });
+const ProfilePanel = dynamic(() => import('@/components/profile/ProfilePanel'), { ssr: false, loading: () => <PanelSkeleton /> });
 
 const PanelSkeleton = () => (
   <div className="flex items-center justify-center h-full">
@@ -37,7 +37,7 @@ const PanelSkeleton = () => (
   </div>
 );
 
-type PanelType = 'home' | 'inmemus' | 'outmemus' | 'drafts' | 'connections' | 'spaces' | 'confer' | 'calendar' | 'handles' | 'airshare' | 'docs' | 'slides' | 'sheets' | 'space-dashboard' | 'analytics' | 'notes';
+type PanelType = 'home' | 'inmemus' | 'outmemus' | 'drafts' | 'connections' | 'spaces' | 'confer' | 'calendar' | 'handles' | 'airshare' | 'docs' | 'slides' | 'sheets' | 'space-dashboard' | 'analytics' | 'notes' | 'profile';
 
 export default function MemuApp() {
   const router = useRouter();
@@ -111,7 +111,7 @@ export default function MemuApp() {
   }, []);
 
   const isValidPanel = (panel: string): panel is PanelType => {
-    return ['home', 'inmemus', 'outmemus', 'drafts', 'connections', 'spaces', 'confer', 'calendar', 'handles', 'airshare', 'docs', 'slides', 'sheets', 'space-dashboard', 'analytics', 'notes'].includes(panel);
+    return ['home', 'inmemus', 'outmemus', 'drafts', 'connections', 'spaces', 'confer', 'calendar', 'handles', 'airshare', 'docs', 'slides', 'sheets', 'space-dashboard', 'analytics', 'notes', 'profile'].includes(panel);
   };
 
   const updateUrl = useCallback((panel: PanelType, spaceId?: string | null) => {
@@ -160,7 +160,6 @@ export default function MemuApp() {
     handleCloseCompose();
   }, [handleCloseCompose]);
 
-  // Reply event listener - placed after handleOpenCompose is defined
   useEffect(() => {
     const handleReplyEvent = (e: CustomEvent) => {
       setReplyToMemuId(e.detail.memuId);
@@ -188,9 +187,10 @@ export default function MemuApp() {
       case 'sheets': return <SheetsPanel />;
       case 'analytics': return <AnalyticsPanel />;
       case 'notes': return <NotesPanel />;
+      case 'profile': return <ProfilePanel user={session?.user} />;
       default: return <HomeDashboard />;
     }
-  }, [activePanel, session, requireAuth, handleOpenCompose]);
+  }, [activePanel, session, requireAuth, handleOpenCompose, searchParams]);
 
   if (showSplash) {
     return <SplashScreen onComplete={() => setShowSplash(false)} />;
@@ -217,19 +217,21 @@ export default function MemuApp() {
           onOpenCompose={() => handleOpenCompose()}
           isGuest={isGuest}
           onSignIn={() => setShowAuthModal(true)}
+          onOpenProfile={() => handleNavigate('profile')}
           user={session?.user || null}
         />
         
-        <main className="flex-1 overflow-auto pb-28 md:pb-24">
+      <main className="flex-1 overflow-auto pb-28 md:pb-24">
           <div className="lg:hidden h-14" />
           
           {isGuest && (
-            <div className="bg-gradient-to-r from-[#4f46e5] to-[#0891b2] text-white px-4 py-2 text-center text-sm">
-               You're browsing in guest mode. 
-              <button onClick={() => setShowAuthModal(true)} className="underline ml-2 font-medium">
-                Sign in or create an account
+            <div className="bg-gradient-to-r from-indigo-600/90 to-cyan-600/90 backdrop-blur-md text-white px-4 py-2.5 text-center text-sm flex items-center justify-center gap-2 shadow-sm">
+              <Sparkles size={14} />
+              <span>You're exploring in Guest Mode.</span>
+              <button onClick={() => setShowAuthModal(true)} className="font-semibold underline underline-offset-2 hover:text-cyan-200 transition">
+                Claim your @handle
               </button>
-              to send memus and save your work.
+              <span>to send memus and unlock everything.</span>
             </div>
           )}
           

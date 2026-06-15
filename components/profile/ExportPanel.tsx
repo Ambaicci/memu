@@ -2,8 +2,8 @@
 
 import { useState } from 'react';
 import { 
-  Download, FileText, FileSpreadsheet, FileJson, FileMarkdown,
-  CheckCircle, AlertCircle, X, Archive, Send, Inbox
+  Download, FileText, FileSpreadsheet, FileJson,
+  CheckCircle, AlertCircle, X, Archive, Send
 } from 'lucide-react';
 
 interface ExportPanelProps {

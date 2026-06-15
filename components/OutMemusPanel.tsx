@@ -23,6 +23,11 @@ interface OutMemu {
   attachments?: any[];
 }
 
+interface OutMemusPanelProps {
+  isGuest?: boolean;
+  requireAuth?: (action: string, callback: () => void) => void;
+}
+
 const filterOptions = [
   { id: 'all', label: 'All memus', icon: <Send size={12} /> },
   { id: 'delivered', label: 'Delivered', icon: <CheckCircle size={12} /> },
@@ -33,7 +38,7 @@ const filterOptions = [
   { id: 'failed', label: 'Failed', icon: <AlertCircle size={12} /> },
 ];
 
-export default function OutMemusPanel() {
+export default function OutMemusPanel({ isGuest, requireAuth }: OutMemusPanelProps = {}) {
   const [memus, setMemus] = useState<OutMemu[]>([]);
   const [loading, setLoading] = useState(true);
   const [searchQuery, setSearchQuery] = useState('');

@@ -66,9 +66,11 @@ class NotificationService {
     });
 
     if (data.url) {
+      // Capture the string to satisfy TypeScript inside the closure
+      const targetUrl = data.url; 
       notification.onclick = () => {
         window.focus();
-        window.location.href = data.url;
+        window.location.href = targetUrl;
         notification.close();
       };
     }

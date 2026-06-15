@@ -92,7 +92,7 @@ export default function SpaceMembers({ spaceId }: SpaceMembersProps) {
           full_name: profile?.full_name,
           username: profile?.username,
           avatar_url: profile?.avatar_url,
-          initials: name.split(' ').map(n => n[0]).join('').toUpperCase().slice(0, 2),
+          initials: name.split(' ').map((n: string) => n[0]).join('').toUpperCase().slice(0, 2),
         };
       });
 

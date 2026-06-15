@@ -139,3 +139,20 @@ h1, h2, h3, .heading-serif {
   -webkit-box-orient: vertical;
   overflow: hidden;
 }
+/* --- Premium UI: Hide Scrollbars but keep functionality --- */
+.no-scrollbar::-webkit-scrollbar {
+  display: none;
+}
+.no-scrollbar {
+  -ms-overflow-style: none;  /* IE and Edge */
+  scrollbar-width: none;  /* Firefox */
+}
+
+/* --- Premium UI: Hide Scrollbars Globally --- */
+* {
+  scrollbar-width: none; /* Firefox */
+  -ms-overflow-style: none;  /* IE and Edge */
+}
+*::-webkit-scrollbar { 
+  display: none; /* Chrome, Safari, and Opera */
+}

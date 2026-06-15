@@ -14,9 +14,9 @@ const supabaseAdmin = createClient(
 
 export async function POST(request: Request) {
   try {
-    const { email, password, fullName, username, avatarUrl } = await request.json();
+    const { email, password, fullName, username, avatarUrl, bio, organization, occupation } = await request.json();
 
-    // Check if user already exists
+    // 1. Check if user already exists
     const { data: existingUsers, error: listError } = await supabaseAdmin.auth.admin.listUsers();
     let userId: string | null = null;
 
@@ -27,44 +27,54 @@ export async function POST(request: Request) {
       }
     }
 
-    // If user doesn't exist, create them
+    // 2. If user doesn't exist, create them in Supabase Auth
     if (!userId) {
       const { data: authData, error: signUpError } = await supabaseAdmin.auth.admin.createUser({
         email,
         password,
-        email_confirm: true,
-        user_metadata: { full_name: fullName, username },
+        email_confirm: true, // Auto-confirm the email
+        user_metadata: { 
+          full_name: fullName, 
+          username: username,
+          avatar_url: avatarUrl 
+        },
       });
 
       if (signUpError) {
+        console.error('Signup error:', signUpError);
         return NextResponse.json({ error: signUpError.message }, { status: 400 });
       }
       userId = authData.user.id;
     }
 
-    // Check if profile already exists
-    const { data: existingProfile } = await supabaseAdmin
+    // 3. Create or update the profile in the database
+    const { error: profileError } = await supabaseAdmin
       .from('profiles')
-      .select('id')
-      .eq('id', userId)
-      .single();
+      .upsert({
+        id: userId,
+        username: username,
+        full_name: fullName,
+        avatar_url: avatarUrl,
+        bio: bio || null,
+        organization: organization || null,
+        occupation: occupation || null,
+        updated_at: new Date().toISOString(),
+      }, {
+        onConflict: 'id',
+      });
 
-    if (!existingProfile) {
-      const { error: profileError } = await supabaseAdmin
-        .from('profiles')
-        .insert({
-          id: userId,
-          username,
-          full_name: fullName,
-          avatar_url: avatarUrl,
-        });
-
-      if (profileError) {
-        return NextResponse.json({ error: profileError.message }, { status: 400 });
-      }
+    if (profileError) {
+      console.error('Profile error:', profileError);
+      return NextResponse.json({ error: profileError.message }, { status: 400 });
     }
 
-    return NextResponse.json({ user: { id: userId } }, { status: 200 });
+    return NextResponse.json({ 
+      user: { 
+        id: userId,
+        email: email,
+        username: username 
+      } 
+    }, { status: 200 });
   } catch (err) {
     console.error('Signup API error:', err);
     return NextResponse.json({ error: 'Internal server error' }, { status: 500 });

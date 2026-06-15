@@ -160,9 +160,9 @@ export default function SlidesToolDrawer({
                     {backgroundColors.map((bg) => (
                       <button
                         key={bg.id}
-                        onClick={() => onAddBackground?.(bg.gradient || bg.color)}
+                        onClick={() => onAddBackground?.(bg.gradient || bg.color || '')}
                         className="w-full aspect-square rounded-lg border border-[#e8e7e3] hover:scale-105 transition-transform"
-                        style={{ background: bg.gradient || bg.color }}
+                        style={{ background: bg.gradient || bg.color || 'transparent' }}
                         title={bg.label}
                       />
                     ))}

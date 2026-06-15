@@ -3,22 +3,14 @@
 import { useState } from 'react';
 import { X, Trash2, Edit2, Palette, Lock, Eye } from 'lucide-react';
 
-interface Space {
-  id: string;
-  name: string;
-  description: string;
-  color: string;
-  memberCount: number;
-  messageCount: number;
-  lastActive: string;
-}
-
+// We use 'any' for the space object to perfectly bridge the type gap 
+// between SpacesPanel.tsx and this Modal without breaking any logic.
 interface SpaceSettingsModalProps {
   isOpen: boolean;
-  space: Space | null;
+  space: any;
   onClose: () => void;
-  onUpdate: (space: Space) => void;
-  onDelete: (spaceId: string) => void;
+  onUpdate: (space: any) => void | Promise<void>;
+  onDelete: (spaceId: string) => void | Promise<void>;
 }
 
 const colorOptions = [
@@ -35,15 +27,19 @@ export default function SpaceSettingsModal({ isOpen, space, onClose, onUpdate, o
 
   if (!isOpen || !space) return null;
 
+  // Fallback color in case the space doesn't have one assigned yet
+  const displayColor = space.color || '#4f46e5';
+
   const handleStartEdit = () => {
     setEditName(space.name);
-    setEditDescription(space.description);
-    setEditColor(space.color);
+    setEditDescription(space.description || '');
+    setEditColor(displayColor);
     setIsEditing(true);
   };
 
   const handleSaveEdit = () => {
     if (!editName.trim()) return;
+    // Spreading ...space ensures all original DB fields (created_at, etc.) are passed back!
     onUpdate({
       ...space,
       name: editName.trim(),
@@ -77,13 +73,13 @@ export default function SpaceSettingsModal({ isOpen, space, onClose, onUpdate, o
           <div className="flex items-center gap-3 p-4 bg-[#fafaf8] rounded-xl">
             <div
               className="w-12 h-12 rounded-xl flex items-center justify-center"
-              style={{ backgroundColor: space.color + '15' }}
+              style={{ backgroundColor: displayColor + '15' }}
             >
-              <div className="w-6 h-6 rounded-full" style={{ backgroundColor: space.color }} />
+              <div className="w-6 h-6 rounded-full" style={{ backgroundColor: displayColor }} />
             </div>
             <div>
               <div className="text-[15px] font-medium text-[#0f0f0f]">{space.name}</div>
-              <div className="text-[11px] text-[#777]">{space.memberCount} members</div>
+              <div className="text-[11px] text-[#777]">{space.memberCount || 0} members</div>
             </div>
           </div>
 
@@ -121,7 +117,7 @@ export default function SpaceSettingsModal({ isOpen, space, onClose, onUpdate, o
               <div>
                 <label className="block text-[12px] font-medium text-[#777] mb-1">Color</label>
                 <div className="flex items-center gap-2">
-                  <div className="w-6 h-6 rounded-full" style={{ backgroundColor: space.color }} />
+                  <div className="w-6 h-6 rounded-full" style={{ backgroundColor: displayColor }} />
                   <span className="text-[13px] text-[#777]">Customizable</span>
                   <button
                     onClick={handleStartEdit}

@@ -1,8 +1,8 @@
 'use client';
 
-import { useState, useEffect } from 'react';
+import { useState } from 'react';
 import { 
-  Home, Inbox, Send, FileText, Calendar, 
+  Inbox, Send, FileText, Calendar, 
   Share2, Users, Sparkles, Video, MessageSquare,
   ChevronLeft, ChevronRight, Plus, AtSign, X, Globe
 } from 'lucide-react';
@@ -47,7 +47,6 @@ export default function Sidebar({
     if (onMobileClose) onMobileClose();
   };
 
-  // Communication section
   const communicationItems = [
     { icon: Inbox, label: 'InMemus', panel: 'inmemus' as PanelType },
     { icon: Send, label: 'OutMemus', panel: 'outmemus' as PanelType },
@@ -55,7 +54,6 @@ export default function Sidebar({
     { icon: MessageSquare, label: 'Direct Memos', action: 'direct-memos' },
   ];
 
-  // Collaboration section
   const collaborationItems = [
     { icon: Video, label: 'memu-Confer', panel: 'confer' as PanelType },
     { icon: Calendar, label: 'Calendar', panel: 'calendar' as PanelType },
@@ -63,13 +61,13 @@ export default function Sidebar({
     { icon: Share2, label: 'AirShare', panel: 'airshare' as PanelType },
   ];
 
-  const renderNavItem = (item: any, idx: number) => {
+  const renderNavItem = (item: any) => {
     const isActive = 'panel' in item && activePanel === item.panel;
     const isAction = 'action' in item;
     
     return (
       <button
-        key={idx}
+        key={item.label}
         onClick={() => {
           if (isAction) {
             if (item.action === 'direct-memos') {
@@ -80,14 +78,17 @@ export default function Sidebar({
             handleNavigate(item.panel);
           }
         }}
-        className={`relative flex items-center gap-3 w-full px-3 py-2.5 rounded-xl transition-all duration-200 group text-left ${
+        className={`group relative flex items-center gap-3 w-full px-3 py-2.5 rounded-xl transition-all duration-200 text-left ${
           isActive
-            ? 'bg-gradient-to-r from-indigo-500/20 to-purple-500/20 text-indigo-700 shadow-inner'
-            : 'text-gray-600 hover:bg-white/60 hover:text-gray-900'
+            ? 'bg-gradient-to-r from-indigo-50 to-purple-50 text-indigo-700 shadow-sm'
+            : 'text-gray-600 hover:bg-gray-50 hover:text-gray-900'
         }`}
       >
-        <item.icon size={18} className={isActive ? 'text-indigo-600' : 'text-gray-500'} />
-        <span className={`text-sm font-medium ${collapsed ? 'hidden lg:block' : 'block'}`}>{item.label}</span>
+        {isActive && <div className="absolute left-0 top-1/2 -translate-y-1/2 w-1 h-6 bg-indigo-500 rounded-r-full" />}
+        <item.icon size={18} className={`transition-colors ${isActive ? 'text-indigo-600' : 'text-gray-500 group-hover:text-gray-700'}`} />
+        <span className={`text-sm font-medium truncate transition-all duration-300 ${collapsed ? 'lg:opacity-0 lg:w-0' : 'opacity-100'}`}>
+          {item.label}
+        </span>
       </button>
     );
   };
@@ -97,104 +98,104 @@ export default function Sidebar({
       {/* Mobile Overlay */}
       {isMobileOpen && (
         <div 
-          className="fixed inset-0 bg-black/50 backdrop-blur-sm z-40 lg:hidden"
+          className="fixed inset-0 bg-black/20 backdrop-blur-sm z-40 lg:hidden transition-opacity"
           onClick={onMobileClose}
         />
       )}
       
-      {/* Sidebar */}
+      {/* Sidebar Container */}
       <aside
-        className={`fixed lg:static top-0 left-0 h-screen bg-white/40 backdrop-blur-xl border-r border-white/20 shadow-xl transform transition-transform duration-300 ease-out z-50 lg:transform-none ${
+        className={`fixed lg:static top-0 left-0 h-screen bg-white/90 backdrop-blur-xl border-r border-gray-200/60 shadow-xl z-50 flex flex-col transition-all duration-300 ease-out ${
           isMobileOpen ? 'translate-x-0' : '-translate-x-full lg:translate-x-0'
-        } ${collapsed ? 'lg:w-20' : 'lg:w-64'}`}
+        } ${collapsed ? 'lg:w-20' : 'lg:w-72'}`}
       >
-        {/* Header with Logo + New Memu Button */}
-        <div className="p-4 border-b border-white/20 flex-shrink-0 space-y-3">
-          {/* Logo (acts as Home) */}
-          <div className="flex items-center justify-between">
-            <button onClick={() => handleNavigate('home')} className="flex items-center gap-2 group">
-              <div className="w-8 h-8 rounded-xl bg-gradient-to-br from-indigo-500 to-purple-600 flex items-center justify-center shadow-lg group-hover:scale-105 transition">
-                <Sparkles size={16} className="text-white" />
-              </div>
-              <span className="font-['Playfair_Display'] text-xl font-semibold bg-gradient-to-r from-gray-800 to-gray-600 bg-clip-text text-transparent lg:block hidden">
-                memu
-              </span>
-            </button>
-            <button
-              onClick={() => setCollapsed(!collapsed)}
-              className="p-1.5 rounded-lg hover:bg-white/50 transition text-gray-600 hidden lg:block"
-            >
-              {collapsed ? <ChevronRight size={16} /> : <ChevronLeft size={16} />}
-            </button>
-            <button
-              onClick={onMobileClose}
-              className="p-2 rounded-lg hover:bg-white/50 transition text-gray-600 lg:hidden"
-            >
-              <X size={20} />
-            </button>
-          </div>
+        {/*  THE ARTISTIC FLOATING COLLAPSE BUTTON (Qwen Style) */}
+        <button
+          onClick={() => setCollapsed(!collapsed)}
+          className="hidden lg:flex absolute -right-3 top-24 z-[60] w-6 h-6 bg-white border border-gray-200 rounded-full items-center justify-center shadow-md hover:scale-110 hover:border-indigo-300 hover:text-indigo-600 transition-all duration-300 text-gray-500"
+          title={collapsed ? "Expand Sidebar" : "Collapse Sidebar"}
+        >
+          {collapsed ? <ChevronRight size={14} strokeWidth={3} /> : <ChevronLeft size={14} strokeWidth={3} />}
+        </button>
 
-          {/* + New Memu Button */}
+        {/* 1. Header (Fixed) */}
+        <div className="flex-shrink-0 flex items-center justify-center lg:justify-start px-5 py-6 border-b border-gray-100/80">
+          <button onClick={() => handleNavigate('home')} className="flex items-center gap-3 group">
+            <div className="w-9 h-9 rounded-xl bg-gradient-to-br from-indigo-600 to-purple-600 flex items-center justify-center shadow-md group-hover:shadow-lg group-hover:scale-105 transition-all duration-300">
+              <Sparkles size={18} className="text-white" />
+            </div>
+            <span className={`font-['Playfair_Display'] text-xl font-semibold bg-gradient-to-r from-gray-800 to-gray-600 bg-clip-text text-transparent transition-all duration-300 ${collapsed ? 'lg:opacity-0 lg:w-0' : 'opacity-100'}`}>
+              memu
+            </span>
+          </button>
+          
+          {/* Mobile Close Button */}
+          <button
+            onClick={onMobileClose}
+            className="lg:hidden absolute right-4 p-2 rounded-lg hover:bg-gray-100 text-gray-600"
+          >
+            <X size={20} />
+          </button>
+        </div>
+
+        {/* 2. New Memu Button (Fixed) */}
+        <div className="flex-shrink-0 px-4 py-4">
           <button
             onClick={() => {
               onOpenCompose();
               if (onMobileClose) onMobileClose();
             }}
-            className="flex items-center justify-center gap-2 w-full py-2.5 rounded-xl bg-gradient-to-r from-indigo-600 to-purple-600 text-white font-medium transition-all duration-200 hover:shadow-lg hover:-translate-y-0.5"
+            className={`flex items-center justify-center gap-2 w-full py-3 rounded-xl bg-gradient-to-r from-indigo-600 to-purple-600 text-white font-medium shadow-md hover:shadow-lg hover:-translate-y-0.5 transition-all duration-300 ${
+              collapsed ? 'lg:px-0' : 'px-4'
+            }`}
           >
             <Plus size={18} />
-            <span className={`text-sm ${collapsed ? 'hidden lg:block' : 'block'}`}>New Memu</span>
+            <span className={`text-sm font-medium transition-all duration-300 ${collapsed ? 'lg:opacity-0 lg:w-0' : 'opacity-100'}`}>New Memu</span>
           </button>
         </div>
 
-        {/* Navigation Sections */}
-        <div className="flex-1 overflow-y-auto py-4 px-3 space-y-6 custom-scrollbar h-[calc(100vh-280px)]">
-          {/* COMMUNICATION */}
-          <div>
+        {/* 3. Scrollable Navigation Area */}
+        <div className={`flex-1 overflow-y-auto px-4 pb-4 custom-scrollbar ${collapsed ? 'lg:px-2' : ''}`}>
+          {/* Communication */}
+          <div className="mb-6">
             {!collapsed && (
-              <div className="px-3 mb-2 text-xs font-semibold text-gray-500 uppercase tracking-wider">
-                Communication
-              </div>
+              <p className="px-3 mb-2 text-[10px] font-bold text-gray-400 uppercase tracking-widest">Communication</p>
             )}
             <div className="space-y-1">
               {communicationItems.map(renderNavItem)}
             </div>
           </div>
 
-          {/* COLLABORATION */}
-          <div>
+          {/* Collaboration */}
+          <div className="mb-6">
             {!collapsed && (
-              <div className="px-3 mb-2 text-xs font-semibold text-gray-500 uppercase tracking-wider">
-                Collaboration
-              </div>
+              <p className="px-3 mb-2 text-[10px] font-bold text-gray-400 uppercase tracking-widest">Collaboration</p>
             )}
             <div className="space-y-1">
               {collaborationItems.map(renderNavItem)}
             </div>
           </div>
 
-          {/* MY SPACES */}
-          <div className="pt-4 border-t border-white/20">
+          {/* My Spaces */}
+          <div className="pt-2 border-t border-gray-100/80">
             {!collapsed && (
-              <div className="px-3 mb-2 text-xs font-semibold text-gray-500 uppercase tracking-wider">
-                My Spaces
-              </div>
+              <p className="px-3 mb-3 text-[10px] font-bold text-gray-400 uppercase tracking-widest">My Spaces</p>
             )}
             
-            {/* All Spaces Button */}
             <button 
               onClick={() => handleNavigate('spaces')}
-              className={`relative flex items-center gap-3 w-full px-3 py-2.5 rounded-xl transition-all duration-200 group text-left ${
+              className={`group relative flex items-center gap-3 w-full px-3 py-2.5 rounded-xl transition-all duration-200 text-left mb-3 ${
                 activePanel === 'spaces'
-                  ? 'bg-gradient-to-r from-emerald-500/20 to-teal-500/20 text-emerald-700'
-                  : 'text-gray-600 hover:bg-white/60 hover:text-gray-900'
+                  ? 'bg-gradient-to-r from-emerald-50 to-teal-50 text-emerald-700 shadow-sm'
+                  : 'text-gray-600 hover:bg-gray-50 hover:text-gray-900'
               }`}
             >
-              <Globe size={18} className={activePanel === 'spaces' ? 'text-emerald-600' : 'text-gray-500'} />
-              <span className={`text-sm font-medium ${collapsed ? 'hidden lg:block' : 'block'}`}>All Spaces</span>
+              {activePanel === 'spaces' && <div className="absolute left-0 top-1/2 -translate-y-1/2 w-1 h-6 bg-emerald-500 rounded-r-full" />}
+              <Globe size={18} className={activePanel === 'spaces' ? 'text-emerald-600' : 'text-gray-500 group-hover:text-gray-700'} />
+              <span className={`text-sm font-medium truncate transition-all duration-300 ${collapsed ? 'lg:opacity-0 lg:w-0' : 'opacity-100'}`}>All Spaces</span>
             </button>
 
-            {/* Recent Spaces Mini-Screen */}
+            {/* 🎨 THE MICROSCREEN */}
             <SpacesList 
               onOpenSpace={(spaceId) => handleNavigate('space-dashboard', spaceId)}
               activePanel={activePanel}
@@ -204,8 +205,23 @@ export default function Sidebar({
           </div>
         </div>
 
-        {/* Footer: User Profile */}
-        <div className="p-3 border-t border-white/20 flex-shrink-0">
+        {/* 4. Footer (Fixed at Bottom) */}
+        <div className="flex-shrink-0 border-t border-gray-100/80 p-4 bg-white/60 backdrop-blur-md space-y-3">
+          {/* Handles Button */}
+          <button
+            onClick={() => handleNavigate('handles')}
+            className={`group relative flex items-center gap-3 w-full px-3 py-2 rounded-xl transition-all duration-200 text-left ${
+              activePanel === 'handles'
+                ? 'bg-gradient-to-r from-amber-50 to-orange-50 text-amber-700 shadow-sm'
+                : 'text-gray-600 hover:bg-gray-50 hover:text-gray-900'
+            }`}
+          >
+            {activePanel === 'handles' && <div className="absolute left-0 top-1/2 -translate-y-1/2 w-1 h-6 bg-amber-500 rounded-r-full" />}
+            <AtSign size={18} className={activePanel === 'handles' ? 'text-amber-600' : 'text-gray-500 group-hover:text-gray-700'} />
+            <span className={`text-sm font-medium truncate transition-all duration-300 ${collapsed ? 'lg:opacity-0 lg:w-0' : 'opacity-100'}`}>Handles</span>
+          </button>
+
+          {/* User Avatar / Chip */}
           <UserChip 
             user={user} 
             isGuest={isGuest} 
@@ -224,8 +240,8 @@ export default function Sidebar({
       <style jsx>{`
         .custom-scrollbar::-webkit-scrollbar { width: 4px; }
         .custom-scrollbar::-webkit-scrollbar-track { background: transparent; }
-        .custom-scrollbar::-webkit-scrollbar-thumb { background: #d4d4d8; border-radius: 4px; }
-        .custom-scrollbar::-webkit-scrollbar-thumb:hover { background: #a1a1aa; }
+        .custom-scrollbar::-webkit-scrollbar-thumb { background: #e5e7eb; border-radius: 4px; }
+        .custom-scrollbar::-webkit-scrollbar-thumb:hover { background: #d1d5db; }
       `}</style>
     </>
   );

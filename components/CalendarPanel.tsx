@@ -1,6 +1,7 @@
 'use client';
 
-import { useState, useEffect, useCallback } from 'react';
+import { useState, useEffect } from 'react';
+import { useQuery, useQueryClient } from '@tanstack/react-query'; // <-- NEW IMPORTS
 import { 
   ChevronLeft, ChevronRight, Plus, Calendar as CalendarIcon, 
   Clock, Video, Users, X, ChevronDown, Phone, Video as VideoIcon, Filter
@@ -46,12 +47,11 @@ const computeDuration = (start: string, end: string) => {
   return `${hours}h ${minutes}m`;
 };
 
-// Vibrant, edgy colors for event types
 const getEventColorForBorder = (type: string): string => {
   switch (type) {
-    case 'call': return '#3b82f6';     // vivid blue
-    case 'meeting': return '#10b981';   // fresh green
-    default: return '#f59e0b';          // bright orange
+    case 'call': return '#3b82f6';
+    case 'meeting': return '#10b981';
+    default: return '#f59e0b';
   }
 };
 
@@ -72,11 +72,10 @@ const getJoinButtonStyle = (type: string): string => {
 };
 
 export default function CalendarPanel({ isGuest, requireAuth }: CalendarPanelProps = {}) {
+  const queryClient = useQueryClient(); // <-- NEW HOOK
   const [currentMonth, setCurrentMonth] = useState(new Date().getMonth());
   const [currentYear, setCurrentYear] = useState(new Date().getFullYear());
   const [selectedDate, setSelectedDate] = useState<number | null>(null);
-  const [eventsMap, setEventsMap] = useState<Record<number, CalendarEvent[]>>({});
-  const [loading, setLoading] = useState(true);
   const [showEventModal, setShowEventModal] = useState(false);
   const [selectedEvents, setSelectedEvents] = useState<CalendarEvent[]>([]);
   const [viewMode, setViewMode] = useState<'month' | 'week'>('month');
@@ -100,54 +99,55 @@ export default function CalendarPanel({ isGuest, requireAuth }: CalendarPanelPro
     getUser();
   }, []);
 
-  const fetchEvents = useCallback(async () => {
-    if (!currentUserId) return;
-    const supabase = createClient();
-    setLoading(true);
-    const startOfMonth = new Date(currentYear, currentMonth, 1);
-    const endOfMonth = new Date(currentYear, currentMonth + 1, 0, 23, 59, 59);
-    const { data, error } = await supabase
-      .from('calendar_events')
-      .select('*')
-      .eq('user_id', currentUserId)
-      .gte('start_time', startOfMonth.toISOString())
-      .lte('start_time', endOfMonth.toISOString())
-      .order('start_time', { ascending: true });
+  // 🚀 THE MAGIC: React Query caches events by month/year!
+  const { data: eventsMap = {}, isLoading } = useQuery({
+    queryKey: ['calendar-events', currentUserId, currentMonth, currentYear],
+    queryFn: async () => {
+      if (!currentUserId) return {};
+      const supabase = createClient();
+      
+      const startOfMonth = new Date(currentYear, currentMonth, 1);
+      const endOfMonth = new Date(currentYear, currentMonth + 1, 0, 23, 59, 59);
+      
+      const { data, error } = await supabase
+        .from('calendar_events')
+        .select('*')
+        .eq('user_id', currentUserId)
+        .gte('start_time', startOfMonth.toISOString())
+        .lte('start_time', endOfMonth.toISOString())
+        .order('start_time', { ascending: true });
 
-    if (error) {
-      console.error('Error fetching calendar events:', error);
-      setLoading(false);
-      return;
-    }
+      if (error) {
+        console.error('Error fetching calendar events:', error);
+        return {};
+      }
 
-    const map: Record<number, CalendarEvent[]> = {};
-    for (const ev of data) {
-      const start = new Date(ev.start_time);
-      const day = start.getDate();
-      const timeStr = formatEventTime(ev.start_time, ev.end_time, ev.all_day);
-      const duration = computeDuration(ev.start_time, ev.end_time);
-      if (!map[day]) map[day] = [];
-      map[day].push({
-        id: ev.id,
-        title: ev.title,
-        start_time: ev.start_time,
-        end_time: ev.end_time,
-        all_day: ev.all_day,
-        event_type: ev.event_type,
-        participants: ev.participants || [],
-        description: ev.description,
-        date: day,
-        time: timeStr,
-        duration,
-      });
-    }
-    setEventsMap(map);
-    setLoading(false);
-  }, [currentUserId, currentMonth, currentYear]);
-
-  useEffect(() => {
-    if (currentUserId) fetchEvents();
-  }, [fetchEvents, currentUserId]);
+      const map: Record<number, CalendarEvent[]> = {};
+      for (const ev of data) {
+        const start = new Date(ev.start_time);
+        const day = start.getDate();
+        const timeStr = formatEventTime(ev.start_time, ev.end_time, ev.all_day);
+        const duration = computeDuration(ev.start_time, ev.end_time);
+        if (!map[day]) map[day] = [];
+        map[day].push({
+          id: ev.id,
+          title: ev.title,
+          start_time: ev.start_time,
+          end_time: ev.end_time,
+          all_day: ev.all_day,
+          event_type: ev.event_type,
+          participants: ev.participants || [],
+          description: ev.description,
+          date: day,
+          time: timeStr,
+          duration,
+        });
+      }
+      return map;
+    },
+    enabled: !!currentUserId,
+    staleTime: 60 * 1000, // Cache each month for 1 minute!
+  });
 
   const handleDateClick = (date: number) => {
     setSelectedDate(date);
@@ -202,7 +202,8 @@ export default function CalendarPanel({ isGuest, requireAuth }: CalendarPanelPro
       showToast('Event created', 'success');
       setShowAddModal(false);
       resetAddForm();
-      fetchEvents();
+      // 🚀 Invalidate cache for current month!
+      queryClient.invalidateQueries({ queryKey: ['calendar-events', currentUserId, currentMonth, currentYear] });
     }
   };
 
@@ -229,7 +230,8 @@ export default function CalendarPanel({ isGuest, requireAuth }: CalendarPanelPro
     if (error) showToast('Failed to delete event', 'error');
     else {
       showToast('Event deleted', 'success');
-      fetchEvents();
+      // 🚀 Invalidate cache for current month!
+      queryClient.invalidateQueries({ queryKey: ['calendar-events', currentUserId, currentMonth, currentYear] });
       setShowEventModal(false);
     }
   };
@@ -301,7 +303,7 @@ export default function CalendarPanel({ isGuest, requireAuth }: CalendarPanelPro
   const totalEvents = Object.values(eventsMap).flat().length;
   const upcomingCount = totalEvents;
 
-  if (loading) {
+  if (isLoading) {
     return (
       <div className="flex items-center justify-center h-full">
         <div className="w-6 h-6 border-2 border-[#4f46e5] border-t-transparent rounded-full animate-spin" />
@@ -345,7 +347,6 @@ export default function CalendarPanel({ isGuest, requireAuth }: CalendarPanelPro
         </div>
         <div className="grid grid-cols-7 gap-2">{renderCalendar()}</div>
 
-        {/* Upcoming Events Section - richer colors */}
         <div className="mt-8">
           <h3 className="text-[15px] font-medium text-[#1a1a1a] mb-3 flex items-center gap-2"><CalendarIcon size={14} className="text-[#777]" /> Upcoming events</h3>
           {totalEvents === 0 ? (
@@ -385,7 +386,6 @@ export default function CalendarPanel({ isGuest, requireAuth }: CalendarPanelPro
         </div>
       </div>
 
-      {/* Event Modal */}
       {showEventModal && selectedEvents.length > 0 && (
         <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4" onClick={() => setShowEventModal(false)}>
           <div className="bg-white rounded-2xl w-[450px] max-w-full shadow-2xl animate-fadeIn" onClick={e => e.stopPropagation()}>
@@ -420,7 +420,6 @@ export default function CalendarPanel({ isGuest, requireAuth }: CalendarPanelPro
         </div>
       )}
 
-      {/* Add Event Modal - richer inputs */}
       {showAddModal && (
         <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4" onClick={() => { setShowAddModal(false); resetAddForm(); }}>
           <div className="bg-white rounded-2xl w-[450px] max-w-full shadow-2xl p-5 animate-fadeIn" onClick={e => e.stopPropagation()}>

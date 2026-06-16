@@ -1,7 +1,8 @@
 'use client';
 
-import { useState, useEffect, useCallback, useRef } from 'react';
-import { FileText, Clock, Loader2, Search, Edit, Trash2, Filter, ChevronDown, Send, Inbox } from 'lucide-react';
+import { useState, useEffect, useRef } from 'react';
+import { useQuery, useQueryClient } from '@tanstack/react-query'; // <-- NEW IMPORTS
+import { FileText, Clock, Search, Edit, Trash2, Filter, ChevronDown } from 'lucide-react';
 import { createClient } from '@/lib/supabase/client';
 import { useToast } from '@/contexts/ToastContext';
 
@@ -51,8 +52,7 @@ const DraftSkeleton = () => (
 );
 
 export default function DraftsPanel({ isGuest, requireAuth, onEditDraft }: DraftsPanelProps) {
-  const [drafts, setDrafts] = useState<Draft[]>([]);
-  const [loading, setLoading] = useState(true);
+  const queryClient = useQueryClient(); // <-- NEW HOOK
   const [currentUserId, setCurrentUserId] = useState<string | null>(null);
   const [searchQuery, setSearchQuery] = useState('');
   const [filter, setFilter] = useState<'all' | 'recent'>('all');
@@ -79,16 +79,13 @@ export default function DraftsPanel({ isGuest, requireAuth, onEditDraft }: Draft
     getUser();
   }, []);
 
-  const fetchDrafts = useCallback(async () => {
-    if (!currentUserId) {
-      setLoading(false);
-      return;
-    }
-    
-    setLoading(true);
-    const supabase = createClient();
-    
-    try {
+  // 🚀 THE MAGIC: React Query handles fetching and caching!
+  const { data: drafts = [], isLoading } = useQuery({
+    queryKey: ['drafts', currentUserId],
+    queryFn: async () => {
+      if (!currentUserId) return [];
+      const supabase = createClient();
+      
       const { data, error } = await supabase
         .from('drafts')
         .select('*')
@@ -96,18 +93,11 @@ export default function DraftsPanel({ isGuest, requireAuth, onEditDraft }: Draft
         .order('updated_at', { ascending: false });
 
       if (error) throw error;
-      setDrafts(data || []);
-    } catch (err) {
-      console.error('Error fetching drafts:', err);
-      showToast('Failed to load drafts', 'error');
-    } finally {
-      setLoading(false);
-    }
-  }, [currentUserId, showToast]);
-
-  useEffect(() => {
-    if (currentUserId) fetchDrafts();
-  }, [fetchDrafts, currentUserId]);
+      return data || [];
+    },
+    enabled: !!currentUserId,
+    staleTime: 60 * 1000, // Cache for 1 minute!
+  });
 
   const handleDeleteDraft = async (id: string, e: React.MouseEvent) => {
     e.stopPropagation();
@@ -117,7 +107,11 @@ export default function DraftsPanel({ isGuest, requireAuth, onEditDraft }: Draft
     if (error) {
       showToast('Failed to delete draft', 'error');
     } else {
-      setDrafts(prev => prev.filter(d => d.id !== id));
+      // 🚀 Update the cache instantly!
+      queryClient.setQueryData(['drafts', currentUserId], (old: Draft[] | undefined) => {
+        if (!old) return old;
+        return old.filter(d => d.id !== id);
+      });
       showToast('Draft deleted', 'success');
     }
   };
@@ -163,7 +157,7 @@ export default function DraftsPanel({ isGuest, requireAuth, onEditDraft }: Draft
 
   const currentFilterLabel = filter === 'all' ? 'All drafts' : 'Recently edited';
 
-  if (loading) {
+  if (isLoading) {
     return <DraftSkeleton />;
   }
 

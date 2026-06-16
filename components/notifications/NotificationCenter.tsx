@@ -24,6 +24,7 @@ export default function NotificationCenter() {
   const [currentUserId, setCurrentUserId] = useState<string | null>(null);
   
   const containerRef = useRef<HTMLDivElement>(null);
+  const channelRef = useRef<any>(null); // <-- Track channel reference
   const router = useRouter();
 
   // Get current user
@@ -57,33 +58,49 @@ export default function NotificationCenter() {
     setLoading(false);
   };
 
+  // Subscribe to real-time with proper cleanup
   useEffect(() => {
-    if (currentUserId) {
-      fetchNotifications(currentUserId);
+    if (!currentUserId) return;
 
-      // Subscribe to real-time inserts
-      const supabase = createClient();
-      const channel = supabase
-        .channel('notification-changes')
-        .on(
-          'postgres_changes',
-          {
-            event: 'INSERT',
-            schema: 'public',
-            table: 'notifications',
-            filter: `user_id=eq.${currentUserId}`,
-          },
-          (payload) => {
-            setNotifications((prev) => [payload.new as Notification, ...prev]);
-            setUnreadCount((prev) => prev + 1);
-          }
-        )
-        .subscribe();
+    fetchNotifications(currentUserId);
 
-      return () => {
-        supabase.removeChannel(channel);
-      };
+    const supabase = createClient();
+    
+    // Clean up any existing channel first
+    if (channelRef.current) {
+      supabase.removeChannel(channelRef.current);
+      channelRef.current = null;
     }
+
+    // Create channel with unique name
+    const channelName = `notifications-${currentUserId}-${Date.now()}`;
+    const channel = supabase
+      .channel(channelName)
+      .on(
+        'postgres_changes',
+        {
+          event: 'INSERT',
+          schema: 'public',
+          table: 'notifications',
+          filter: `user_id=eq.${currentUserId}`,
+        },
+        (payload) => {
+          setNotifications((prev) => [payload.new as Notification, ...prev]);
+          setUnreadCount((prev) => prev + 1);
+        }
+      )
+      .subscribe((status) => {
+        console.log('Notification channel status:', status);
+      });
+
+    channelRef.current = channel;
+
+    return () => {
+      if (channelRef.current) {
+        supabase.removeChannel(channelRef.current);
+        channelRef.current = null;
+      }
+    };
   }, [currentUserId]);
 
   // Close on outside click

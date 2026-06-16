@@ -24,11 +24,9 @@ export async function middleware(request: NextRequest) {
     }
   )
 
-  // Refresh session if expired - required for Server Components
-  const { data: { user } } = await supabase.auth.getUser()
-
-  // Optional: Protect specific routes later (e.g., /dashboard, /compose)
-  // For now, we just ensure cookies sync correctly across requests
+  // IMPORTANT: We removed the getUser() call to prevent middleware crashes
+  // The middleware now just syncs cookies without making network requests
+  // You can add route protection later if needed
 
   return supabaseResponse
 }

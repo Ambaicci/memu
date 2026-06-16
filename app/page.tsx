@@ -1,5 +1,4 @@
 'use client';
-// Updated deployment $(Get-Date)
 
 import { useState, useEffect, useCallback, Suspense } from 'react';
 import { useRouter, usePathname, useSearchParams } from 'next/navigation';
@@ -13,7 +12,7 @@ import GlobalSearch from '@/components/search/GlobalSearch';
 import NotificationCenter from '@/components/notifications/NotificationCenter';
 import SplashScreen from '@/components/SplashScreen';
 import HomeDashboard from '@/components/HomeDashboard';
-import { ChevronLeft, Home, Sparkles } from 'lucide-react';
+import { ChevronLeft, Home, Sparkles, Menu } from 'lucide-react';
 
 const InMemusPanel = dynamic(() => import('@/components/InMemusPanel'), { ssr: false, loading: () => <PanelSkeleton /> });
 const OutMemusPanel = dynamic(() => import('@/components/OutMemusPanel'), { ssr: false, loading: () => <PanelSkeleton /> });
@@ -56,6 +55,7 @@ export default function MemuApp() {
   const [pendingAction, setPendingAction] = useState<string | null>(null);
   const [isOnline, setIsOnline] = useState(typeof navigator !== 'undefined' ? navigator.onLine : true);
   const [replyToMemuId, setReplyToMemuId] = useState<string | null>(null);
+  const [isMobileSidebarOpen, setIsMobileSidebarOpen] = useState(false); // <-- NEW STATE
 
   useEffect(() => {
     const handleOnline = () => setIsOnline(true);
@@ -220,23 +220,40 @@ export default function MemuApp() {
           onSignIn={() => setShowAuthModal(true)}
           onOpenProfile={() => handleNavigate('profile')}
           user={session?.user || null}
+          isMobileOpen={isMobileSidebarOpen}
+          onMobileClose={() => setIsMobileSidebarOpen(false)}
         />
         
-      <main className="flex-1 overflow-auto pb-28 md:pb-24">
-          <div className="lg:hidden h-14" />
-          
-          {isGuest && (
-            <div className="bg-gradient-to-r from-indigo-600/90 to-cyan-600/90 backdrop-blur-md text-white px-4 py-2.5 text-center text-sm flex items-center justify-center gap-2 shadow-sm">
-              <Sparkles size={14} />
-              <span>You're exploring in Guest Mode.</span>
-              <button onClick={() => setShowAuthModal(true)} className="font-semibold underline underline-offset-2 hover:text-cyan-200 transition">
-                Claim your @handle
-              </button>
-              <span>to send memus and unlock everything.</span>
+        <main className="flex-1 overflow-auto pb-28 md:pb-24">
+          {/* Mobile Header with Hamburger Menu */}
+          <div className="lg:hidden sticky top-0 z-30 bg-[#fafaf8]/95 backdrop-blur-sm border-b border-[#e8e7e3] px-4 py-3">
+            <div className="flex items-center justify-between">
+              <div className="flex items-center gap-3">
+                <button
+                  onClick={() => setIsMobileSidebarOpen(true)}
+                  className="p-2 rounded-lg hover:bg-[#e8e7e3] transition text-[#3a3a3a]"
+                  aria-label="Open menu"
+                >
+                  <Menu size={20} />
+                </button>
+                <button onClick={() => handleNavigate('home')} className="flex items-center gap-2">
+                  <div className="w-7 h-7 rounded-lg bg-gradient-to-br from-indigo-500 to-purple-600 flex items-center justify-center shadow">
+                    <Sparkles size={14} className="text-white" />
+                  </div>
+                  <span className="font-['Playfair_Display'] text-lg font-semibold text-[#1a1a1a]">
+                    memu
+                  </span>
+                </button>
+              </div>
+              <div className="flex items-center gap-1">
+                <GlobalSearch />
+                <NotificationCenter />
+              </div>
             </div>
-          )}
-          
-          <div className="sticky top-0 z-20 bg-[#fafaf8]/80 backdrop-blur-sm border-b border-[#e8e7e3] px-4 md:px-6 py-2">
+          </div>
+
+          {/* Desktop Breadcrumb Header */}
+          <div className="hidden lg:block sticky top-0 z-20 bg-[#fafaf8]/80 backdrop-blur-sm border-b border-[#e8e7e3] px-6 py-2">
             <div className="flex items-center justify-between">
               <div className="flex items-center gap-2">
                 <button
@@ -253,7 +270,7 @@ export default function MemuApp() {
                 >
                   <Home size={18} />
                 </button>
-                <div className="flex items-center gap-1.5 text-[11px] md:text-[13px] ml-1">
+                <div className="flex items-center gap-1.5 text-[13px] ml-1">
                   <span className="text-[#777] font-medium">memu</span>
                   <span className="text-[#aaa]">/</span>
                   <span className="heading-gradient font-medium capitalize">{activePanel.replace('-', ' ')}</span>
@@ -265,6 +282,17 @@ export default function MemuApp() {
               </div>
             </div>
           </div>
+          
+          {isGuest && (
+            <div className="bg-gradient-to-r from-indigo-600/90 to-cyan-600/90 backdrop-blur-md text-white px-4 py-2.5 text-center text-sm flex items-center justify-center gap-2 shadow-sm">
+              <Sparkles size={14} />
+              <span>You're exploring in Guest Mode.</span>
+              <button onClick={() => setShowAuthModal(true)} className="font-semibold underline underline-offset-2 hover:text-cyan-200 transition">
+                Claim your @handle
+              </button>
+              <span>to send memus and unlock everything.</span>
+            </div>
+          )}
           
           <Suspense fallback={<PanelSkeleton />}>
             {renderPanel()}

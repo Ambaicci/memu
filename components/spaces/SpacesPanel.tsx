@@ -1,6 +1,7 @@
 'use client';
 
 import { useState, useEffect } from 'react';
+import { useQuery, useQueryClient } from '@tanstack/react-query'; // <-- NEW IMPORTS
 import { Plus, Users, MessageSquare, Calendar, Settings, ChevronRight, Sparkles } from 'lucide-react';
 import { createClient } from '@/lib/supabase/client';
 import { useToast } from '@/contexts/ToastContext';
@@ -31,8 +32,7 @@ const stringToColor = (str: string) => {
 };
 
 export default function SpacesPanel() {
-  const [spaces, setSpaces] = useState<Space[]>([]);
-  const [loading, setLoading] = useState(true);
+  const queryClient = useQueryClient(); // <-- NEW HOOK
   const [showCreateModal, setShowCreateModal] = useState(false);
   const [showSettingsModal, setShowSettingsModal] = useState(false);
   const [spaceToEdit, setSpaceToEdit] = useState<Space | null>(null);
@@ -48,12 +48,13 @@ export default function SpacesPanel() {
     getUser();
   }, []);
 
-  const fetchSpaces = async () => {
-    if (!currentUserId) return;
-    const supabase = createClient();
-    setLoading(true);
+  // 🚀 THE MAGIC: React Query handles fetching and caching the complex space data!
+  const { data: spaces = [], isLoading } = useQuery({
+    queryKey: ['spaces', currentUserId],
+    queryFn: async () => {
+      if (!currentUserId) return [];
+      const supabase = createClient();
 
-    try {
       const { data: memberships, error: memError } = await supabase
         .from('space_members')
         .select('space_id, role')
@@ -61,11 +62,7 @@ export default function SpacesPanel() {
       
       if (memError) throw memError;
 
-      if (!memberships || memberships.length === 0) {
-        setSpaces([]);
-        setLoading(false);
-        return;
-      }
+      if (!memberships || memberships.length === 0) return [];
 
       const spaceIds = memberships.map(m => m.space_id);
       
@@ -105,29 +102,23 @@ export default function SpacesPanel() {
         })
       );
 
-      setSpaces(enriched);
-    } catch (err) {
-      console.error('Error fetching spaces:', err);
-      showToast('Failed to load spaces', 'error');
-    } finally {
-      setLoading(false);
-    }
-  };
+      return enriched;
+    },
+    enabled: !!currentUserId,
+    staleTime: 60 * 1000, // Cache for 1 minute!
+  });
 
-  useEffect(() => {
-    if (currentUserId) fetchSpaces();
-  }, [currentUserId]);
-
+  // Realtime subscription - just invalidate the cache instead of refetching manually
   useEffect(() => {
     if (!currentUserId) return;
     const supabase = createClient();
     const channel = supabase
       .channel('spaces-panel')
-      .on('postgres_changes', { event: '*', schema: 'public', table: 'space_members', filter: `user_id=eq.${currentUserId}` }, fetchSpaces)
-      .on('postgres_changes', { event: '*', schema: 'public', table: 'spaces' }, fetchSpaces)
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'space_members', filter: `user_id=eq.${currentUserId}` }, () => queryClient.invalidateQueries({ queryKey: ['spaces', currentUserId] }))
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'spaces' }, () => queryClient.invalidateQueries({ queryKey: ['spaces', currentUserId] }))
       .subscribe();
     return () => { supabase.removeChannel(channel); };
-  }, [currentUserId]);
+  }, [currentUserId, queryClient]);
 
   const handleCreateSpace = async (newSpace: Omit<Space, 'id' | 'memberCount' | 'messageCount' | 'lastActive' | 'created_at' | 'updated_at' | 'created_by'>) => {
     if (!currentUserId) {
@@ -166,7 +157,8 @@ export default function SpacesPanel() {
 
       showToast('Space created successfully!', 'success');
       setShowCreateModal(false);
-      fetchSpaces();
+      // 🚀 Update cache instantly!
+      queryClient.invalidateQueries({ queryKey: ['spaces', currentUserId] });
     } catch (err) {
       console.error('Creation error:', err);
       showToast('Failed to create space', 'error');
@@ -183,7 +175,8 @@ export default function SpacesPanel() {
     
     if (error) { showToast('Failed to update space', 'error'); return; }
     showToast('Space updated', 'success');
-    fetchSpaces();
+    // 🚀 Update cache instantly!
+    queryClient.invalidateQueries({ queryKey: ['spaces', currentUserId] });
   };
 
   const handleDeleteSpace = async (spaceId: string) => {
@@ -192,7 +185,8 @@ export default function SpacesPanel() {
     const { error } = await supabase.from('spaces').delete().eq('id', spaceId);
     if (error) { showToast('Failed to delete space', 'error'); return; }
     showToast('Space deleted', 'success');
-    fetchSpaces();
+    // 🚀 Update cache instantly!
+    queryClient.invalidateQueries({ queryKey: ['spaces', currentUserId] });
   };
 
   const handleOpenSpace = (space: Space) => {
@@ -205,7 +199,7 @@ export default function SpacesPanel() {
     setShowSettingsModal(true);
   };
 
-  if (loading) {
+  if (isLoading) {
     return (
       <div className="flex items-center justify-center h-full">
         <div className="w-6 h-6 border-2 border-[#4f46e5] border-t-transparent rounded-full animate-spin" />

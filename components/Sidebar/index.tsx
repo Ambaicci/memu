@@ -3,8 +3,8 @@
 import { useState } from 'react';
 import { 
   Inbox, Send, FileText, Calendar, 
-  Share2, Users, Sparkles, Video, MessageSquare,
-  ChevronLeft, ChevronRight, Plus, AtSign, X, Globe
+  Share2, Users, Layers, Video, MessageSquare,
+  ChevronLeft, ChevronRight, Plus, AtSign, X, LayoutGrid
 } from 'lucide-react';
 import SpacesList from './SpacesList';
 import UserChip from './UserChip';
@@ -109,7 +109,7 @@ export default function Sidebar({
           isMobileOpen ? 'translate-x-0' : '-translate-x-full lg:translate-x-0'
         } ${collapsed ? 'lg:w-20' : 'lg:w-72'}`}
       >
-        {/*  THE ARTISTIC FLOATING COLLAPSE BUTTON (Qwen Style) */}
+        {/* THE ARTISTIC FLOATING COLLAPSE BUTTON */}
         <button
           onClick={() => setCollapsed(!collapsed)}
           className="hidden lg:flex absolute -right-3 top-24 z-[60] w-6 h-6 bg-white border border-gray-200 rounded-full items-center justify-center shadow-md hover:scale-110 hover:border-indigo-300 hover:text-indigo-600 transition-all duration-300 text-gray-500"
@@ -118,12 +118,18 @@ export default function Sidebar({
           {collapsed ? <ChevronRight size={14} strokeWidth={3} /> : <ChevronLeft size={14} strokeWidth={3} />}
         </button>
 
-        {/* 1. Header (Fixed) */}
+        {/* 1. Header with ACTUAL LOGO */}
         <div className="flex-shrink-0 flex items-center justify-center lg:justify-start px-5 py-6 border-b border-gray-100/80">
           <button onClick={() => handleNavigate('home')} className="flex items-center gap-3 group">
-            <div className="w-9 h-9 rounded-xl bg-gradient-to-br from-indigo-600 to-purple-600 flex items-center justify-center shadow-md group-hover:shadow-lg group-hover:scale-105 transition-all duration-300">
-              <Sparkles size={18} className="text-white" />
+            {/* YOUR LOGO */}
+            <div className="w-9 h-9 rounded-xl overflow-hidden shadow-md group-hover:shadow-lg group-hover:scale-105 transition-all duration-300 bg-white">
+              <img 
+                src="/svg.logo.png" 
+                alt="memu" 
+                className="w-full h-full object-cover"
+              />
             </div>
+            
             <span className={`font-['Playfair_Display'] text-xl font-semibold bg-gradient-to-r from-gray-800 to-gray-600 bg-clip-text text-transparent transition-all duration-300 ${collapsed ? 'lg:opacity-0 lg:w-0' : 'opacity-100'}`}>
               memu
             </span>
@@ -138,7 +144,7 @@ export default function Sidebar({
           </button>
         </div>
 
-        {/* 2. New Memu Button (Fixed) */}
+        {/* 2. New Memu Button */}
         <div className="flex-shrink-0 px-4 py-4">
           <button
             onClick={() => {
@@ -182,6 +188,7 @@ export default function Sidebar({
               <p className="px-3 mb-3 text-[10px] font-bold text-gray-400 uppercase tracking-widest">My Spaces</p>
             )}
             
+            {/* All Spaces Button - Using LayoutGrid instead of Globe */}
             <button 
               onClick={() => handleNavigate('spaces')}
               className={`group relative flex items-center gap-3 w-full px-3 py-2.5 rounded-xl transition-all duration-200 text-left mb-3 ${
@@ -191,7 +198,7 @@ export default function Sidebar({
               }`}
             >
               {activePanel === 'spaces' && <div className="absolute left-0 top-1/2 -translate-y-1/2 w-1 h-6 bg-emerald-500 rounded-r-full" />}
-              <Globe size={18} className={activePanel === 'spaces' ? 'text-emerald-600' : 'text-gray-500 group-hover:text-gray-700'} />
+              <LayoutGrid size={18} className={activePanel === 'spaces' ? 'text-emerald-600' : 'text-gray-500 group-hover:text-gray-700'} />
               <span className={`text-sm font-medium truncate transition-all duration-300 ${collapsed ? 'lg:opacity-0 lg:w-0' : 'opacity-100'}`}>All Spaces</span>
             </button>
 
@@ -205,7 +212,7 @@ export default function Sidebar({
           </div>
         </div>
 
-        {/* 4. Footer (Fixed at Bottom) */}
+        {/* 4. Footer */}
         <div className="flex-shrink-0 border-t border-gray-100/80 p-4 bg-white/60 backdrop-blur-md space-y-3">
           {/* Handles Button */}
           <button

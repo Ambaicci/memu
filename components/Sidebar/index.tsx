@@ -36,9 +36,11 @@ export default function Sidebar({
   const [showDeleteModal, setShowDeleteModal] = useState(false);
   const [itemToDelete, setItemToDelete] = useState<any>(null);
   const [isMobile, setIsMobile] = useState(false);
+  const [mounted, setMounted] = useState(false); // <-- NEW STATE TO PREVENT CRASH
 
-  // Detect mobile view
+  // Detect mobile view safely
   useEffect(() => {
+    setMounted(true);
     const checkMobile = () => {
       setIsMobile(window.innerWidth < 1024);
       if (window.innerWidth >= 1024) {
@@ -75,6 +77,17 @@ export default function Sidebar({
     { icon: AtSign, label: 'Handles', panel: 'handles' },
     { icon: Share2, label: 'AirShare', panel: 'airshare' },
   ];
+
+  // Prevent hydration mismatch by rendering nothing until mounted
+  if (!mounted) {
+    return (
+      <aside className="hidden lg:flex relative flex-col h-screen w-64 bg-white/40 backdrop-blur-xl border-r border-white/20 shadow-xl">
+        <div className="flex items-center justify-between p-4 border-b border-white/20">
+          <div className="w-8 h-8 rounded-xl bg-gradient-to-br from-indigo-500 to-purple-600" />
+        </div>
+      </aside>
+    );
+  }
 
   // Mobile overlay
   if (isMobile) {
@@ -177,11 +190,17 @@ export default function Sidebar({
             />
           </div>
         </aside>
+
+        <DeleteConfirmModal 
+          isOpen={showDeleteModal && itemToDelete !== null}
+          onClose={() => { setShowDeleteModal(false); setItemToDelete(null); }}
+          item={itemToDelete}
+        />
       </>
     );
   }
 
-  // Desktop Sidebar (existing code)
+  // Desktop Sidebar
   return (
     <>
       <aside

@@ -1,7 +1,8 @@
 'use client';
 
-import { useState, useEffect, useCallback, useRef } from 'react';
-import { Users, Star, Mail, MessageSquare, Loader2, Search, Filter, ChevronDown, Sparkles } from 'lucide-react';
+import { useState, useEffect, useRef } from 'react';
+import { useQuery } from '@tanstack/react-query'; // <-- NEW IMPORT
+import { Users, Star, Mail, MessageSquare, Search, Filter, ChevronDown } from 'lucide-react';
 import { createClient } from '@/lib/supabase/client';
 import { useToast } from '@/contexts/ToastContext';
 
@@ -30,8 +31,6 @@ const filterOptions = [
 ];
 
 export default function ConnectionsPanel({ isGuest, requireAuth }: ConnectionsPanelProps = {}) {
-  const [connections, setConnections] = useState<Connection[]>([]);
-  const [loading, setLoading] = useState(true);
   const [currentUserId, setCurrentUserId] = useState<string | null>(null);
   const [filter, setFilter] = useState<'all' | 'favorites'>('all');
   const [favorites, setFavorites] = useState<Set<string>>(new Set());
@@ -71,13 +70,13 @@ export default function ConnectionsPanel({ isGuest, requireAuth }: ConnectionsPa
     }
   }, []);
 
-  const saveFavorites = useCallback((ids: Set<string>) => {
+  const saveFavorites = (ids: Set<string>) => {
     try {
       localStorage.setItem('connections_favorites', JSON.stringify(Array.from(ids)));
     } catch (err) {
       console.error('Failed to save favorites:', err);
     }
-  }, []);
+  };
 
   const toggleFavorite = (id: string) => {
     const newFavorites = new Set(favorites);
@@ -92,16 +91,13 @@ export default function ConnectionsPanel({ isGuest, requireAuth }: ConnectionsPa
     saveFavorites(newFavorites);
   };
 
-  const fetchConnections = useCallback(async () => {
-    if (!currentUserId) {
-      setLoading(false);
-      return;
-    }
-
-    setLoading(true);
-    const supabase = createClient();
-    
-    try {
+  // 🚀 THE MAGIC: React Query handles fetching and caching!
+  const { data: connections = [], isLoading } = useQuery({
+    queryKey: ['connections', currentUserId],
+    queryFn: async () => {
+      if (!currentUserId) return [];
+      const supabase = createClient();
+      
       const { data: profilesData, error } = await supabase
         .from('profiles')
         .select('id, full_name, username, bio')
@@ -119,18 +115,11 @@ export default function ConnectionsPanel({ isGuest, requireAuth }: ConnectionsPa
         profile: p,
       }));
 
-      setConnections(fallbackConnections);
-    } catch (err) {
-      console.error('Error fetching connections:', err);
-      showToast('Failed to load connections', 'error');
-    } finally {
-      setLoading(false);
-    }
-  }, [currentUserId, showToast]);
-
-  useEffect(() => {
-    if (currentUserId) fetchConnections();
-  }, [fetchConnections, currentUserId]);
+      return fallbackConnections;
+    },
+    enabled: !!currentUserId,
+    staleTime: 60 * 1000, // Cache for 1 minute!
+  });
 
   const filteredConnections = connections.filter(c => {
     const matchesFilter = filter === 'all' ? true : favorites.has(c.connected_user_id);
@@ -162,7 +151,7 @@ export default function ConnectionsPanel({ isGuest, requireAuth }: ConnectionsPa
 
   const currentFilterLabel = filter === 'all' ? 'All connections' : 'Favorites';
 
-  if (loading) {
+  if (isLoading) {
     return (
       <div className="flex items-center justify-center h-full">
         <div className="w-6 h-6 border-2 border-[#4f46e5] border-t-transparent rounded-full animate-spin" />

@@ -1,7 +1,8 @@
 'use client';
 
 import { useState, useEffect, useCallback, useRef } from 'react';
-import { Inbox, Mail, Clock, Loader2, Star, Search, Eye, Sparkles, CheckCircle, BookOpen, Reply, Filter, ChevronDown, Paperclip } from 'lucide-react';
+import { useQuery, useQueryClient } from '@tanstack/react-query'; // <-- NEW IMPORTS
+import { Inbox, Mail, Clock, Star, Search, Eye, Sparkles, CheckCircle, BookOpen, Reply, Filter, ChevronDown, Paperclip } from 'lucide-react';
 import { createClient } from '@/lib/supabase/client';
 import { useToast } from '@/contexts/ToastContext';
 
@@ -64,8 +65,7 @@ const InboxSkeleton = () => (
 );
 
 export default function InMemusPanel({ isGuest, requireAuth }: InMemusPanelProps = {}) {
-  const [memus, setMemus] = useState<Memu[]>([]);
-  const [loading, setLoading] = useState(true);
+  const queryClient = useQueryClient(); // <-- NEW HOOK
   const [currentUserId, setCurrentUserId] = useState<string | null>(null);
   const [filter, setFilter] = useState<'all' | 'unread' | 'starred'>('all');
   const [favorites, setFavorites] = useState<Set<string>>(new Set());
@@ -130,6 +130,51 @@ export default function InMemusPanel({ isGuest, requireAuth }: InMemusPanelProps
     saveFavorites(newFavorites);
   };
 
+  // 🚀 THE MAGIC: React Query handles fetching and caching!
+  const { data: memus = [], isLoading } = useQuery({
+    queryKey: ['inmemus', currentUserId],
+    queryFn: async () => {
+      if (!currentUserId) return [];
+      const supabase = createClient();
+      
+      const { data: memusData, error } = await supabase
+        .from('memus')
+        .select('*')
+        .eq('recipient_id', currentUserId)
+        .order('created_at', { ascending: false });
+      
+      if (error) throw error;
+      
+      const senderIds = [...new Set((memusData || []).map(m => m.sender_id).filter(id => id))];
+      let profilesMap: Record<string, any> = {};
+      
+      if (senderIds.length > 0) {
+        const { data: profilesData } = await supabase
+          .from('profiles')
+          .select('id, full_name, username')
+          .in('id', senderIds);
+        if (profilesData) {
+          profilesMap = profilesData.reduce((acc, p) => ({ ...acc, [p.id]: p }), {});
+        }
+      }
+      
+      const enrichedMemus = (memusData || []).map(m => ({
+        ...m,
+        is_read: m.is_read || false,
+        delivered_at: m.delivered_at || null,
+        opened_at: m.opened_at || null,
+        read_completely_at: m.read_completely_at || null,
+        replied_at: m.replied_at || null,
+        attachments: m.attachments || [],
+        sender_profile: m.sender_id ? profilesMap[m.sender_id] || null : null,
+      }));
+      
+      return enrichedMemus as Memu[];
+    },
+    enabled: !!currentUserId,
+    staleTime: 60 * 1000, // Cache for 1 minute!
+  });
+
   const markAsRead = useCallback(async (memu: Memu) => {
     if (!currentUserId) return;
     const supabase = createClient();
@@ -140,7 +185,12 @@ export default function InMemusPanel({ isGuest, requireAuth }: InMemusPanelProps
       .eq('id', memu.id)
       .eq('recipient_id', currentUserId);
     if (!error) {
-      setMemus(prev => prev.map(m => m.id === memu.id ? { ...m, is_read: true, opened_at: now } : m));
+      // 🚀 Update the cache instantly!
+      queryClient.setQueryData(['inmemus', currentUserId], (old: Memu[] | undefined) => {
+        if (!old) return old;
+        return old.map(m => m.id === memu.id ? { ...m, is_read: true, opened_at: now } : m);
+      });
+      
       if (memu.sender_id) {
         await supabase.channel(`user-notifications:${memu.sender_id}`).send({
           type: 'broadcast',
@@ -149,7 +199,7 @@ export default function InMemusPanel({ isGuest, requireAuth }: InMemusPanelProps
         });
       }
     }
-  }, [currentUserId]);
+  }, [currentUserId, queryClient]);
 
   const markFullyRead = useCallback(async (memu: Memu) => {
     if (!currentUserId) return;
@@ -162,7 +212,12 @@ export default function InMemusPanel({ isGuest, requireAuth }: InMemusPanelProps
       .eq('id', memu.id)
       .eq('recipient_id', currentUserId);
     if (!error) {
-      setMemus(prev => prev.map(m => m.id === memu.id ? { ...m, read_completely_at: now } : m));
+      // 🚀 Update the cache instantly!
+      queryClient.setQueryData(['inmemus', currentUserId], (old: Memu[] | undefined) => {
+        if (!old) return old;
+        return old.map(m => m.id === memu.id ? { ...m, read_completely_at: now } : m);
+      });
+      
       if (memu.sender_id) {
         await supabase.channel(`user-notifications:${memu.sender_id}`).send({
           type: 'broadcast',
@@ -171,52 +226,9 @@ export default function InMemusPanel({ isGuest, requireAuth }: InMemusPanelProps
         });
       }
     }
-  }, [currentUserId]);
+  }, [currentUserId, queryClient]);
 
-  const fetchMemus = useCallback(async () => {
-    if (!currentUserId) {
-      setLoading(false);
-      return;
-    }
-    setLoading(true);
-    const supabase = createClient();
-    try {
-      const { data: memusData, error } = await supabase
-        .from('memus')
-        .select('*')
-        .eq('recipient_id', currentUserId)
-        .order('created_at', { ascending: false });
-      if (error) throw error;
-      const senderIds = [...new Set((memusData || []).map(m => m.sender_id).filter(id => id))];
-      let profilesMap: Record<string, any> = {};
-      if (senderIds.length > 0) {
-        const { data: profilesData } = await supabase
-          .from('profiles')
-          .select('id, full_name, username')
-          .in('id', senderIds);
-        if (profilesData) {
-          profilesMap = profilesData.reduce((acc, p) => ({ ...acc, [p.id]: p }), {});
-        }
-      }
-      const enrichedMemus = (memusData || []).map(m => ({
-        ...m,
-        is_read: m.is_read || false,
-        delivered_at: m.delivered_at || null,
-        opened_at: m.opened_at || null,
-        read_completely_at: m.read_completely_at || null,
-        replied_at: m.replied_at || null,
-        attachments: m.attachments || [],
-        sender_profile: m.sender_id ? profilesMap[m.sender_id] || null : null,
-      }));
-      setMemus(enrichedMemus as Memu[]);
-    } catch (err) {
-      console.error('Error fetching memus:', err);
-      showToast('Failed to load memus', 'error');
-    } finally {
-      setLoading(false);
-    }
-  }, [currentUserId, showToast]);
-
+  // Real-time subscription for new memus
   useEffect(() => {
     if (!currentUserId) return;
     const supabase = createClient();
@@ -239,16 +251,18 @@ export default function InMemusPanel({ isGuest, requireAuth }: InMemusPanelProps
           senderProfile = data;
         }
         const enriched = { ...newMemu, is_read: false, attachments: newMemu.attachments || [], sender_profile: senderProfile };
-        setMemus(prev => [enriched as Memu, ...prev]);
+        
+        // 🚀 Add to cache instantly!
+        queryClient.setQueryData(['inmemus', currentUserId], (old: Memu[] | undefined) => {
+          if (!old) return [enriched as Memu];
+          return [enriched as Memu, ...old];
+        });
+        
         showToast(`New memu from ${senderProfile?.full_name || 'someone'}`, 'info');
       })
       .subscribe();
     return () => { supabase.removeChannel(channel); };
-  }, [currentUserId, showToast]);
-
-  useEffect(() => {
-    if (currentUserId) fetchMemus();
-  }, [fetchMemus, currentUserId]);
+  }, [currentUserId, showToast, queryClient]);
 
   // IntersectionObserver for fully read detection
   useEffect(() => {
@@ -352,7 +366,7 @@ export default function InMemusPanel({ isGuest, requireAuth }: InMemusPanelProps
     }
   };
 
-  if (loading) return <InboxSkeleton />;
+  if (isLoading) return <InboxSkeleton />;
 
   return (
     <>

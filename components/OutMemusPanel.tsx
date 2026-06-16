@@ -1,11 +1,12 @@
 'use client';
 
-import { useState, useEffect, useCallback, useRef } from 'react';
+import { useState, useEffect, useRef } from 'react';
+import { useQuery } from '@tanstack/react-query'; // <-- NEW IMPORT
 import { createClient } from '@/lib/supabase/client';
 import { useToast } from '@/contexts/ToastContext';
 import { 
-  Send, Search, Loader2, CheckCheck, Clock, AlertCircle, Filter,
-  Eye, BookOpen, Reply, CheckCircle, X, ChevronDown, Sparkles, Paperclip
+  Send, Search, CheckCheck, Clock, AlertCircle, Filter,
+  Eye, BookOpen, Reply, CheckCircle, X, ChevronDown, Paperclip
 } from 'lucide-react';
 
 interface OutMemu {
@@ -39,8 +40,6 @@ const filterOptions = [
 ];
 
 export default function OutMemusPanel({ isGuest, requireAuth }: OutMemusPanelProps = {}) {
-  const [memus, setMemus] = useState<OutMemu[]>([]);
-  const [loading, setLoading] = useState(true);
   const [searchQuery, setSearchQuery] = useState('');
   const [filterStatus, setFilterStatus] = useState<string>('all');
   const [currentUserId, setCurrentUserId] = useState<string | null>(null);
@@ -83,27 +82,25 @@ export default function OutMemusPanel({ isGuest, requireAuth }: OutMemusPanelPro
     return () => { supabase.removeChannel(channel); };
   }, [currentUserId, showToast]);
 
-  const fetchOutMemus = useCallback(async () => {
-    if (!currentUserId) {
-      setLoading(false);
-      return;
-    }
-    setLoading(true);
-    const supabase = createClient();
-    try {
+  // 🚀 THE MAGIC: React Query handles fetching and caching!
+  const { data: memus = [], isLoading } = useQuery({
+    queryKey: ['outmemus', currentUserId],
+    queryFn: async () => {
+      if (!currentUserId) return [];
+      const supabase = createClient();
+      
       const { data: memusData, error } = await supabase
         .from('memus')
         .select('*')
         .eq('sender_id', currentUserId)
         .order('created_at', { ascending: false });
+      
       if (error) throw error;
-      if (!memusData || memusData.length === 0) {
-        setMemus([]);
-        setLoading(false);
-        return;
-      }
+      if (!memusData || memusData.length === 0) return [];
+      
       const recipientIds = [...new Set(memusData.map(m => m.recipient_id).filter(id => id))];
       let profilesMap: Record<string, any> = {};
+      
       if (recipientIds.length > 0) {
         const { data: profilesData } = await supabase
           .from('profiles')
@@ -113,6 +110,7 @@ export default function OutMemusPanel({ isGuest, requireAuth }: OutMemusPanelPro
           profilesMap = profilesData.reduce((acc, p) => ({ ...acc, [p.id]: p }), {});
         }
       }
+      
       const formattedMemus: OutMemu[] = memusData.map((m: any) => {
         const profile = m.recipient_id ? profilesMap[m.recipient_id] : null;
         return {
@@ -130,19 +128,12 @@ export default function OutMemusPanel({ isGuest, requireAuth }: OutMemusPanelPro
           attachments: m.attachments || [],
         };
       });
-      setMemus(formattedMemus);
-    } catch (err) {
-      console.error('Error fetching out memus:', err);
-      showToast('Failed to load sent memus', 'error');
-      setMemus([]);
-    } finally {
-      setLoading(false);
-    }
-  }, [currentUserId, showToast]);
-
-  useEffect(() => {
-    if (currentUserId) fetchOutMemus();
-  }, [fetchOutMemus, currentUserId]);
+      
+      return formattedMemus;
+    },
+    enabled: !!currentUserId,
+    staleTime: 60 * 1000, // Cache for 1 minute!
+  });
 
   const getDetailedStatus = (memu: OutMemu) => {
     if (memu.replied_at) return { label: 'Replied', icon: Reply, color: 'text-[#8b5cf6]', bg: 'bg-[#ede9fe]/50' };
@@ -208,7 +199,7 @@ export default function OutMemusPanel({ isGuest, requireAuth }: OutMemusPanelPro
 
   const currentFilterLabel = filterOptions.find(f => f.id === filterStatus)?.label || 'All memus';
 
-  if (loading) {
+  if (isLoading) {
     return (
       <div className="flex items-center justify-center h-full">
         <div className="w-6 h-6 border-2 border-[#4f46e5] border-t-transparent rounded-full animate-spin" />

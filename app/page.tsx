@@ -12,6 +12,7 @@ import GlobalSearch from '@/components/search/GlobalSearch';
 import NotificationCenter from '@/components/notifications/NotificationCenter';
 import SplashScreen from '@/components/SplashScreen';
 import HomeDashboard from '@/components/HomeDashboard';
+import DirectMemoInbox from '@/components/direct-memos/DirectMemoInbox';
 import { ChevronLeft, Home, Sparkles, Menu } from 'lucide-react';
 
 const InMemusPanel = dynamic(() => import('@/components/InMemusPanel'), { ssr: false, loading: () => <PanelSkeleton /> });
@@ -55,7 +56,8 @@ export default function MemuApp() {
   const [pendingAction, setPendingAction] = useState<string | null>(null);
   const [isOnline, setIsOnline] = useState(typeof navigator !== 'undefined' ? navigator.onLine : true);
   const [replyToMemuId, setReplyToMemuId] = useState<string | null>(null);
-  const [isMobileSidebarOpen, setIsMobileSidebarOpen] = useState(false); // <-- NEW STATE
+  const [isMobileSidebarOpen, setIsMobileSidebarOpen] = useState(false);
+  const [isDirectMemosOpen, setIsDirectMemosOpen] = useState(false);
 
   useEffect(() => {
     const handleOnline = () => setIsOnline(true);
@@ -216,6 +218,9 @@ export default function MemuApp() {
           activePanel={activePanel} 
           onOpenSpace={(spaceId) => handleNavigate('space-dashboard', spaceId)}
           onOpenCompose={() => handleOpenCompose()}
+          onOpenDirectMemos={() => {
+            requireAuth('direct-memos', () => setIsDirectMemosOpen(true));
+          }}
           isGuest={isGuest}
           onSignIn={() => setShowAuthModal(true)}
           onOpenProfile={() => handleNavigate('profile')}
@@ -320,6 +325,11 @@ export default function MemuApp() {
           replyToMemuId={replyToMemuId}
         />
       </div>
+
+      {/* Direct Memos Slide-Over */}
+      {isDirectMemosOpen && (
+        <DirectMemoInbox onClose={() => setIsDirectMemosOpen(false)} />
+      )}
 
       {showAuthModal && (
         <Auth 

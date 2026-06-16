@@ -1,11 +1,10 @@
-'use client';
+\'use client';
 
 import { useState, useEffect } from 'react';
 import { 
   Home, Inbox, Send, FileText, Calendar, 
-  Share2, Users, Sparkles,
-  ChevronLeft, ChevronRight, Plus, AtSign,
-  X
+  Share2, Users, Sparkles, Video, MessageSquare,
+  ChevronLeft, ChevronRight, Plus, AtSign, X, Globe
 } from 'lucide-react';
 import SpacesList from './SpacesList';
 import UserChip from './UserChip';
@@ -18,6 +17,7 @@ interface SidebarProps {
   activePanel: PanelType;
   onOpenSpace: (spaceId: string) => void;
   onOpenCompose: () => void;
+  onOpenDirectMemos: () => void;
   isGuest: boolean;
   onSignIn: () => void;
   onOpenProfile: () => void;
@@ -27,7 +27,7 @@ interface SidebarProps {
 }
 
 export default function Sidebar({ 
-  onNavigate, activePanel, onOpenSpace, onOpenCompose, 
+  onNavigate, activePanel, onOpenSpace, onOpenCompose, onOpenDirectMemos,
   isGuest, onSignIn, onOpenProfile, user,
   isMobileOpen = false,
   onMobileClose
@@ -47,16 +47,50 @@ export default function Sidebar({
     if (onMobileClose) onMobileClose();
   };
 
-  const navItems: { icon: any, label: string, panel: PanelType }[] = [
-    { icon: Home, label: 'Home', panel: 'home' },
-    { icon: Inbox, label: 'InMemus', panel: 'inmemus' },
-    { icon: Send, label: 'OutMemus', panel: 'outmemus' },
-    { icon: FileText, label: 'Drafts', panel: 'drafts' },
-    { icon: Calendar, label: 'Calendar', panel: 'calendar' },
-    { icon: Users, label: 'Connections', panel: 'connections' },
-    { icon: AtSign, label: 'Handles', panel: 'handles' },
-    { icon: Share2, label: 'AirShare', panel: 'airshare' },
+  // Communication section
+  const communicationItems = [
+    { icon: Inbox, label: 'InMemus', panel: 'inmemus' as PanelType },
+    { icon: Send, label: 'OutMemus', panel: 'outmemus' as PanelType },
+    { icon: FileText, label: 'Drafts', panel: 'drafts' as PanelType },
+    { icon: MessageSquare, label: 'Direct Memos', action: 'direct-memos' },
   ];
+
+  // Collaboration section
+  const collaborationItems = [
+    { icon: Video, label: 'memu-Confer', panel: 'confer' as PanelType },
+    { icon: Calendar, label: 'Calendar', panel: 'calendar' as PanelType },
+    { icon: Users, label: 'Connections', panel: 'connections' as PanelType },
+    { icon: Share2, label: 'AirShare', panel: 'airshare' as PanelType },
+  ];
+
+  const renderNavItem = (item: any, idx: number) => {
+    const isActive = 'panel' in item && activePanel === item.panel;
+    const isAction = 'action' in item;
+    
+    return (
+      <button
+        key={idx}
+        onClick={() => {
+          if (isAction) {
+            if (item.action === 'direct-memos') {
+              onOpenDirectMemos();
+              if (onMobileClose) onMobileClose();
+            }
+          } else {
+            handleNavigate(item.panel);
+          }
+        }}
+        className={`relative flex items-center gap-3 w-full px-3 py-2.5 rounded-xl transition-all duration-200 group text-left ${
+          isActive
+            ? 'bg-gradient-to-r from-indigo-500/20 to-purple-500/20 text-indigo-700 shadow-inner'
+            : 'text-gray-600 hover:bg-white/60 hover:text-gray-900'
+        }`}
+      >
+        <item.icon size={18} className={isActive ? 'text-indigo-600' : 'text-gray-500'} />
+        <span className={`text-sm font-medium ${collapsed ? 'hidden lg:block' : 'block'}`}>{item.label}</span>
+      </button>
+    );
+  };
 
   return (
     <>
@@ -74,17 +108,18 @@ export default function Sidebar({
           isMobileOpen ? 'translate-x-0' : '-translate-x-full lg:translate-x-0'
         } ${collapsed ? 'lg:w-20' : 'lg:w-64'}`}
       >
-        {/* Header */}
-        <div className="flex items-center justify-between p-4 border-b border-white/20 flex-shrink-0">
-          <button onClick={() => onNavigate('home')} className="flex items-center gap-2 group">
-            <div className="w-8 h-8 rounded-xl bg-gradient-to-br from-indigo-500 to-purple-600 flex items-center justify-center shadow-lg group-hover:scale-105 transition">
-              <Sparkles size={16} className="text-white" />
-            </div>
-            <span className="font-['Playfair_Display'] text-xl font-semibold bg-gradient-to-r from-gray-800 to-gray-600 bg-clip-text text-transparent lg:block hidden">
-              memu
-            </span>
-          </button>
-          <div className="flex items-center gap-2">
+        {/* Header with Logo + New Memu Button */}
+        <div className="p-4 border-b border-white/20 flex-shrink-0 space-y-3">
+          {/* Logo (acts as Home) */}
+          <div className="flex items-center justify-between">
+            <button onClick={() => handleNavigate('home')} className="flex items-center gap-2 group">
+              <div className="w-8 h-8 rounded-xl bg-gradient-to-br from-indigo-500 to-purple-600 flex items-center justify-center shadow-lg group-hover:scale-105 transition">
+                <Sparkles size={16} className="text-white" />
+              </div>
+              <span className="font-['Playfair_Display'] text-xl font-semibold bg-gradient-to-r from-gray-800 to-gray-600 bg-clip-text text-transparent lg:block hidden">
+                memu
+              </span>
+            </button>
             <button
               onClick={() => setCollapsed(!collapsed)}
               className="p-1.5 rounded-lg hover:bg-white/50 transition text-gray-600 hidden lg:block"
@@ -98,40 +133,55 @@ export default function Sidebar({
               <X size={20} />
             </button>
           </div>
+
+          {/* + New Memu Button */}
+          <button
+            onClick={() => {
+              onOpenCompose();
+              if (onMobileClose) onMobileClose();
+            }}
+            className="flex items-center justify-center gap-2 w-full py-2.5 rounded-xl bg-gradient-to-r from-indigo-600 to-purple-600 text-white font-medium transition-all duration-200 hover:shadow-lg hover:-translate-y-0.5"
+          >
+            <Plus size={18} />
+            <span className={`text-sm ${collapsed ? 'hidden lg:block' : 'block'}`}>New Memu</span>
+          </button>
         </div>
 
-        {/* Navigation */}
-        <div className="flex-1 overflow-y-auto py-4 px-3 space-y-1 custom-scrollbar h-[calc(100vh-180px)]">
-          {navItems.map((item) => {
-            const isActive = activePanel === item.panel;
-            return (
-              <button
-                key={item.panel}
-                onClick={() => handleNavigate(item.panel)}
-                className={`relative flex items-center gap-3 w-full px-3 py-2.5 rounded-xl transition-all duration-200 group text-left ${
-                  isActive
-                    ? 'bg-gradient-to-r from-indigo-500/20 to-purple-500/20 text-indigo-700 shadow-inner'
-                    : 'text-gray-600 hover:bg-white/60 hover:text-gray-900'
-                }`}
-              >
-                <item.icon size={18} className={isActive ? 'text-indigo-600' : 'text-gray-500'} />
-                <span className={`text-sm font-medium ${collapsed ? 'hidden' : 'block'}`}>{item.label}</span>
-              </button>
-            );
-          })}
-
-          {/* Spaces Section */}
-          <div className="pt-4 mt-4 border-t border-white/20">
+        {/* Navigation Sections */}
+        <div className="flex-1 overflow-y-auto py-4 px-3 space-y-6 custom-scrollbar h-[calc(100vh-280px)]">
+          {/* COMMUNICATION */}
+          <div>
             {!collapsed && (
               <div className="px-3 mb-2 text-xs font-semibold text-gray-500 uppercase tracking-wider">
-                Your Spaces
+                Communication
               </div>
             )}
-            <SpacesList 
-              onOpenSpace={(spaceId) => handleNavigate('space-dashboard', spaceId)}
-              activePanel={activePanel}
-              onDeleteRequest={handleDeleteRequest}
-            />
+            <div className="space-y-1">
+              {communicationItems.map(renderNavItem)}
+            </div>
+          </div>
+
+          {/* COLLABORATION */}
+          <div>
+            {!collapsed && (
+              <div className="px-3 mb-2 text-xs font-semibold text-gray-500 uppercase tracking-wider">
+                Collaboration
+              </div>
+            )}
+            <div className="space-y-1">
+              {collaborationItems.map(renderNavItem)}
+            </div>
+          </div>
+
+          {/* MY SPACES */}
+          <div className="pt-4 border-t border-white/20">
+            {!collapsed && (
+              <div className="px-3 mb-2 text-xs font-semibold text-gray-500 uppercase tracking-wider">
+                My Spaces
+              </div>
+            )}
+            
+            {/* All Spaces Button */}
             <button 
               onClick={() => handleNavigate('spaces')}
               className={`relative flex items-center gap-3 w-full px-3 py-2.5 rounded-xl transition-all duration-200 group text-left ${
@@ -140,25 +190,22 @@ export default function Sidebar({
                   : 'text-gray-600 hover:bg-white/60 hover:text-gray-900'
               }`}
             >
-              <Plus size={18} className={activePanel === 'spaces' ? 'text-emerald-600' : 'text-gray-500'} />
-              <span className={`text-sm font-medium ${collapsed ? 'hidden' : 'block'}`}>Discover Spaces</span>
+              <Globe size={18} className={activePanel === 'spaces' ? 'text-emerald-600' : 'text-gray-500'} />
+              <span className={`text-sm font-medium ${collapsed ? 'hidden lg:block' : 'block'}`}>All Spaces</span>
             </button>
+
+            {/* Recent Spaces Mini-Screen */}
+            <SpacesList 
+              onOpenSpace={(spaceId) => handleNavigate('space-dashboard', spaceId)}
+              activePanel={activePanel}
+              onDeleteRequest={handleDeleteRequest}
+              maxItems={2}
+            />
           </div>
         </div>
 
-        {/* Bottom Section */}
-        <div className="absolute bottom-0 left-0 right-0 p-3 border-t border-white/20 space-y-3 bg-white/40 backdrop-blur-xl">
-          <button
-            onClick={() => {
-              onOpenCompose();
-              if (onMobileClose) onMobileClose();
-            }}
-            className="flex items-center justify-center gap-2 w-full py-2.5 rounded-xl bg-gradient-to-r from-indigo-600 to-purple-600 text-white font-medium transition-all duration-200 hover:shadow-lg"
-          >
-            <Plus size={18} />
-            <span className={`text-sm ${collapsed ? 'hidden' : 'block'}`}>New Memu</span>
-          </button>
-          
+        {/* Footer: User Profile */}
+        <div className="p-3 border-t border-white/20 flex-shrink-0">
           <UserChip 
             user={user} 
             isGuest={isGuest} 

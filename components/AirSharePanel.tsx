@@ -1,7 +1,8 @@
 'use client';
 
-import { useState, useEffect, useRef, useCallback } from 'react';
-import { Upload, File, Download, Trash2, Share2, Search, Filter, ChevronDown, Image, FileText, HelpCircle, Cloud, X, Check, Copy } from 'lucide-react';
+import { useState, useEffect, useRef } from 'react';
+import { useQuery, useQueryClient } from '@tanstack/react-query'; // <-- NEW IMPORTS
+import { Upload, File, Download, Trash2, Search, Filter, ChevronDown, Image, FileText, HelpCircle, Cloud, Check, Copy } from 'lucide-react';
 import { createClient } from '@/lib/supabase/client';
 import { useToast } from '@/contexts/ToastContext';
 
@@ -28,18 +29,26 @@ const filterOptions = [
 ];
 
 export default function AirSharePanel({ isGuest, requireAuth }: AirSharePanelProps) {
-  const [files, setFiles] = useState<FileItem[]>([]);
+  const queryClient = useQueryClient(); // <-- NEW HOOK
   const [uploading, setUploading] = useState(false);
-  const [loading, setLoading] = useState(true);
   const [searchQuery, setSearchQuery] = useState('');
   const [filter, setFilter] = useState<string>('all');
   const [isFilterOpen, setIsFilterOpen] = useState(false);
   const [isDragging, setIsDragging] = useState(false);
   const [copiedId, setCopiedId] = useState<string | null>(null);
+  const [user, setUser] = useState<any>(null);
+  
   const filterRef = useRef<HTMLDivElement>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
   const { showToast } = useToast();
 
+  // Fetch user once on mount
+  useEffect(() => {
+    const supabase = createClient();
+    supabase.auth.getUser().then(({ data: { user } }) => setUser(user));
+  }, []);
+
+  // Close filter dropdown when clicking outside
   useEffect(() => {
     const handleClickOutside = (e: MouseEvent) => {
       if (filterRef.current && !filterRef.current.contains(e.target as Node)) {
@@ -50,15 +59,12 @@ export default function AirSharePanel({ isGuest, requireAuth }: AirSharePanelPro
     return () => document.removeEventListener('mousedown', handleClickOutside);
   }, []);
 
-  const loadFiles = useCallback(async () => {
-    const supabase = createClient();
-    const { data: { user } } = await supabase.auth.getUser();
-    if (!user) {
-      setLoading(false);
-      return;
-    }
-
-    try {
+  // 🚀 THE MAGIC: React Query handles fetching, caching, and loading states!
+  const { data: files = [], isLoading } = useQuery({
+    queryKey: ['airshare-files', user?.id],
+    queryFn: async () => {
+      if (!user) return [];
+      const supabase = createClient();
       const { data, error } = await supabase
         .from('airshare_files')
         .select('*')
@@ -66,21 +72,13 @@ export default function AirSharePanel({ isGuest, requireAuth }: AirSharePanelPro
         .order('created_at', { ascending: false });
 
       if (error) throw error;
-      setFiles(data || []);
-    } catch {
-      setFiles([]);
-    } finally {
-      setLoading(false);
-    }
-  }, []);
-
-  useEffect(() => {
-    loadFiles();
-  }, [loadFiles]);
+      return data || [];
+    },
+    enabled: !!user, // Only run query if user is logged in
+    staleTime: 60 * 1000, // Cache data for 1 minute!
+  });
 
   const uploadFiles = async (fileList: FileList) => {
-    const supabase = createClient();
-    const { data: { user } } = await supabase.auth.getUser();
     if (!user) {
       showToast('Please sign in', 'error');
       return;
@@ -88,6 +86,7 @@ export default function AirSharePanel({ isGuest, requireAuth }: AirSharePanelPro
 
     setUploading(true);
     let successCount = 0;
+    const supabase = createClient();
 
     for (const file of Array.from(fileList)) {
       try {
@@ -120,7 +119,8 @@ export default function AirSharePanel({ isGuest, requireAuth }: AirSharePanelPro
 
     if (successCount > 0) {
       showToast(`${successCount} file${successCount > 1 ? 's' : ''} uploaded`, 'success');
-      await loadFiles();
+      // 🚀 Instantly refresh the cache instead of waiting!
+      queryClient.invalidateQueries({ queryKey: ['airshare-files', user.id] });
     }
     setUploading(false);
     if (fileInputRef.current) fileInputRef.current.value = '';
@@ -159,10 +159,13 @@ export default function AirSharePanel({ isGuest, requireAuth }: AirSharePanelPro
     const supabase = createClient();
     const urlParts = file.url.split('/');
     const filePath = urlParts.slice(urlParts.indexOf('airshare')).join('/');
+    
     await supabase.storage.from('airshare').remove([filePath]);
     await supabase.from('airshare_files').delete().eq('id', file.id);
-    setFiles(prev => prev.filter(f => f.id !== file.id));
+    
     showToast(`${file.name} deleted`, 'success');
+    // 🚀 Instantly refresh the cache!
+    queryClient.invalidateQueries({ queryKey: ['airshare-files', user?.id] });
   };
 
   const copyLink = async (url: string, id: string) => {
@@ -198,7 +201,7 @@ export default function AirSharePanel({ isGuest, requireAuth }: AirSharePanelPro
     return <File size={20} className="text-[#777]" />;
   };
 
-  const filteredFiles = files.filter(file => {
+  const filteredFiles = files.filter((file: FileItem) => {
     if (searchQuery && !file.name.toLowerCase().includes(searchQuery.toLowerCase())) return false;
     if (filter === 'image' && !file.type.startsWith('image/')) return false;
     if (filter === 'document' && !(file.type.includes('pdf') || file.type.includes('word') || file.type.includes('text'))) return false;
@@ -208,11 +211,12 @@ export default function AirSharePanel({ isGuest, requireAuth }: AirSharePanelPro
 
   const stats = {
     total: files.length,
-    images: files.filter(f => f.type.startsWith('image/')).length,
-    docs: files.filter(f => f.type.includes('pdf') || f.type.includes('word') || f.type.includes('text')).length,
+    images: files.filter((f: FileItem) => f.type.startsWith('image/')).length,
+    docs: files.filter((f: FileItem) => f.type.includes('pdf') || f.type.includes('word') || f.type.includes('text')).length,
   };
 
-  if (loading) {
+  //  Use isLoading from React Query
+  if (isLoading) {
     return (
       <div className="flex items-center justify-center h-full">
         <div className="w-6 h-6 border-2 border-[#4f46e5] border-t-transparent rounded-full animate-spin" />
@@ -322,7 +326,7 @@ export default function AirSharePanel({ isGuest, requireAuth }: AirSharePanelPro
           </div>
         ) : (
           <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4">
-            {filteredFiles.map((file) => (
+            {filteredFiles.map((file: FileItem) => (
               <div
                 key={file.id}
                 className="group bg-white rounded-xl border border-[#e8e7e3] p-4 hover:shadow-md transition-all duration-200 hover:-translate-y-0.5"

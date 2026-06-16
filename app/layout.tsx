@@ -1,6 +1,7 @@
 import type { Metadata } from "next";
 import { ToastProvider } from '@/contexts/ToastContext';
 import { createClient } from '@/lib/supabase/server';
+import QueryProvider from '@/components/QueryProvider'; // <-- NEW IMPORT
 import "./globals.css";
 
 export const metadata: Metadata = {
@@ -27,12 +28,10 @@ export default async function RootLayout({
       </head>
       <body className="antialiased">
         <ToastProvider>
-          {/* 
-            `user` is now available server-side. 
-            Pass it to client components via props or context if needed.
-            Example: <AuthContextProvider user={user}>{children}</AuthContextProvider>
-          */}
-          {children}
+          {/* Wrapping your entire app in the caching engine! */}
+          <QueryProvider>
+            {children}
+          </QueryProvider>
         </ToastProvider>
       </body>
     </html>

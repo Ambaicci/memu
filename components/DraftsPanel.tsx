@@ -1,7 +1,7 @@
 'use client';
 
 import { useState, useEffect, useRef } from 'react';
-import { useQuery, useQueryClient } from '@tanstack/react-query'; // <-- NEW IMPORTS
+import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { FileText, Clock, Search, Edit, Trash2, Filter, ChevronDown } from 'lucide-react';
 import { createClient } from '@/lib/supabase/client';
 import { useToast } from '@/contexts/ToastContext';
@@ -24,35 +24,41 @@ interface DraftsPanelProps {
 }
 
 const filterOptions = [
-  { id: 'all', label: 'All drafts', icon: <FileText size={12} /> },
-  { id: 'recent', label: 'Recently edited', icon: <Clock size={12} /> },
+  { id: 'all', label: 'All drafts', icon: <FileText size={14} /> },
+  { id: 'recent', label: 'Recently edited', icon: <Clock size={14} /> },
 ];
 
 const DraftSkeleton = () => (
-  <div className="space-y-3 px-6 md:px-10">
+  <div className="space-y-3 px-6 md:px-10 pt-8">
     {[1, 2, 3].map((i) => (
-      <div key={i} className="bg-white border border-[#e8e7e3] rounded-2xl p-5 animate-pulse">
-        <div className="flex items-start justify-between mb-3">
-          <div className="flex-1">
-            <div className="flex items-center gap-2 mb-2">
-              <div className="w-4 h-4 bg-[#e8e7e3] rounded-full" />
-              <div className="w-32 h-3 bg-[#e8e7e3] rounded" />
-            </div>
-            <div className="w-3/4 h-4 bg-[#e8e7e3] rounded mb-2" />
-            <div className="w-20 h-3 bg-[#e8e7e3] rounded" />
+      <div key={i} className="bg-white border border-gray-200/60 rounded-2xl p-4 animate-pulse">
+        <div className="flex items-center justify-between mb-3">
+          <div className="flex items-center gap-3">
+            <div className="w-8 h-8 bg-gray-100 rounded-lg" />
+            <div className="w-24 h-3 bg-gray-100 rounded" />
           </div>
+          <div className="w-12 h-3 bg-gray-100 rounded" />
         </div>
-        <div className="space-y-2">
-          <div className="w-full h-3 bg-[#e8e7e3] rounded" />
-          <div className="w-5/6 h-3 bg-[#e8e7e3] rounded" />
-        </div>
+        <div className="w-3/4 h-4 bg-gray-100 rounded mb-2" />
+        <div className="w-full h-3 bg-gray-100 rounded" />
       </div>
     ))}
   </div>
 );
 
+const getNatureStyles = (nature: string) => {
+  switch (nature) {
+    case 'fyi': return { border: 'border-amber-200/60', badge: 'bg-amber-50 text-amber-700 border border-amber-100' };
+    case 'decide': return { border: 'border-indigo-200/60', badge: 'bg-indigo-50 text-indigo-700 border border-indigo-100' };
+    case 'resolve': return { border: 'border-rose-200/60', badge: 'bg-rose-50 text-rose-700 border border-rose-100' };
+    case 'urgent': return { border: 'border-emerald-200/60', badge: 'bg-emerald-50 text-emerald-700 border border-emerald-100' };
+    case 'broadcast': return { border: 'border-pink-200/60', badge: 'bg-pink-50 text-pink-700 border border-pink-100' };
+    default: return { border: 'border-gray-200/60', badge: 'bg-gray-50 text-gray-700 border border-gray-100' };
+  }
+};
+
 export default function DraftsPanel({ isGuest, requireAuth, onEditDraft }: DraftsPanelProps) {
-  const queryClient = useQueryClient(); // <-- NEW HOOK
+  const queryClient = useQueryClient();
   const [currentUserId, setCurrentUserId] = useState<string | null>(null);
   const [searchQuery, setSearchQuery] = useState('');
   const [filter, setFilter] = useState<'all' | 'recent'>('all');
@@ -79,7 +85,6 @@ export default function DraftsPanel({ isGuest, requireAuth, onEditDraft }: Draft
     getUser();
   }, []);
 
-  // 🚀 THE MAGIC: React Query handles fetching and caching!
   const { data: drafts = [], isLoading } = useQuery({
     queryKey: ['drafts', currentUserId],
     queryFn: async () => {
@@ -96,7 +101,7 @@ export default function DraftsPanel({ isGuest, requireAuth, onEditDraft }: Draft
       return data || [];
     },
     enabled: !!currentUserId,
-    staleTime: 60 * 1000, // Cache for 1 minute!
+    staleTime: 60 * 1000,
   });
 
   const handleDeleteDraft = async (id: string, e: React.MouseEvent) => {
@@ -107,7 +112,6 @@ export default function DraftsPanel({ isGuest, requireAuth, onEditDraft }: Draft
     if (error) {
       showToast('Failed to delete draft', 'error');
     } else {
-      // 🚀 Update the cache instantly!
       queryClient.setQueryData(['drafts', currentUserId], (old: Draft[] | undefined) => {
         if (!old) return old;
         return old.filter(d => d.id !== id);
@@ -140,21 +144,6 @@ export default function DraftsPanel({ isGuest, requireAuth, onEditDraft }: Draft
     return date.toLocaleDateString();
   };
 
-  const getNatureBadge = (nature: string) => {
-    const colors: Record<string, string> = {
-      fyi: 'bg-[#fef3c7] text-[#d97706]',
-      decide: 'bg-[#ede9fe] text-[#7c3aed]',
-      resolve: 'bg-[#fee2e2] text-[#dc2626]',
-      urgent: 'bg-[#d1fae5] text-[#059669]',
-      broadcast: 'bg-[#fce7f3] text-[#be185d]',
-    };
-    return (
-      <span className={`px-2 py-0.5 rounded-full text-[10px] font-medium ${colors[nature] || 'bg-[#f2f1ee] text-[#777]'}`}>
-        {nature.toUpperCase()}
-      </span>
-    );
-  };
-
   const currentFilterLabel = filter === 'all' ? 'All drafts' : 'Recently edited';
 
   if (isLoading) {
@@ -162,33 +151,41 @@ export default function DraftsPanel({ isGuest, requireAuth, onEditDraft }: Draft
   }
 
   return (
-    <div className="flex flex-col h-full bg-[#fafaf8]">
-      <div className="px-6 md:px-10 pt-8 pb-4">
-        <div className="flex items-center justify-between flex-wrap gap-4 mb-2">
-          <div>
-            <h1 className="heading-gradient font-['Playfair_Display'] text-3xl md:text-4xl font-medium tracking-tight">Drafts</h1>
-            <div className="flex flex-wrap gap-2 mt-2">
-              <span className="text-xs text-[#777]">{drafts.length} saved drafts</span>
+    <div className="flex flex-col h-full bg-memu-canvas animate-page-enter">
+      {/* Header Section */}
+      <div className="px-6 md:px-10 pt-8 pb-6">
+        <div className="flex items-center justify-between flex-wrap gap-4 mb-6">
+          <div className="space-y-2">
+            <div className="flex items-center gap-3 text-indigo-600">
+              <div className="w-11 h-11 rounded-2xl bg-gradient-to-br from-indigo-600 to-purple-600 flex items-center justify-center shadow-lg">
+                <FileText size={22} className="text-white" strokeWidth={2.5} />
+              </div>
+              <span className="text-sm font-bold uppercase tracking-wider">Drafts</span>
+            </div>
+            <h1 className="font-serif text-3xl md:text-4xl font-semibold text-gray-900 leading-tight">Saved Drafts</h1>
+            <div className="flex flex-wrap gap-3 mt-3">
+              <span className="text-sm text-gray-500 font-medium">{drafts.length} saved drafts</span>
             </div>
           </div>
+          
           <div className="relative" ref={filterRef}>
             <button
               onClick={() => setIsFilterOpen(!isFilterOpen)}
-              className="flex items-center gap-2 px-4 py-2 bg-white/80 backdrop-blur-sm border border-[#e8e7e3] rounded-full text-sm text-[#777] hover:border-[#4f46e5] transition shadow-sm"
+              className="flex items-center gap-3 px-5 py-3 bg-white/80 backdrop-blur-xl border border-gray-200 rounded-2xl text-sm font-medium text-gray-700 hover:bg-white hover:border-gray-300 transition-all shadow-sm btn-press"
             >
-              <Filter size={12} />
+              <Filter size={15} />
               <span>{currentFilterLabel}</span>
-              <ChevronDown size={10} />
+              <ChevronDown size={13} />
             </button>
             {isFilterOpen && (
-              <div className="absolute right-0 mt-2 w-44 bg-white rounded-xl shadow-lg border border-[#e8e7e3] overflow-hidden z-20 animate-fadeIn">
-                <div className="py-1">
+              <div className="absolute right-0 mt-3 w-48 bg-white rounded-2xl shadow-2xl border border-gray-200 overflow-hidden z-20 animate-fadeIn">
+                <div className="py-2">
                   {filterOptions.map((opt) => (
                     <button
                       key={opt.id}
                       onClick={() => { setFilter(opt.id as any); setIsFilterOpen(false); }}
-                      className={`w-full flex items-center gap-2 px-4 py-2 text-sm text-left transition ${
-                        filter === opt.id ? 'bg-[#ede9fe] text-[#4f46e5]' : 'text-[#777] hover:bg-[#fafaf8]'
+                      className={`w-full flex items-center gap-3 px-5 py-3 text-sm text-left transition ${
+                        filter === opt.id ? 'bg-indigo-50 text-indigo-700 font-semibold' : 'text-gray-600 hover:bg-gray-50'
                       }`}
                     >
                       {opt.icon}
@@ -200,63 +197,110 @@ export default function DraftsPanel({ isGuest, requireAuth, onEditDraft }: Draft
             )}
           </div>
         </div>
-
-        <div className="relative mt-3">
-          <Search size={14} className="absolute left-3 top-1/2 -translate-y-1/2 text-[#aaa]" />
+        
+        <div className="relative">
+          <Search size={19} className="absolute left-4 top-1/2 -translate-y-1/2 text-gray-400" />
           <input
             type="text"
             value={searchQuery}
             onChange={(e) => setSearchQuery(e.target.value)}
             placeholder="Search drafts..."
-            className="w-full pl-9 pr-4 py-2 bg-white border border-[#e8e7e3] rounded-full text-sm outline-none focus:border-[#4f46e5] transition"
+            className="w-full pl-12 pr-4 py-4 bg-white/80 backdrop-blur-xl border border-gray-200 rounded-2xl text-sm text-gray-900 outline-none focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500 transition-all placeholder:text-gray-400"
           />
         </div>
       </div>
 
+      {/* Drafts List */}
       <div className="flex-1 overflow-y-auto px-6 md:px-10 pb-10">
         {filteredDrafts.length === 0 ? (
-          <div className="flex flex-col items-center justify-center py-16 text-center">
-            <div className="w-16 h-16 rounded-full bg-[#f2f1ee] flex items-center justify-center mb-4">
-              <FileText size={28} className="text-[#aaa]" />
+          <div className="flex flex-col items-center justify-center py-24 text-center animate-fade-in-scale">
+            <div className="relative w-32 h-32 mb-8">
+              <div className="absolute inset-0 bg-gradient-to-br from-indigo-100 to-purple-100 rounded-3xl blur-2xl animate-pulse"></div>
+              <div className="relative bg-white rounded-3xl w-32 h-32 flex items-center justify-center shadow-xl border border-gray-200">
+                <FileText size={48} className="text-indigo-500" strokeWidth={2} />
+              </div>
             </div>
-            <h3 className="text-[17px] font-medium text-[#1a1a1a] mb-1">No drafts</h3>
-            <p className="text-[13px] text-[#777]">Start writing a memu and save it as a draft</p>
+            <h3 className="font-serif text-xl font-semibold text-gray-900 mb-3">No drafts</h3>
+            <p className="text-gray-500 text-sm max-w-md">
+              Start writing a memu and save it as a draft
+            </p>
           </div>
         ) : (
-          <div className="space-y-4">
-            {filteredDrafts.map((draft) => (
-              <div
-                key={draft.id}
-                onClick={() => onEditDraft(draft)}
-                className="group bg-white rounded-2xl border border-[#e8e7e3] p-5 cursor-pointer transition-all duration-200 hover:shadow-md hover:-translate-y-0.5"
-              >
-                <div className="flex items-start justify-between mb-3">
-                  <div className="flex-1">
-                    <div className="flex items-center gap-2 mb-1 flex-wrap">
-                      <FileText size={14} className="text-[#4f46e5]" />
-                      <span className="text-[13px] font-medium text-[#1a1a1a]">To: {draft.toHandles.slice(0, 2).join(', ')}{draft.toHandles.length > 2 && ` +${draft.toHandles.length - 2}`}</span>
-                      {getNatureBadge(draft.nature)}
+          <div className="space-y-3">
+            {filteredDrafts.map((draft, idx) => {
+              const natureStyles = getNatureStyles(draft.nature);
+              
+              return (
+                <div
+                  key={draft.id}
+                  onClick={() => onEditDraft(draft)}
+                  className={`group relative bg-white rounded-2xl border-[1px] shadow-[0_2px_8px_-2px_rgba(0,0,0,0.04)] hover:shadow-lg hover:-translate-y-0.5 transition-all duration-300 ${natureStyles.border} p-4 cursor-pointer animate-slide-up btn-press`}
+                  style={{ animationDelay: `${idx * 60}ms`, opacity: 0 }}
+                >
+                  {/* 1. Header: Recipients & Nature Badge */}
+                  <div className="flex items-center justify-between mb-2">
+                    <div className="flex items-center gap-2.5">
+                      <div className="w-8 h-8 rounded-lg bg-gray-100 flex items-center justify-center">
+                        <FileText size={14} className="text-gray-500" strokeWidth={2.5} />
+                      </div>
+                      <div className="text-sm font-semibold text-gray-900">
+                        To: {draft.toHandles.slice(0, 2).join(', ')}{draft.toHandles.length > 2 && ` +${draft.toHandles.length - 2}`}
+                      </div>
                     </div>
-                    <div className="text-[15px] font-semibold text-[#1a1a1a] mb-1">{draft.subject || 'No subject'}</div>
-                    <div className="flex items-center gap-2 text-meta text-[#777]"><Clock size={10} /> {formatDate(draft.updated_at)}</div>
+                    <div className="text-[11px] text-gray-400 font-medium">{formatDate(draft.updated_at)}</div>
                   </div>
-                  <div className="flex gap-1 opacity-0 group-hover:opacity-100 transition">
-                    <button onClick={(e) => { e.stopPropagation(); onEditDraft(draft); }} className="p-1.5 rounded-full hover:bg-[#f2f1ee] text-[#4f46e5]" title="Edit"><Edit size={14} /></button>
-                    <button onClick={(e) => handleDeleteDraft(draft.id, e)} className="p-1.5 rounded-full hover:bg-[#fee2e2] text-[#777] hover:text-[#dc2626]" title="Delete"><Trash2 size={14} /></button>
+
+                  {/* 2. Content: Subject & Body */}
+                  <div className="mb-3">
+                    <h3 className="font-serif text-[15px] font-semibold text-gray-900 mb-1 group-hover:text-indigo-600 transition-colors line-clamp-1">
+                      {draft.subject || 'No subject'}
+                    </h3>
+                    <p className="text-[13px] text-gray-500 leading-relaxed line-clamp-2">
+                      {draft.body || 'No content'}
+                    </p>
+                  </div>
+
+                  {/* 3. Footer: Nature Badge & Actions */}
+                  <div className="flex items-center justify-between pt-2 border-t border-gray-100/50">
+                    <div className="flex items-center gap-3">
+                      <span className={`px-2 py-0.5 rounded-md text-[9px] font-bold uppercase tracking-wider ${natureStyles.badge}`}>
+                        {draft.nature}
+                      </span>
+                      <div className="flex items-center gap-1 text-[11px] text-gray-400">
+                        <Clock size={10} strokeWidth={2.5} />
+                        <span className="font-medium">Edited {formatDate(draft.updated_at)}</span>
+                      </div>
+                    </div>
+                    
+                    <div className="flex items-center gap-1 opacity-0 group-hover:opacity-100 transition-opacity duration-200">
+                      <button 
+                        onClick={(e) => { e.stopPropagation(); onEditDraft(draft); }} 
+                        className="p-1.5 rounded-md hover:bg-gray-100 text-gray-400 hover:text-indigo-600 transition-all btn-press" 
+                        title="Edit"
+                      >
+                        <Edit size={12} strokeWidth={2.5} />
+                      </button>
+                      <button 
+                        onClick={(e) => handleDeleteDraft(draft.id, e)} 
+                        className="p-1.5 rounded-md hover:bg-gray-100 text-gray-400 hover:text-rose-600 transition-all btn-press" 
+                        title="Delete"
+                      >
+                        <Trash2 size={12} strokeWidth={2.5} />
+                      </button>
+                    </div>
                   </div>
                 </div>
-                <div className="text-[13px] text-[#555] leading-relaxed line-clamp-2 bg-[#fafaf8] rounded-xl p-3">{draft.body || 'No content'}</div>
-              </div>
-            ))}
+              );
+            })}
           </div>
         )}
       </div>
 
       <style>{`
+        .line-clamp-1 { display: -webkit-box; -webkit-line-clamp: 1; -webkit-box-orient: vertical; overflow: hidden; }
         .line-clamp-2 { display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden; }
         @keyframes fadeIn { from { opacity: 0; transform: scale(0.96); } to { opacity: 1; transform: scale(1); } }
-        .animate-fadeIn { animation: fadeIn 0.15s ease-out; }
-        .text-meta { font-size: 11px; color: #777; }
+        .animate-fadeIn { animation: fadeIn 0.2s ease-out; }
       `}</style>
     </div>
   );

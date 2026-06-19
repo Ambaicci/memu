@@ -135,3 +135,4 @@ export default function CreateBoardModal({ isOpen, onClose, onCreate }: CreateBo
     </div>
   );
 }
+

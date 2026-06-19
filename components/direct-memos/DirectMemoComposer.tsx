@@ -147,7 +147,7 @@ export default function DirectMemoComposer({
                 <button
                   key={user.id}
                   onClick={() => { setSelectedUser(user); setSearchQuery(''); }}
-                  className="w-full flex items-center gap-3 px-4 py-2.5 hover:bg-[#fafaf8] transition text-left"
+                  className="w-full flex items-center gap-3 px-4 py-2.5 hover:bg-memu-canvas transition text-left"
                 >
                   <div className="w-8 h-8 rounded-full bg-gradient-to-br from-[#4f46e5] to-[#0891b2] flex items-center justify-center text-white text-[10px] font-bold shadow-sm flex-shrink-0">
                     {(user.full_name || user.username || '?').substring(0, 2).toUpperCase()}
@@ -243,3 +243,4 @@ export default function DirectMemoComposer({
     </div>
   );
 }
+

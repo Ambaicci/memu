@@ -412,7 +412,7 @@ export default function SheetsPanel() {
   }
 
   return (
-    <div className={`${isFullscreen ? 'fixed inset-0 z-50 bg-[#fafaf8]' : 'flex h-full'} bg-[#fafaf8] transition-all duration-300`}>
+    <div className={`${isFullscreen ? 'fixed inset-0 z-50 bg-memu-canvas' : 'flex h-full'} bg-memu-canvas transition-all duration-300 animate-page-enter`}>
       {/* Sidebar */}
       <div className="w-64 border-r border-[#e8e7e3] bg-white flex flex-col shadow-sm">
         <div className="px-4 pt-6 pb-4 border-b border-[#f2f1ee]">
@@ -425,7 +425,7 @@ export default function SheetsPanel() {
         </div>
         
         <div className="p-3">
-          <button onClick={() => setShowNewModal(true)} className="w-full flex items-center justify-center gap-2 py-2.5 btn-primary text-white rounded-lg text-[13px] font-medium">
+          <button onClick={() => setShowNewModal(true)} className="w-full flex items-center justify-center gap-2 py-2.5 btn-primary text-white rounded-lg text-[13px] font-medium btn-press">
             <Plus size={14} /> New Workbook
           </button>
         </div>
@@ -437,14 +437,14 @@ export default function SheetsPanel() {
             <input type="text" value={searchQuery} onChange={(e) => setSearchQuery(e.target.value)} placeholder="Search workbooks..." className="flex-1 text-[12px] outline-none bg-transparent" />
           </div>
           <div className="relative" ref={filterRef}>
-            <button onClick={() => setIsFilterOpen(!isFilterOpen)} className="w-full flex items-center justify-between gap-2 bg-white border border-[#e8e7e3] rounded-lg px-3 py-1.5 text-[12px] text-[#777] hover:border-[#4f46e5] transition">
+            <button onClick={() => setIsFilterOpen(!isFilterOpen)} className="w-full flex items-center justify-between gap-2 bg-white border border-[#e8e7e3] rounded-lg px-3 py-1.5 text-[12px] text-[#777] hover:border-[#4f46e5] transition btn-press">
               <span className="flex items-center gap-1"><Filter size={10} /> {currentFilterLabel}</span>
               <ChevronDown size={10} />
             </button>
             {isFilterOpen && (
-              <div className="absolute left-0 right-0 mt-1 bg-white rounded-lg shadow-xl border border-[#e8e7e3] z-20">
+              <div className="absolute left-0 right-0 mt-1 bg-white rounded-lg shadow-xl border border-[#e8e7e3] z-20 animate-fade-in-scale">
                 {filterOptions.map((opt) => (
-                  <button key={opt.id} onClick={() => { setFilter(opt.id as any); setIsFilterOpen(false); }} className={`w-full flex items-center gap-2 px-3 py-2 text-[12px] transition ${filter === opt.id ? 'bg-[#fffbeb] text-[#d97706]' : 'text-[#777] hover:bg-[#fafaf8]'}`}>
+                  <button key={opt.id} onClick={() => { setFilter(opt.id as any); setIsFilterOpen(false); }} className={`w-full flex items-center gap-2 px-3 py-2 text-[12px] transition ${filter === opt.id ? 'bg-[#fffbeb] text-[#d97706]' : 'text-[#777] hover:bg-memu-canvas'}`}>
                     {opt.icon} {opt.label}
                   </button>
                 ))}
@@ -455,20 +455,20 @@ export default function SheetsPanel() {
         
         <div className="flex-1 overflow-y-auto px-2 pb-4">
           {filteredWorkbooks.length === 0 ? (
-            <div className="p-6 text-center">
+            <div className="p-6 text-center animate-fade-in-scale">
               <FileSpreadsheet size={32} className="text-[#aaa] mx-auto mb-3" />
               <p className="text-[12px] text-[#777] mb-2">No workbooks found</p>
             </div>
           ) : (
             <div className="space-y-1">
-              {filteredWorkbooks.map((wb) => (
-                <div key={wb.id} onClick={() => { setActiveWorkbookId(wb.id); setWorkbookName(wb.name); fetchSheets(wb.id); }} className={`group p-3 rounded-lg cursor-pointer transition-all ${activeWorkbookId === wb.id ? 'bg-[#fffbeb] ring-1 ring-[#d97706]/40' : 'hover:bg-[#f9fafb]'}`}>
+              {filteredWorkbooks.map((wb, idx) => (
+                <div key={wb.id} onClick={() => { setActiveWorkbookId(wb.id); setWorkbookName(wb.name); fetchSheets(wb.id); }} className={`group p-3 rounded-lg cursor-pointer transition-all animate-slide-up btn-press ${activeWorkbookId === wb.id ? 'bg-[#fffbeb] ring-1 ring-[#d97706]/40' : 'hover:bg-[#f9fafb]'}`} style={{ animationDelay: `${idx * 40}ms`, opacity: 0 }}>
                   <div className="flex items-center justify-between mb-1">
                     <div className="flex items-center gap-2 flex-1 min-w-0">
                       <FileSpreadsheet size={13} className="text-[#d97706] flex-shrink-0" />
                       <span className="text-[13px] font-medium text-[#0f0f0f] truncate">{wb.name}</span>
                     </div>
-                    <button onClick={(e) => { e.stopPropagation(); handleDeleteWorkbook(wb.id); }} className="opacity-0 group-hover:opacity-100 p-1 rounded hover:bg-red-100 transition"><Trash2 size={11} className="text-[#777] hover:text-[#dc2626]" /></button>
+                    <button onClick={(e) => { e.stopPropagation(); handleDeleteWorkbook(wb.id); }} className="opacity-0 group-hover:opacity-100 p-1 rounded hover:bg-red-100 transition btn-press"><Trash2 size={11} className="text-[#777] hover:text-[#dc2626]" /></button>
                   </div>
                   <div className="text-[10px] text-[#777] pl-6">{formatDate(wb.updated_at)}</div>
                 </div>
@@ -484,17 +484,17 @@ export default function SheetsPanel() {
           <>
             <div className="border-b border-[#e8e7e3] bg-white shadow-sm px-4 py-2.5 flex items-center justify-between flex-wrap gap-2">
               <div className="flex items-center gap-2 flex-wrap">
-                <button onClick={() => updateCellFormat('bold')} className={`p-1.5 rounded-md transition ${selectedCell && activeSheet?.data[selectedCell.row][selectedCell.col].bold ? 'bg-[#fffbeb] text-[#d97706]' : 'text-[#777] hover:bg-[#fffbeb]'}`} title="Bold"><Bold size={14} /></button>
-                <button onClick={() => updateCellFormat('italic')} className={`p-1.5 rounded-md transition ${selectedCell && activeSheet?.data[selectedCell.row][selectedCell.col].italic ? 'bg-[#fffbeb] text-[#d97706]' : 'text-[#777] hover:bg-[#fffbeb]'}`} title="Italic"><Italic size={14} /></button>
+                <button onClick={() => updateCellFormat('bold')} className={`p-1.5 rounded-md transition btn-press ${selectedCell && activeSheet?.data[selectedCell.row][selectedCell.col].bold ? 'bg-[#fffbeb] text-[#d97706]' : 'text-[#777] hover:bg-[#fffbeb]'}`} title="Bold"><Bold size={14} /></button>
+                <button onClick={() => updateCellFormat('italic')} className={`p-1.5 rounded-md transition btn-press ${selectedCell && activeSheet?.data[selectedCell.row][selectedCell.col].italic ? 'bg-[#fffbeb] text-[#d97706]' : 'text-[#777] hover:bg-[#fffbeb]'}`} title="Italic"><Italic size={14} /></button>
                 <div className="w-px h-5 bg-[#e8e7e3]" />
-                <button onClick={() => updateCellFormat('align', 'left')} className="p-1.5 rounded-md text-[#777] hover:bg-[#fffbeb] transition" title="Align Left"><AlignLeft size={14} /></button>
-                <button onClick={() => updateCellFormat('align', 'center')} className="p-1.5 rounded-md text-[#777] hover:bg-[#fffbeb] transition" title="Align Center"><AlignCenter size={14} /></button>
-                <button onClick={() => updateCellFormat('align', 'right')} className="p-1.5 rounded-md text-[#777] hover:bg-[#fffbeb] transition" title="Align Right"><AlignRight size={14} /></button>
+                <button onClick={() => updateCellFormat('align', 'left')} className="p-1.5 rounded-md text-[#777] hover:bg-[#fffbeb] transition btn-press" title="Align Left"><AlignLeft size={14} /></button>
+                <button onClick={() => updateCellFormat('align', 'center')} className="p-1.5 rounded-md text-[#777] hover:bg-[#fffbeb] transition btn-press" title="Align Center"><AlignCenter size={14} /></button>
+                <button onClick={() => updateCellFormat('align', 'right')} className="p-1.5 rounded-md text-[#777] hover:bg-[#fffbeb] transition btn-press" title="Align Right"><AlignRight size={14} /></button>
                 <SheetsToolDrawer onFormat={updateCellFormat} onInsertFormula={handleInsertFormula} onNumberFormat={handleNumberFormat} />
               </div>
               <div className="flex items-center gap-3">
                 {isSaving && <div className="text-[10px] text-[#059669] animate-pulse flex items-center gap-1"><Loader2 size={10} className="animate-spin" /> Saving...</div>}
-                <button onClick={() => setIsFullscreen(!isFullscreen)} className="p-2 rounded-lg hover:bg-[#f2f1ee] transition text-[#d97706]">{isFullscreen ? <Minimize2 size={16} /> : <Maximize2 size={16} />}</button>
+                <button onClick={() => setIsFullscreen(!isFullscreen)} className="p-2 rounded-lg hover:bg-[#f2f1ee] transition text-[#d97706] btn-press">{isFullscreen ? <Minimize2 size={16} /> : <Maximize2 size={16} />}</button>
               </div>
             </div>
 
@@ -503,15 +503,15 @@ export default function SheetsPanel() {
             </div>
 
             <div className="px-6 pt-2 border-b border-[#e8e7e3] flex gap-1 overflow-x-auto bg-white">
-              {sheets.map((sheet) => (
+              {sheets.map((sheet, idx) => (
                 <div key={sheet.id} className="flex items-center">
-                  <button onClick={() => setActiveSheetId(sheet.id)} className={`px-4 py-2 text-[12px] rounded-t-lg transition ${activeSheetId === sheet.id ? 'bg-[#f9fafb] text-[#d97706] border-l border-r border-t border-[#e8e7e3] font-medium' : 'text-[#777] hover:text-[#0f0f0f] hover:bg-[#f2f1ee]'}`}>
+                  <button onClick={() => setActiveSheetId(sheet.id)} className={`px-4 py-2 text-[12px] rounded-t-lg transition btn-press ${activeSheetId === sheet.id ? 'bg-[#f9fafb] text-[#d97706] border-l border-r border-t border-[#e8e7e3] font-medium' : 'text-[#777] hover:text-[#0f0f0f] hover:bg-[#f2f1ee]'}`}>
                     {sheet.name}
                   </button>
-                  {sheets.length > 1 && <button onClick={() => deleteSheet(sheet.id)} className="ml-1 p-1 text-[#777] hover:text-[#dc2626] transition"><X size={12} /></button>}
+                  {sheets.length > 1 && <button onClick={() => deleteSheet(sheet.id)} className="ml-1 p-1 text-[#777] hover:text-[#dc2626] transition btn-press"><X size={12} /></button>}
                 </div>
               ))}
-              <button onClick={addNewSheet} className="px-3 py-2 text-[12px] text-[#777] hover:text-[#d97706] transition font-medium">+ New Sheet</button>
+              <button onClick={addNewSheet} className="px-3 py-2 text-[12px] text-[#777] hover:text-[#d97706] transition font-medium btn-press">+ New Sheet</button>
             </div>
 
             <div className="px-6 py-2 border-b border-[#e8e7e3] bg-white flex items-center gap-2">
@@ -546,25 +546,25 @@ export default function SheetsPanel() {
             </div>
           </>
         ) : (
-          <div className="flex-1 flex items-center justify-center bg-white">
+          <div className="flex-1 flex items-center justify-center bg-white animate-fade-in-scale">
             <div className="text-center max-w-md">
               <div className="w-20 h-20 rounded-full bg-[#fffbeb] flex items-center justify-center mx-auto mb-4"><FileSpreadsheet size={36} className="text-[#d97706]" /></div>
               <h3 className="text-[20px] font-semibold text-[#0f0f0f] mb-2">No workbook selected</h3>
               <p className="text-[13px] text-[#777] mb-6">Create a new workbook to start building your spreadsheet</p>
-              <button onClick={() => setShowNewModal(true)} className="btn-primary">Create New Workbook</button>
+              <button onClick={() => setShowNewModal(true)} className="btn-primary btn-press">Create New Workbook</button>
             </div>
           </div>
         )}
       </div>
 
       {showNewModal && (
-        <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50" onClick={() => setShowNewModal(false)}>
-          <div className="bg-white rounded-2xl w-[400px] max-w-[90%] p-6 shadow-2xl" onClick={(e) => e.stopPropagation()}>
+        <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 animate-fadeIn" onClick={() => setShowNewModal(false)}>
+          <div className="bg-white rounded-2xl w-[400px] max-w-[90%] p-6 shadow-2xl animate-fade-in-scale" onClick={(e) => e.stopPropagation()}>
             <h3 className="text-[18px] font-semibold text-[#0f0f0f] mb-4">New Workbook</h3>
             <input type="text" value={newWorkbookName} onChange={(e) => setNewWorkbookName(e.target.value)} placeholder="Workbook name" className="w-full px-4 py-2.5 border border-[#e8e7e3] rounded-lg text-[14px] focus:outline-none focus:border-[#d97706] mb-4 transition" autoFocus onKeyDown={(e) => e.key === 'Enter' && handleNewWorkbook()} />
             <div className="flex gap-3 justify-end">
-              <button onClick={() => setShowNewModal(false)} className="px-4 py-2 rounded-lg text-[13px] text-[#777] hover:bg-[#f2f1ee] transition">Cancel</button>
-              <button onClick={handleNewWorkbook} disabled={!newWorkbookName.trim()} className="btn-primary disabled:opacity-50">Create</button>
+              <button onClick={() => setShowNewModal(false)} className="px-4 py-2 rounded-lg text-[13px] text-[#777] hover:bg-[#f2f1ee] transition btn-press">Cancel</button>
+              <button onClick={handleNewWorkbook} disabled={!newWorkbookName.trim()} className="btn-primary disabled:opacity-50 btn-press">Create</button>
             </div>
           </div>
         </div>

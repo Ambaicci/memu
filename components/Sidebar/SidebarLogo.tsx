@@ -27,3 +27,4 @@ export default function SidebarLogo({ onMobileClose }: SidebarLogoProps) {
     </div>
   );
 }
+

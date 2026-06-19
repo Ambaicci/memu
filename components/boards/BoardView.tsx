@@ -317,7 +317,7 @@ export default function BoardView({ board, onBack, currentUser }: BoardViewProps
   };
 
   return (
-    <div className="flex flex-col h-full bg-[#fafaf8]">
+    <div className="flex flex-col h-full bg-memu-canvas">
       {/* Header with Tabs */}
       <div className="px-6 py-4 border-b border-[#e8e7e3] bg-white">
         <div className="flex items-center justify-between mb-4">
@@ -493,3 +493,4 @@ export default function BoardView({ board, onBack, currentUser }: BoardViewProps
     </div>
   );
 }
+

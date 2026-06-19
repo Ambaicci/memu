@@ -148,3 +148,4 @@ export function StatCard({ icon, label, value, color }: StatCardProps) {
     </div>
   );
 }
+

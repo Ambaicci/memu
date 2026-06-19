@@ -24,3 +24,4 @@ export default function NavSection({ title, colorBar, children, isCollapsed }: N
     </div>
   );
 }
+

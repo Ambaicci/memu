@@ -368,3 +368,4 @@ export default function SheetsToolDrawer({ onFormat, onInsertFormula, onNumberFo
     </div>
   );
 }
+

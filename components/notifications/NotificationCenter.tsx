@@ -179,7 +179,7 @@ export default function NotificationCenter() {
       {isOpen && (
         <div className="absolute top-full right-0 mt-2 w-80 bg-white rounded-xl shadow-2xl border border-[#e8e7e3] z-50 animate-fadeIn overflow-hidden">
           {/* Header */}
-          <div className="flex items-center justify-between px-4 py-3 border-b border-[#f2f1ee] bg-[#fafaf8]">
+          <div className="flex items-center justify-between px-4 py-3 border-b border-[#f2f1ee] bg-memu-canvas">
             <h3 className="text-[13px] font-semibold text-[#0f0f0f]">Notifications</h3>
             {unreadCount > 0 && (
               <button
@@ -208,7 +208,7 @@ export default function NotificationCenter() {
                   <button
                     key={notif.id}
                     onClick={() => handleNotificationClick(notif)}
-                    className={`w-full text-left px-4 py-3 hover:bg-[#fafaf8] transition flex gap-3 ${
+                    className={`w-full text-left px-4 py-3 hover:bg-memu-canvas transition flex gap-3 ${
                       !notif.is_read ? 'bg-[#ede9fe]/20' : 'bg-white'
                     }`}
                   >
@@ -249,3 +249,4 @@ export default function NotificationCenter() {
     </div>
   );
 }
+

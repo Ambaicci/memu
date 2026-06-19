@@ -127,7 +127,7 @@ export default function NoteEditor({ note, onClose, onSave }: NoteEditorProps) {
   return (
     <div className="fixed inset-y-0 right-0 w-full max-w-md bg-white shadow-2xl z-50 flex flex-col border-l border-[#e8e7e3] animate-slideIn">
       {/* Header */}
-      <div className="flex items-center justify-between px-6 py-4 border-b border-[#e8e7e3] bg-[#fafaf8]">
+      <div className="flex items-center justify-between px-6 py-4 border-b border-[#e8e7e3] bg-memu-canvas">
         <h3 className="text-[14px] font-semibold text-[#0f0f0f]">
           {note ? 'Edit Note' : 'New Note'}
         </h3>
@@ -233,3 +233,4 @@ export default function NoteEditor({ note, onClose, onSave }: NoteEditorProps) {
     </div>
   );
 }
+

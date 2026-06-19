@@ -354,3 +354,4 @@ export default function Auth({ onAuthSuccess, onClose }: AuthProps) {
     </div>
   );
 }
+

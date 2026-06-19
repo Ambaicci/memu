@@ -188,3 +188,4 @@ export default function DocsToolbox({ onFormat, onInsert, wordCount, charCount }
     </div>
   );
 }
+

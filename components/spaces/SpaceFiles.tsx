@@ -201,7 +201,7 @@ export default function SpaceFiles({ spaceId }: SpaceFilesProps) {
         {files.map((file) => (
           <div
             key={file.id}
-            className="grid grid-cols-12 gap-4 px-4 py-3 border-t border-[#f2f1ee] items-center hover:bg-[#fafaf8] transition group"
+            className="grid grid-cols-12 gap-4 px-4 py-3 border-t border-[#f2f1ee] items-center hover:bg-memu-canvas transition group"
           >
             <div className="col-span-5 flex items-center gap-3 min-w-0">
               <div className="w-8 h-8 rounded-lg bg-[#f2f1ee] flex items-center justify-center flex-shrink-0">
@@ -249,3 +249,4 @@ export default function SpaceFiles({ spaceId }: SpaceFilesProps) {
     </div>
   );
 }
+

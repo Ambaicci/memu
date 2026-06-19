@@ -53,3 +53,4 @@ export default function UserChip({ user, isGuest, onSignIn, onOpenProfile }: Use
     </button>
   );
 }
+

@@ -100,7 +100,7 @@ export default function ShortcutsHelp({ onClose }: ShortcutsHelpProps) {
           </div>
         </div>
 
-        <div className="border-t border-[#e8e7e3] p-4 bg-[#fafaf8]">
+        <div className="border-t border-[#e8e7e3] p-4 bg-memu-canvas">
           <p className="text-[11px] text-[#aaa] text-center">
             Press ⌘/ or Ctrl+/ to show this help screen
           </p>
@@ -109,3 +109,4 @@ export default function ShortcutsHelp({ onClose }: ShortcutsHelpProps) {
     </div>
   );
 }
+

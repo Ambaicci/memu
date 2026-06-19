@@ -148,7 +148,7 @@ export default function AnalyticsPanel() {
   const totalNature = Object.values(data.natureBreakdown).reduce((a, b) => a + b, 0);
 
   return (
-    <div className="flex flex-col h-full bg-[#fafaf8] overflow-y-auto">
+    <div className="flex flex-col h-full bg-memu-canvas overflow-y-auto">
       <div className="px-6 md:px-10 pt-8 pb-4">
         <h1 className="heading-gradient font-['Playfair_Display'] text-3xl md:text-4xl font-medium tracking-tight">Analytics</h1>
         <div className="flex flex-wrap gap-2 mt-2">
@@ -323,3 +323,4 @@ function StatCard({ icon, label, value, color }: StatCardProps) {
     </div>
   );
 }
+

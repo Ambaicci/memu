@@ -1,8 +1,8 @@
 'use client';
 
 import { useState, useEffect } from 'react';
-import { useQuery, useQueryClient } from '@tanstack/react-query'; // <-- NEW IMPORTS
-import { Plus, Users, MessageSquare, Calendar, Settings, ChevronRight, Sparkles } from 'lucide-react';
+import { useQuery, useQueryClient } from '@tanstack/react-query';
+import { Plus, Users, MessageSquare, Calendar, Settings, ChevronRight, Layers } from 'lucide-react';
 import { createClient } from '@/lib/supabase/client';
 import { useToast } from '@/contexts/ToastContext';
 import CreateSpaceModal from './CreateSpaceModal';
@@ -31,8 +31,25 @@ const stringToColor = (str: string) => {
   return `hsl(${hue}, 65%, 65%)`;
 };
 
+const getSpaceBorderClass = (color: string) => {
+  const hex = color.replace('#', '').toLowerCase();
+  const colorMap: Record<string, string> = {
+    '4f46e5': 'border-indigo-200/60',
+    '0891b2': 'border-cyan-200/60',
+    '059669': 'border-emerald-200/60',
+    'd97706': 'border-amber-200/60',
+    'dc2626': 'border-rose-200/60',
+    '8b5cf6': 'border-purple-200/60',
+    'ec4899': 'border-pink-200/60',
+    '06b6d4': 'border-cyan-200/60',
+    '10b981': 'border-emerald-200/60',
+    'f59e0b': 'border-amber-200/60',
+  };
+  return colorMap[hex] || 'border-gray-200/60';
+};
+
 export default function SpacesPanel() {
-  const queryClient = useQueryClient(); // <-- NEW HOOK
+  const queryClient = useQueryClient();
   const [showCreateModal, setShowCreateModal] = useState(false);
   const [showSettingsModal, setShowSettingsModal] = useState(false);
   const [spaceToEdit, setSpaceToEdit] = useState<Space | null>(null);
@@ -48,7 +65,6 @@ export default function SpacesPanel() {
     getUser();
   }, []);
 
-  // 🚀 THE MAGIC: React Query handles fetching and caching the complex space data!
   const { data: spaces = [], isLoading } = useQuery({
     queryKey: ['spaces', currentUserId],
     queryFn: async () => {
@@ -61,7 +77,6 @@ export default function SpacesPanel() {
         .eq('user_id', currentUserId);
       
       if (memError) throw memError;
-
       if (!memberships || memberships.length === 0) return [];
 
       const spaceIds = memberships.map(m => m.space_id);
@@ -105,10 +120,9 @@ export default function SpacesPanel() {
       return enriched;
     },
     enabled: !!currentUserId,
-    staleTime: 60 * 1000, // Cache for 1 minute!
+    staleTime: 60 * 1000,
   });
 
-  // Realtime subscription - just invalidate the cache instead of refetching manually
   useEffect(() => {
     if (!currentUserId) return;
     const supabase = createClient();
@@ -157,7 +171,6 @@ export default function SpacesPanel() {
 
       showToast('Space created successfully!', 'success');
       setShowCreateModal(false);
-      // 🚀 Update cache instantly!
       queryClient.invalidateQueries({ queryKey: ['spaces', currentUserId] });
     } catch (err) {
       console.error('Creation error:', err);
@@ -175,7 +188,6 @@ export default function SpacesPanel() {
     
     if (error) { showToast('Failed to update space', 'error'); return; }
     showToast('Space updated', 'success');
-    // 🚀 Update cache instantly!
     queryClient.invalidateQueries({ queryKey: ['spaces', currentUserId] });
   };
 
@@ -185,7 +197,6 @@ export default function SpacesPanel() {
     const { error } = await supabase.from('spaces').delete().eq('id', spaceId);
     if (error) { showToast('Failed to delete space', 'error'); return; }
     showToast('Space deleted', 'success');
-    // 🚀 Update cache instantly!
     queryClient.invalidateQueries({ queryKey: ['spaces', currentUserId] });
   };
 
@@ -202,96 +213,127 @@ export default function SpacesPanel() {
   if (isLoading) {
     return (
       <div className="flex items-center justify-center h-full">
-        <div className="w-6 h-6 border-2 border-[#4f46e5] border-t-transparent rounded-full animate-spin" />
+        <div className="w-6 h-6 border-2 border-indigo-600 border-t-transparent rounded-full animate-spin" />
       </div>
     );
   }
 
   return (
-    <div className="flex flex-col h-full bg-[#fafaf8] overflow-y-auto">
-      <div className="px-6 md:px-10 pt-8 pb-4">
-        <div className="flex items-center justify-between flex-wrap gap-4 mb-2">
-          <div>
-            <h1 className="heading-gradient font-['Playfair_Display'] text-3xl md:text-4xl font-medium tracking-tight">Spaces</h1>
-            <div className="flex flex-wrap gap-2 mt-2">
-              <span className="text-xs text-[#777]">{spaces.length} spaces</span>
+    <div className="flex flex-col h-full bg-memu-canvas overflow-y-auto animate-page-enter">
+      {/* Header Section */}
+      <div className="px-6 md:px-10 pt-8 pb-6">
+        <div className="flex items-center justify-between flex-wrap gap-4 mb-6">
+          <div className="space-y-2">
+            <div className="flex items-center gap-3 text-indigo-600">
+              <div className="w-11 h-11 rounded-2xl bg-gradient-to-br from-indigo-600 to-purple-600 flex items-center justify-center shadow-lg">
+                <Layers size={22} className="text-white" strokeWidth={2.5} />
+              </div>
+              <span className="text-sm font-bold uppercase tracking-wider">Workspaces</span>
+            </div>
+            <h1 className="font-serif text-3xl md:text-4xl font-semibold text-gray-900 leading-tight">Spaces</h1>
+            <div className="flex flex-wrap gap-3 mt-3">
+              <span className="text-sm text-gray-500 font-medium">{spaces.length} spaces</span>
             </div>
           </div>
+          
           <button
             onClick={() => setShowCreateModal(true)}
-            className="flex items-center gap-2 px-4 py-2 bg-gradient-to-r from-[#4f46e5] to-[#0891b2] text-white rounded-full text-sm font-medium hover:from-[#5b21b6] hover:to-[#06b6d4] transition shadow-sm"
+            className="flex items-center gap-2 px-5 py-3 bg-gradient-to-r from-indigo-600 to-purple-600 text-white rounded-full text-sm font-semibold hover:shadow-xl hover:-translate-y-0.5 transition-all shadow-lg btn-press"
           >
-            <Plus size={14} /> New Space
+            <Plus size={16} strokeWidth={2.5} /> New Space
           </button>
         </div>
       </div>
 
+      {/* Spaces Grid */}
       <div className="flex-1 px-6 md:px-10 pb-10">
         {spaces.length === 0 ? (
-          <div className="flex flex-col items-center justify-center py-20 text-center">
-            <div className="w-20 h-20 rounded-full bg-gradient-to-br from-[#f2f1ee] to-[#e8e7e3] flex items-center justify-center mx-auto mb-6">
-              <Users size={36} className="text-[#aaa]" />
+          <div className="flex flex-col items-center justify-center py-24 text-center animate-fade-in-scale">
+            <div className="relative w-32 h-32 mb-8">
+              <div className="absolute inset-0 bg-gradient-to-br from-indigo-100 to-purple-100 rounded-3xl blur-2xl animate-pulse"></div>
+              <div className="relative bg-white rounded-3xl w-32 h-32 flex items-center justify-center shadow-xl border border-gray-200">
+                <Users size={48} className="text-indigo-500" strokeWidth={2} />
+              </div>
             </div>
-            <h3 className="text-[17px] font-medium text-[#1a1a1a] mb-2">No spaces yet</h3>
-            <p className="text-[13px] text-[#777] max-w-sm mb-6">Create a space to collaborate with your team, friends, or family.</p>
+            <h3 className="font-serif text-xl font-semibold text-gray-900 mb-3">No spaces yet</h3>
+            <p className="text-gray-500 text-sm max-w-md mb-6">
+              Create a space to collaborate with your team, friends, or family.
+            </p>
             <button
               onClick={() => setShowCreateModal(true)}
-              className="px-5 py-2.5 bg-gradient-to-r from-[#4f46e5] to-[#0891b2] text-white rounded-full text-[13px] font-medium hover:shadow-lg transition"
+              className="inline-flex items-center gap-2 px-5 py-3 bg-gradient-to-r from-indigo-600 to-purple-600 text-white rounded-full text-sm font-semibold hover:shadow-xl hover:-translate-y-0.5 transition-all shadow-lg btn-press"
             >
-              Create your first space
+              <Plus size={16} strokeWidth={2.5} /> Create your first space
             </button>
           </div>
         ) : (
-          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-5">
-            {spaces.map((space) => (
-              <div
-                key={space.id}
-                onClick={() => handleOpenSpace(space)}
-                className="group bg-white rounded-2xl border border-[#e8e7e3] p-5 cursor-pointer transition-all duration-200 hover:shadow-md hover:-translate-y-0.5 hover:border-[#d0cfc9]"
-              >
-                <div className="flex items-start justify-between mb-3">
-                  <div className="flex items-center gap-3">
-                    <div
-                      className="w-12 h-12 rounded-xl flex items-center justify-center shadow-sm"
-                      style={{ backgroundColor: (space.color || '#4f46e5') + '15' }}
-                    >
-                      <div className="w-6 h-6 rounded-full shadow-inner" style={{ backgroundColor: space.color || '#4f46e5' }} />
-                    </div>
-                    <div>
-                      <h3 className="text-[15px] font-semibold text-[#1a1a1a]">{space.name}</h3>
-                      <div className="flex items-center gap-2 mt-0.5">
-                        <span className="text-[10px] text-[#777]">{space.memberCount || 0} members</span>
-                        {space.role === 'admin' && (
-                          <span className="text-[9px] bg-[#ede9fe] text-[#4f46e5] px-1.5 py-0.5 rounded-full">Admin</span>
-                        )}
+          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
+            {spaces.map((space, idx) => {
+              const borderClass = getSpaceBorderClass(space.color || '#4f46e5');
+              
+              return (
+                <div
+                  key={space.id}
+                  onClick={() => handleOpenSpace(space)}
+                  className={`group relative bg-white rounded-2xl border-[1px] shadow-[0_2px_8px_-2px_rgba(0,0,0,0.04)] hover:shadow-lg hover:-translate-y-0.5 transition-all duration-300 ${borderClass} p-4 cursor-pointer animate-slide-up btn-press`}
+                  style={{ animationDelay: `${idx * 80}ms`, opacity: 0 }}
+                >
+                  {/* 1. Header: Space Avatar & Name */}
+                  <div className="flex items-start justify-between mb-3">
+                    <div className="flex items-center gap-2.5">
+                      <div 
+                        className="w-10 h-10 rounded-xl flex items-center justify-center shadow-sm"
+                        style={{ backgroundColor: (space.color || '#4f46e5') + '15' }}
+                      >
+                        <div 
+                          className="w-5 h-5 rounded-full shadow-inner" 
+                          style={{ backgroundColor: space.color || '#4f46e5' }} 
+                        />
+                      </div>
+                      <div>
+                        <h3 className="text-sm font-bold text-gray-900 group-hover:text-indigo-600 transition-colors">
+                          {space.name}
+                        </h3>
+                        <div className="flex items-center gap-2 mt-0.5">
+                          <span className="text-[11px] text-gray-400">{space.memberCount || 0} members</span>
+                          {space.role === 'admin' && (
+                            <span className="text-[9px] bg-indigo-50 text-indigo-700 px-1.5 py-0.5 rounded-md font-bold uppercase tracking-wider border border-indigo-100">
+                              Admin
+                            </span>
+                          )}
+                        </div>
                       </div>
                     </div>
+                    <button
+                      onClick={(e) => handleOpenSettings(space, e)}
+                      className="opacity-0 group-hover:opacity-100 p-1.5 rounded-lg hover:bg-gray-100 text-gray-400 hover:text-gray-600 transition-all btn-press"
+                    >
+                      <Settings size={14} strokeWidth={2.5} />
+                    </button>
                   </div>
-                  <button
-                    onClick={(e) => handleOpenSettings(space, e)}
-                    className="opacity-0 group-hover:opacity-100 p-1.5 rounded-full hover:bg-[#f2f1ee] transition"
-                  >
-                    <Settings size={14} className="text-[#777]" />
-                  </button>
-                </div>
-                <p className="text-[12px] text-[#777] mb-4 line-clamp-2">
-                  {space.description || 'No description'}
-                </p>
-                <div className="flex items-center justify-between pt-3 border-t border-[#f2f1ee]">
-                  <div className="flex items-center gap-3">
-                    <div className="flex items-center gap-1">
-                      <MessageSquare size={11} className="text-[#aaa]" />
-                      <span className="text-[10px] text-[#777]">{space.messageCount || 0} msgs</span>
+
+                  {/* 2. Description */}
+                  <p className="text-[13px] text-gray-500 mb-3 line-clamp-2 leading-relaxed">
+                    {space.description || 'No description'}
+                  </p>
+
+                  {/* 3. Footer: Stats */}
+                  <div className="flex items-center justify-between pt-3 border-t border-gray-100/50">
+                    <div className="flex items-center gap-3">
+                      <div className="flex items-center gap-1">
+                        <MessageSquare size={11} strokeWidth={2.5} className="text-gray-400" />
+                        <span className="text-[11px] text-gray-400 font-medium">{space.messageCount || 0} msgs</span>
+                      </div>
+                      <div className="flex items-center gap-1">
+                        <Calendar size={11} strokeWidth={2.5} className="text-gray-400" />
+                        <span className="text-[11px] text-gray-400 font-medium">{space.lastActive || 'New'}</span>
+                      </div>
                     </div>
-                    <div className="flex items-center gap-1">
-                      <Calendar size={11} className="text-[#aaa]" />
-                      <span className="text-[10px] text-[#777]">{space.lastActive || 'New'}</span>
-                    </div>
+                    <ChevronRight size={14} strokeWidth={2.5} className="text-gray-300 group-hover:text-indigo-600 group-hover:translate-x-0.5 transition-all" />
                   </div>
-                  <ChevronRight size={14} className="text-[#aaa] group-hover:text-[#4f46e5] group-hover:translate-x-0.5 transition-all" />
                 </div>
-              </div>
-            ))}
+              );
+            })}
           </div>
         )}
       </div>

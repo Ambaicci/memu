@@ -216,3 +216,4 @@ export default function SpaceBoards({ spaceId, onOpenBoard }: SpaceBoardsProps) 
     </div>
   );
 }
+

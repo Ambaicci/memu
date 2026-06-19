@@ -70,7 +70,7 @@ export default function SpaceSettingsModal({ isOpen, space, onClose, onUpdate, o
 
         <div className="p-6 space-y-5">
           {/* Space Preview */}
-          <div className="flex items-center gap-3 p-4 bg-[#fafaf8] rounded-xl">
+          <div className="flex items-center gap-3 p-4 bg-memu-canvas rounded-xl">
             <div
               className="w-12 h-12 rounded-xl flex items-center justify-center"
               style={{ backgroundColor: displayColor + '15' }}
@@ -222,3 +222,4 @@ export default function SpaceSettingsModal({ isOpen, space, onClose, onUpdate, o
     </div>
   );
 }
+

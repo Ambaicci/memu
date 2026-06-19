@@ -433,3 +433,4 @@ export default function BoardKanbanPanel({ boardId, boardColor }: BoardKanbanPan
     </div>
   );
 }
+

@@ -8,6 +8,7 @@ import Auth from '@/components/Auth';
 import Sidebar from '@/components/Sidebar';
 import ComposePanel from '@/components/ComposePanel';
 import OfficeFAB from '@/components/OfficeFAB';
+import BottomNav from '@/components/BottomNav';
 import GlobalSearch from '@/components/search/GlobalSearch';
 import NotificationCenter from '@/components/notifications/NotificationCenter';
 import SplashScreen from '@/components/SplashScreen';
@@ -212,7 +213,7 @@ export default function MemuApp() {
           You are offline. Some features may be unavailable.
         </div>
       )}
-      <div className="flex h-screen overflow-hidden bg-[#fafaf8]">
+      <div className="flex h-screen overflow-hidden bg-memu-canvas">
         <Sidebar 
           onNavigate={handleNavigate} 
           activePanel={activePanel} 
@@ -231,7 +232,7 @@ export default function MemuApp() {
         
         <main className="flex-1 overflow-auto pb-28 md:pb-24">
           {/* Mobile Header with Hamburger Menu */}
-          <div className="lg:hidden sticky top-0 z-30 bg-[#fafaf8]/95 backdrop-blur-sm border-b border-[#e8e7e3] px-4 py-3">
+          <div className="lg:hidden sticky top-0 z-30 bg-memu-canvas/95 backdrop-blur-sm border-b border-[#e8e7e3] px-4 py-3">
             <div className="flex items-center justify-between">
               <div className="flex items-center gap-3">
                 <button
@@ -258,7 +259,7 @@ export default function MemuApp() {
           </div>
 
           {/* Desktop Breadcrumb Header */}
-          <div className="hidden lg:block sticky top-0 z-20 bg-[#fafaf8]/80 backdrop-blur-sm border-b border-[#e8e7e3] px-6 py-2">
+          <div className="hidden lg:block sticky top-0 z-20 bg-memu-canvas/80 backdrop-blur-sm border-b border-[#e8e7e3] px-6 py-2">
             <div className="flex items-center justify-between">
               <div className="flex items-center gap-2">
                 <button
@@ -304,16 +305,28 @@ export default function MemuApp() {
           </Suspense>
         </main>
 
-        <OfficeFAB 
+        {/* OfficeFAB - Desktop Only (hidden on mobile to avoid conflict with BottomNav) */}
+        <div className="hidden lg:block">
+          <OfficeFAB 
+            isGuest={isGuest}
+            requireAuth={requireAuth}
+            onOpenItem={(suiteId, itemId) => {
+              if (suiteId === 'airshare') requireAuth('airshare', () => handleNavigate('airshare'));
+              else if (suiteId === 'docs') requireAuth('docs', () => handleNavigate('docs'));
+              else if (suiteId === 'slides') requireAuth('slides', () => handleNavigate('slides'));
+              else if (suiteId === 'sheets') requireAuth('sheets', () => handleNavigate('sheets'));
+              else if (suiteId === 'notes') requireAuth('notes', () => handleNavigate('notes'));
+            }} 
+          />
+        </div>
+
+        {/* BottomNav - Mobile Only */}
+        <BottomNav 
+          activePanel={activePanel}
+          onNavigate={handleNavigate}
+          onOpenCompose={() => handleOpenCompose()}
           isGuest={isGuest}
-          requireAuth={requireAuth}
-          onOpenItem={(suiteId, itemId) => {
-            if (suiteId === 'airshare') requireAuth('airshare', () => handleNavigate('airshare'));
-            else if (suiteId === 'docs') requireAuth('docs', () => handleNavigate('docs'));
-            else if (suiteId === 'slides') requireAuth('slides', () => handleNavigate('slides'));
-            else if (suiteId === 'sheets') requireAuth('sheets', () => handleNavigate('sheets'));
-            else if (suiteId === 'notes') requireAuth('notes', () => handleNavigate('notes'));
-          }} 
+          onSignIn={() => setShowAuthModal(true)}
         />
 
         <ComposePanel

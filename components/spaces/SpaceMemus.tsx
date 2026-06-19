@@ -218,3 +218,4 @@ export default function SpaceMemus({ spaceId }: SpaceMemusProps) {
     </div>
   );
 }
+

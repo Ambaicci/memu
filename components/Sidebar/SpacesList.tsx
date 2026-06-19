@@ -114,3 +114,4 @@ export default function SpacesList({ onOpenSpace, activePanel, onDeleteRequest, 
     </div>
   );
 }
+

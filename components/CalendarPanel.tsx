@@ -1,10 +1,12 @@
 'use client';
 
 import { useState, useEffect } from 'react';
-import { useQuery, useQueryClient } from '@tanstack/react-query'; // <-- NEW IMPORTS
+import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { 
   ChevronLeft, ChevronRight, Plus, Calendar as CalendarIcon, 
-  Clock, Video, Users, X, ChevronDown, Phone, Video as VideoIcon, Filter
+  Clock, Video, Users, X, ChevronDown, Phone, Video as VideoIcon, Filter,
+  Heart, Plane, Briefcase, Utensils, Gift, Star, Activity, Coffee,
+  Share2, Search, Link as LinkIcon, Send, Loader2
 } from 'lucide-react';
 import { createClient } from '@/lib/supabase/client';
 import { useToast } from '@/contexts/ToastContext';
@@ -12,12 +14,13 @@ import { useToast } from '@/contexts/ToastContext';
 interface CalendarEvent {
   id: string;
   title: string;
+  description?: string;
   start_time: string;
   end_time: string;
   all_day: boolean;
-  event_type: 'call' | 'meeting' | 'reminder';
+  event_type: string;
   participants: string[];
-  description?: string;
+  created_by?: string;
   date: number;
   time: string;
   duration?: string;
@@ -27,6 +30,22 @@ interface CalendarPanelProps {
   isGuest?: boolean;
   requireAuth?: (action: string, callback: () => void) => void;
 }
+
+// EXPANDED EVENT TYPES - Including Custom/Open option
+const eventTypes = [
+  { id: 'meeting', label: 'Meeting', icon: <Users size={16} />, color: 'bg-emerald-500', border: 'border-emerald-200/60', badge: 'bg-emerald-50 text-emerald-700 border-emerald-100' },
+  { id: 'call', label: 'Call', icon: <Phone size={16} />, color: 'bg-blue-500', border: 'border-blue-200/60', badge: 'bg-blue-50 text-blue-700 border-blue-100' },
+  { id: 'date', label: 'Date', icon: <Heart size={16} />, color: 'bg-rose-500', border: 'border-rose-200/60', badge: 'bg-rose-50 text-rose-700 border-rose-100' },
+  { id: 'travel', label: 'Travel', icon: <Plane size={16} />, color: 'bg-sky-500', border: 'border-sky-200/60', badge: 'bg-sky-50 text-sky-700 border-sky-100' },
+  { id: 'appointment', label: 'Appointment', icon: <Briefcase size={16} />, color: 'bg-indigo-500', border: 'border-indigo-200/60', badge: 'bg-indigo-50 text-indigo-700 border-indigo-100' },
+  { id: 'birthday', label: 'Birthday', icon: <Gift size={16} />, color: 'bg-amber-500', border: 'border-amber-200/60', badge: 'bg-amber-50 text-amber-700 border-amber-100' },
+  { id: 'deadline', label: 'Deadline', icon: <Clock size={16} />, color: 'bg-red-500', border: 'border-red-200/60', badge: 'bg-red-50 text-red-700 border-red-100' },
+  { id: 'personal', label: 'Personal', icon: <Star size={16} />, color: 'bg-purple-500', border: 'border-purple-200/60', badge: 'bg-purple-50 text-purple-700 border-purple-100' },
+  { id: 'work', label: 'Work', icon: <Activity size={16} />, color: 'bg-cyan-500', border: 'border-cyan-200/60', badge: 'bg-cyan-50 text-cyan-700 border-cyan-100' },
+  { id: 'social', label: 'Social', icon: <Coffee size={16} />, color: 'bg-pink-500', border: 'border-pink-200/60', badge: 'bg-pink-50 text-pink-700 border-pink-100' },
+  { id: 'reminder', label: 'Reminder', icon: <Clock size={16} />, color: 'bg-orange-500', border: 'border-orange-200/60', badge: 'bg-orange-50 text-orange-700 border-orange-100' },
+  { id: 'custom', label: 'Custom', icon: <Star size={16} />, color: 'bg-gray-500', border: 'border-gray-200/60', badge: 'bg-gray-50 text-gray-700 border-gray-100' },
+];
 
 const weekDays = ['SUN', 'MON', 'TUE', 'WED', 'THU', 'FRI', 'SAT'];
 const monthNames = ['January', 'February', 'March', 'April', 'May', 'June', 'July', 'August', 'September', 'October', 'November', 'December'];
@@ -47,32 +66,10 @@ const computeDuration = (start: string, end: string) => {
   return `${hours}h ${minutes}m`;
 };
 
-const getEventColorForBorder = (type: string): string => {
-  switch (type) {
-    case 'call': return '#3b82f6';
-    case 'meeting': return '#10b981';
-    default: return '#f59e0b';
-  }
-};
-
-const getEventColor = (type: string) => {
-  switch (type) {
-    case 'call': return 'bg-[#dbeafe] text-[#1e40af] border-[#bfdbfe] shadow-sm';
-    case 'meeting': return 'bg-[#d1fae5] text-[#065f46] border-[#a7f3d0] shadow-sm';
-    default: return 'bg-[#fef3c7] text-[#92400e] border-[#fde68a] shadow-sm';
-  }
-};
-
-const getJoinButtonStyle = (type: string): string => {
-  switch (type) {
-    case 'call': return 'bg-gradient-to-r from-[#2563eb] to-[#3b82f6] hover:from-[#1d4ed8] hover:to-[#2563eb] text-white shadow-md';
-    case 'meeting': return 'bg-gradient-to-r from-[#059669] to-[#10b981] hover:from-[#047857] hover:to-[#059669] text-white shadow-md';
-    default: return 'bg-gradient-to-r from-[#ea580c] to-[#f97316] hover:from-[#c2410c] hover:to-[#ea580c] text-white shadow-md';
-  }
-};
+const getEventTypeById = (id: string) => eventTypes.find(t => t.id === id) || eventTypes[0];
 
 export default function CalendarPanel({ isGuest, requireAuth }: CalendarPanelProps = {}) {
-  const queryClient = useQueryClient(); // <-- NEW HOOK
+  const queryClient = useQueryClient();
   const [currentMonth, setCurrentMonth] = useState(new Date().getMonth());
   const [currentYear, setCurrentYear] = useState(new Date().getFullYear());
   const [selectedDate, setSelectedDate] = useState<number | null>(null);
@@ -80,11 +77,18 @@ export default function CalendarPanel({ isGuest, requireAuth }: CalendarPanelPro
   const [selectedEvents, setSelectedEvents] = useState<CalendarEvent[]>([]);
   const [viewMode, setViewMode] = useState<'month' | 'week'>('month');
   const [showAddModal, setShowAddModal] = useState(false);
+  const [showShareModal, setShowShareModal] = useState(false);
+  const [eventToShare, setEventToShare] = useState<CalendarEvent | null>(null);
+  const [shareHandle, setShareHandle] = useState('');
+  const [shareSearchResults, setShareSearchResults] = useState<any[]>([]);
+  const [searchingHandles, setSearchingHandles] = useState(false);
+  const [sharingEvent, setSharingEvent] = useState(false);
   const [newEventTitle, setNewEventTitle] = useState('');
+  const [newEventDescription, setNewEventDescription] = useState('');
   const [newEventDate, setNewEventDate] = useState('');
   const [newEventStart, setNewEventStart] = useState('09:00');
   const [newEventEnd, setNewEventEnd] = useState('10:00');
-  const [newEventType, setNewEventType] = useState<'call' | 'meeting' | 'reminder'>('meeting');
+  const [newEventType, setNewEventType] = useState('meeting');
   const [newEventParticipants, setNewEventParticipants] = useState('');
   const [newEventAllDay, setNewEventAllDay] = useState(false);
   const [currentUserId, setCurrentUserId] = useState<string | null>(null);
@@ -99,7 +103,6 @@ export default function CalendarPanel({ isGuest, requireAuth }: CalendarPanelPro
     getUser();
   }, []);
 
-  // 🚀 THE MAGIC: React Query caches events by month/year!
   const { data: eventsMap = {}, isLoading } = useQuery({
     queryKey: ['calendar-events', currentUserId, currentMonth, currentYear],
     queryFn: async () => {
@@ -132,12 +135,13 @@ export default function CalendarPanel({ isGuest, requireAuth }: CalendarPanelPro
         map[day].push({
           id: ev.id,
           title: ev.title,
+          description: ev.description,
           start_time: ev.start_time,
           end_time: ev.end_time,
           all_day: ev.all_day,
           event_type: ev.event_type,
           participants: ev.participants || [],
-          description: ev.description,
+          created_by: ev.created_by,
           date: day,
           time: timeStr,
           duration,
@@ -146,7 +150,7 @@ export default function CalendarPanel({ isGuest, requireAuth }: CalendarPanelPro
       return map;
     },
     enabled: !!currentUserId,
-    staleTime: 60 * 1000, // Cache each month for 1 minute!
+    staleTime: 60 * 1000,
   });
 
   const handleDateClick = (date: number) => {
@@ -189,6 +193,7 @@ export default function CalendarPanel({ isGuest, requireAuth }: CalendarPanelPro
       .insert({
         user_id: currentUserId,
         title: newEventTitle,
+        description: newEventDescription,
         start_time: startDateTime.toISOString(),
         end_time: endDateTime.toISOString(),
         all_day: newEventAllDay,
@@ -202,13 +207,73 @@ export default function CalendarPanel({ isGuest, requireAuth }: CalendarPanelPro
       showToast('Event created', 'success');
       setShowAddModal(false);
       resetAddForm();
-      // 🚀 Invalidate cache for current month!
       queryClient.invalidateQueries({ queryKey: ['calendar-events', currentUserId, currentMonth, currentYear] });
     }
   };
 
+  const handleShareEvent = async (event: CalendarEvent) => {
+    setEventToShare(event);
+    setShowShareModal(true);
+  };
+
+  const handleSearchHandles = async () => {
+    if (!shareHandle.trim() || shareHandle.length < 2) {
+      setShareSearchResults([]);
+      return;
+    }
+    setSearchingHandles(true);
+    const supabase = createClient();
+    const { data, error } = await supabase
+      .from('profiles')
+      .select('id, full_name, username')
+      .or(`full_name.ilike.%${shareHandle}%,username.ilike.%${shareHandle}%`)
+      .neq('id', currentUserId || '')
+      .limit(5);
+    if (!error && data) setShareSearchResults(data);
+    else setShareSearchResults([]);
+    setSearchingHandles(false);
+  };
+
+  useEffect(() => {
+    const debounce = setTimeout(handleSearchHandles, 300);
+    return () => clearTimeout(debounce);
+  }, [shareHandle]);
+
+  const handleSendShare = async (recipientId: string, recipientUsername: string) => {
+    if (!eventToShare) return;
+    setSharingEvent(true);
+    const supabase = createClient();
+    
+    // Create a shareable link/event notification
+    const shareData = {
+      event_id: eventToShare.id,
+      title: eventToShare.title,
+      description: eventToShare.description,
+      start_time: eventToShare.start_time,
+      end_time: eventToShare.end_time,
+      event_type: eventToShare.event_type,
+      shared_by: currentUserId,
+      shared_with: recipientId,
+    };
+
+    const { error } = await supabase
+      .from('event_shares')
+      .insert(shareData);
+
+    if (error) {
+      showToast('Failed to share event', 'error');
+    } else {
+      showToast(`Event shared with @${recipientUsername}`, 'success');
+      setShowShareModal(false);
+      setShareHandle('');
+      setShareSearchResults([]);
+    }
+    setSharingEvent(false);
+  };
+
   const resetAddForm = () => {
     setNewEventTitle('');
+    setNewEventDescription('');
     setNewEventDate('');
     setNewEventStart('09:00');
     setNewEventEnd('10:00');
@@ -230,7 +295,6 @@ export default function CalendarPanel({ isGuest, requireAuth }: CalendarPanelPro
     if (error) showToast('Failed to delete event', 'error');
     else {
       showToast('Event deleted', 'success');
-      // 🚀 Invalidate cache for current month!
       queryClient.invalidateQueries({ queryKey: ['calendar-events', currentUserId, currentMonth, currentYear] });
       setShowEventModal(false);
     }
@@ -258,41 +322,33 @@ export default function CalendarPanel({ isGuest, requireAuth }: CalendarPanelPro
     const calendarDays = [];
     for (let i = 0; i < firstDay; i++) {
       calendarDays.push(
-        <div key={`empty-${i}`} className="bg-[#fafaf8] min-h-[100px] p-2 border border-[#e8e7e3] rounded-lg" />
+        <div key={`empty-${i}`} className="bg-gray-50/50 min-h-[90px] p-2 border border-gray-100 rounded-xl" />
       );
     }
     for (let d = 1; d <= daysInMonth; d++) {
       const events = eventsMap[d] || [];
       const isToday = isCurrentMonth && d === todayDate;
-      let borderStyle = {};
-      if (events.length === 1) {
-        const color = getEventColorForBorder(events[0].event_type);
-        borderStyle = { borderTopWidth: '2px', borderTopColor: color };
-      } else if (events.length >= 2) {
-        const gradientColors = events.map(e => getEventColorForBorder(e.event_type)).join(', ');
-        borderStyle = { borderTopWidth: '2px', borderImage: `linear-gradient(to right, ${gradientColors}) 1` };
-      }
+      const borderClass = events.length > 0 ? getEventTypeById(events[0].event_type).border : 'border-gray-100';
+      
       calendarDays.push(
         <div
           key={d}
           onClick={() => handleDateClick(d)}
-          className={`min-h-[100px] p-2 border border-[#e8e7e3] rounded-lg cursor-pointer transition-all duration-200 hover:shadow-md hover:-translate-y-0.5 relative overflow-hidden ${
-            selectedDate === d ? 'bg-[#ede9fe] border-[#4f46e5] shadow-inner' : 'bg-white hover:border-[#cbd5e1]'
-          } ${isToday ? 'ring-2 ring-[#3b82f6] ring-offset-1' : ''}`}
-          style={borderStyle}
+          className={`min-h-[90px] p-2 border-[1px] rounded-xl cursor-pointer transition-all duration-300 hover:shadow-lg hover:-translate-y-0.5 relative overflow-hidden ${borderClass} ${
+            selectedDate === d ? 'bg-indigo-50 border-indigo-200 shadow-md' : 'bg-white hover:bg-gray-50'
+          } ${isToday ? 'ring-2 ring-indigo-400 ring-offset-1' : ''} btn-press`}
         >
-          <div className={`text-[13px] font-medium mb-1.5 ${isToday ? 'text-[#2563eb] font-bold' : 'text-[#1a1a1a]'}`}>{d}</div>
+          <div className={`text-[13px] font-bold mb-1.5 ${isToday ? 'text-indigo-600' : 'text-gray-900'}`}>{d}</div>
           <div className="space-y-1">
-            {events.slice(0, 2).map((event) => (
-              <div key={event.id} className={`text-[10px] px-1.5 py-0.5 rounded truncate font-medium shadow-sm ${
-                event.event_type === 'call' ? 'bg-[#dbeafe] text-[#1e40af]' :
-                event.event_type === 'meeting' ? 'bg-[#d1fae5] text-[#065f46]' :
-                'bg-[#fef3c7] text-[#92400e]'
-              }`}>
-                {event.time} {event.title}
-              </div>
-            ))}
-            {events.length > 2 && <div className="text-[9px] text-[#777] px-1.5">+{events.length - 2} more</div>}
+            {events.slice(0, 2).map((event) => {
+              const eventType = getEventTypeById(event.event_type);
+              return (
+                <div key={event.id} className={`text-[10px] px-1.5 py-0.5 rounded-md truncate font-semibold border ${eventType.badge}`}>
+                  {event.time} {event.title}
+                </div>
+              );
+            })}
+            {events.length > 2 && <div className="text-[9px] text-gray-400 px-1.5 font-medium">+{events.length - 2} more</div>}
           </div>
         </div>
       );
@@ -301,149 +357,290 @@ export default function CalendarPanel({ isGuest, requireAuth }: CalendarPanelPro
   };
 
   const totalEvents = Object.values(eventsMap).flat().length;
-  const upcomingCount = totalEvents;
 
   if (isLoading) {
     return (
       <div className="flex items-center justify-center h-full">
-        <div className="w-6 h-6 border-2 border-[#4f46e5] border-t-transparent rounded-full animate-spin" />
+        <div className="w-6 h-6 border-2 border-indigo-600 border-t-transparent rounded-full animate-spin" />
       </div>
     );
   }
 
   return (
-    <div className="flex flex-col h-full bg-[#fafaf8]">
-      <div className="flex-1 overflow-y-auto p-4 md:p-8">
-        <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4 mb-6">
-          <div>
-            <h1 className="heading-gradient font-['Playfair_Display'] text-3xl md:text-4xl font-medium tracking-tight">Calendar</h1>
-            <div className="flex flex-wrap gap-2 mt-2">
-              <span className="text-xs text-[#777]">{totalEvents} events this month</span>
-              {upcomingCount > 0 && <span className="text-xs text-[#777]">· {upcomingCount} upcoming</span>}
+    <div className="flex flex-col h-full bg-memu-canvas animate-page-enter">
+      {/* Header Section */}
+      <div className="px-6 md:px-10 pt-8 pb-6">
+        <div className="flex items-center justify-between flex-wrap gap-4 mb-6">
+          <div className="space-y-2">
+            <div className="flex items-center gap-3 text-indigo-600">
+              <div className="w-11 h-11 rounded-2xl bg-gradient-to-br from-indigo-600 to-purple-600 flex items-center justify-center shadow-lg">
+                <CalendarIcon size={22} className="text-white" strokeWidth={2.5} />
+              </div>
+              <span className="text-sm font-bold uppercase tracking-wider">Schedule</span>
+            </div>
+            <h1 className="font-serif text-3xl md:text-4xl font-semibold text-gray-900 leading-tight">Calendar</h1>
+            <div className="flex flex-wrap gap-3 mt-3">
+              <span className="text-sm text-gray-500 font-medium">{totalEvents} events this month</span>
             </div>
           </div>
+          
           <button
             onClick={handleAddEventClick}
-            className="flex items-center gap-2 px-4 py-2 bg-gradient-to-r from-[#4f46e5] to-[#0891b2] text-white rounded-full text-sm font-medium hover:from-[#5b21b6] hover:to-[#06b6d4] transition shadow-sm"
+            className="flex items-center gap-2 px-5 py-3 bg-gradient-to-r from-indigo-600 to-purple-600 text-white rounded-full text-sm font-semibold hover:shadow-xl hover:-translate-y-0.5 transition-all shadow-lg btn-press"
           >
-            <Plus size={14} /> Add Event
+            <Plus size={16} strokeWidth={2.5} /> Add Event
           </button>
-        </div>
-
-        <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3 mb-5">
-          <div className="flex items-center gap-3">
-            <button onClick={handlePrevMonth} className="p-2 border border-[#e8e7e3] rounded-full hover:border-[#4f46e5] transition"><ChevronLeft size={16} className="text-[#777]" /></button>
-            <span className="text-[18px] font-medium text-[#1a1a1a]">{monthNames[currentMonth]} {currentYear}</span>
-            <button onClick={handleNextMonth} className="p-2 border border-[#e8e7e3] rounded-full hover:border-[#4f46e5] transition"><ChevronRight size={16} className="text-[#777]" /></button>
-          </div>
-          <div className="flex items-center gap-2">
-            <button onClick={() => { const now = new Date(); setCurrentMonth(now.getMonth()); setCurrentYear(now.getFullYear()); setSelectedDate(now.getDate()); }} className="px-4 py-1.5 text-[12px] border border-[#e8e7e3] rounded-full hover:border-[#4f46e5] transition">Today</button>
-            <button onClick={() => setViewMode(viewMode === 'month' ? 'week' : 'month')} className="flex items-center gap-1 px-4 py-1.5 text-[12px] border border-[#e8e7e3] rounded-full hover:border-[#4f46e5] transition">{viewMode === 'month' ? 'Month' : 'Week'} <ChevronDown size={10} /></button>
-          </div>
-        </div>
-
-        <div className="grid grid-cols-7 gap-2 mb-2">
-          {weekDays.map(day => <div key={day} className="bg-[#f2f1ee] p-2 text-center text-[11px] font-medium text-[#777] rounded-lg">{day}</div>)}
-        </div>
-        <div className="grid grid-cols-7 gap-2">{renderCalendar()}</div>
-
-        <div className="mt-8">
-          <h3 className="text-[15px] font-medium text-[#1a1a1a] mb-3 flex items-center gap-2"><CalendarIcon size={14} className="text-[#777]" /> Upcoming events</h3>
-          {totalEvents === 0 ? (
-            <div className="text-center text-[#777] py-8 bg-white rounded-xl border border-[#e8e7e3]">No upcoming events. Click on a date to add one.</div>
-          ) : (
-            <div className="space-y-2">
-              {Object.entries(eventsMap).slice(0, 5).map(([date, events]) => (
-                <div key={date} className="bg-white border border-[#e8e7e3] rounded-xl p-4 hover:shadow-md transition-all hover:border-[#cbd5e1]">
-                  <div className="flex flex-col sm:flex-row sm:items-start gap-3">
-                    <div className="sm:min-w-[80px]">
-                      <div className="text-[14px] font-medium text-[#1a1a1a]">{monthNames[currentMonth]} {date}</div>
-                      <div className="text-[10px] text-[#777]">{new Date(currentYear, currentMonth, parseInt(date)).toLocaleDateString('en-US', { weekday: 'short' })}</div>
-                    </div>
-                    <div className="flex-1 space-y-2">
-                      {events.map(event => (
-                        <div key={event.id} className="flex flex-col sm:flex-row sm:items-center gap-3 p-3 bg-[#fafaf8] rounded-xl hover:shadow-sm transition group">
-                          <div className={`p-2 rounded-lg w-fit transition-all group-hover:scale-105 ${getEventColor(event.event_type)}`}>
-                            {event.event_type === 'call' ? <Phone size={14} /> : event.event_type === 'meeting' ? <Users size={14} /> : <Clock size={14} />}
-                          </div>
-                          <div className="flex-1">
-                            <div className="text-[14px] font-medium text-[#1a1a1a]">{event.title}</div>
-                            <div className="text-[11px] text-[#777] flex flex-wrap items-center gap-3 mt-1">
-                              <span>{event.time}</span> • <span>{event.duration}</span> • <span>{event.participants?.join(', ') || 'No participants'}</span>
-                            </div>
-                          </div>
-                          <button onClick={(e) => handleJoinEvent(event, e)} className={`px-4 py-1.5 rounded-full text-[11px] font-medium transition flex items-center gap-1.5 ${getJoinButtonStyle(event.event_type)}`}>
-                            {event.event_type === 'call' ? <VideoIcon size={12} /> : <Users size={12} />} Join
-                          </button>
-                        </div>
-                      ))}
-                    </div>
-                  </div>
-                </div>
-              ))}
-            </div>
-          )}
         </div>
       </div>
 
-      {showEventModal && selectedEvents.length > 0 && (
-        <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4" onClick={() => setShowEventModal(false)}>
-          <div className="bg-white rounded-2xl w-[450px] max-w-full shadow-2xl animate-fadeIn" onClick={e => e.stopPropagation()}>
-            <div className="p-5 border-b border-[#e8e7e3] flex justify-between items-center">
-              <h3 className="text-[18px] font-['Playfair_Display'] font-medium text-[#1a1a1a]">Events on {monthNames[currentMonth]} {selectedDate}</h3>
-              <button onClick={() => setShowEventModal(false)} className="p-1 rounded-full hover:bg-[#f2f1ee] transition"><X size={18} className="text-[#777]" /></button>
+      {/* Calendar Controls */}
+      <div className="px-6 md:px-10 pb-6">
+        <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3 mb-5">
+          <div className="flex items-center gap-3">
+            <button onClick={handlePrevMonth} className="w-9 h-9 border border-gray-200 rounded-xl flex items-center justify-center hover:border-gray-300 hover:bg-gray-50 transition-all text-gray-500 btn-press">
+              <ChevronLeft size={16} strokeWidth={2.5} />
+            </button>
+            <span className="text-lg font-bold text-gray-900">{monthNames[currentMonth]} {currentYear}</span>
+            <button onClick={handleNextMonth} className="w-9 h-9 border border-gray-200 rounded-xl flex items-center justify-center hover:border-gray-300 hover:bg-gray-50 transition-all text-gray-500 btn-press">
+              <ChevronRight size={16} strokeWidth={2.5} />
+            </button>
+          </div>
+          <div className="flex items-center gap-2">
+            <button onClick={() => { const now = new Date(); setCurrentMonth(now.getMonth()); setCurrentYear(now.getFullYear()); setSelectedDate(now.getDate()); }} className="px-4 py-2 text-xs font-semibold border border-gray-200 rounded-xl hover:border-gray-300 hover:bg-gray-50 transition-all btn-press">
+              Today
+            </button>
+            <button onClick={() => setViewMode(viewMode === 'month' ? 'week' : 'month')} className="flex items-center gap-2 px-4 py-2 text-xs font-semibold border border-gray-200 rounded-xl hover:border-gray-300 hover:bg-gray-50 transition-all btn-press">
+              {viewMode === 'month' ? 'Month' : 'Week'} <ChevronDown size={12} strokeWidth={2.5} />
+            </button>
+          </div>
+        </div>
+
+        {/* Weekday Headers */}
+        <div className="grid grid-cols-7 gap-2 mb-2">
+          {weekDays.map(day => (
+            <div key={day} className="bg-gray-50 p-2 text-center text-[11px] font-bold text-gray-400 rounded-xl uppercase tracking-wider">
+              {day}
             </div>
-            <div className="p-5 space-y-3 max-h-[60vh] overflow-y-auto">
-              {selectedEvents.map(event => (
-                <div key={event.id} className={`p-4 rounded-xl border ${getEventColor(event.event_type)} hover:shadow-md transition`}>
-                  <div className="flex justify-between items-start mb-2">
-                    <div className="flex items-center gap-2">
-                      {event.event_type === 'call' ? <Phone size={14} /> : event.event_type === 'meeting' ? <Users size={14} /> : <Clock size={14} />}
-                      <span className="text-[15px] font-medium text-[#1a1a1a]">{event.title}</span>
-                    </div>
-                    <span className="text-[12px] text-[#777]">{event.time}</span>
+          ))}
+        </div>
+        
+        {/* Calendar Grid */}
+        <div className="grid grid-cols-7 gap-2">{renderCalendar()}</div>
+      </div>
+
+      {/* Upcoming Events - Fixed Height Section */}
+      <div className="px-6 md:px-10 py-6 border-t border-gray-200 bg-white/50 backdrop-blur-sm">
+        <h3 className="text-sm font-bold text-gray-900 mb-4 flex items-center gap-2 uppercase tracking-wider">
+          <CalendarIcon size={16} strokeWidth={2.5} className="text-indigo-600" /> Upcoming Events
+        </h3>
+        {totalEvents === 0 ? (
+          <div className="text-center text-gray-400 py-8 bg-white rounded-2xl border border-gray-100 animate-fade-in-scale">
+            <p className="text-sm font-medium">No upcoming events. Click on a date to add one.</p>
+          </div>
+        ) : (
+          <div className="space-y-3 max-h-[300px] overflow-y-auto">
+            {Object.entries(eventsMap).slice(0, 5).map(([date, events], idx) => (
+              <div key={date} className={`bg-white rounded-2xl border-[1px] shadow-[0_2px_8px_-2px_rgba(0,0,0,0.04)] hover:shadow-lg hover:-translate-y-0.5 transition-all duration-300 ${getEventTypeById(events[0].event_type).border} p-4 animate-slide-up btn-press`} style={{ animationDelay: `${idx * 80}ms`, opacity: 0 }}>
+                <div className="flex flex-col sm:flex-row sm:items-start gap-3">
+                  <div className="sm:min-w-[80px]">
+                    <div className="text-sm font-bold text-gray-900">{monthNames[currentMonth]} {date}</div>
+                    <div className="text-[11px] text-gray-400 font-medium">{new Date(currentYear, currentMonth, parseInt(date)).toLocaleDateString('en-US', { weekday: 'short' })}</div>
                   </div>
-                  <div className="text-[12px] text-[#777] space-y-1 ml-7">
-                    <div>Duration: {event.duration}</div>
-                    <div>Participants: {event.participants?.join(', ') || 'None'}</div>
-                  </div>
-                  <div className="flex gap-2 mt-3 ml-7">
-                    <button onClick={(e) => handleJoinEvent(event, e)} className={`text-[11px] font-medium px-4 py-1.5 rounded-full flex items-center gap-1.5 ${getJoinButtonStyle(event.event_type)}`}>
-                      {event.event_type === 'call' ? <VideoIcon size={12} /> : <Users size={12} />} Join
-                    </button>
-                    <button onClick={(e) => handleDeleteEvent(event.id, e)} className="text-[11px] font-medium px-3 py-1.5 rounded-full bg-[#f2f1ee] text-[#777] hover:bg-[#fee2e2] hover:text-[#dc2626] transition">Delete</button>
+                  <div className="flex-1 space-y-2">
+                    {events.map(event => {
+                      const eventType = getEventTypeById(event.event_type);
+                      return (
+                        <div key={event.id} className="flex flex-col sm:flex-row sm:items-center gap-3 p-3 bg-gray-50 rounded-xl hover:bg-gray-100 transition-all group">
+                          <div className={`p-2 rounded-lg w-fit transition-all group-hover:scale-105 border ${eventType.badge}`}>
+                            {eventType.icon}
+                          </div>
+                          <div className="flex-1">
+                            <div className="text-sm font-bold text-gray-900">{event.title}</div>
+                            <div className="text-[11px] text-gray-500 flex flex-wrap items-center gap-3 mt-1 font-medium">
+                              <span>{event.time}</span> • <span>{event.duration}</span> • <span>{event.participants?.join(', ') || 'No participants'}</span>
+                            </div>
+                          </div>
+                          <div className="flex gap-2">
+                            <button onClick={(e) => handleJoinEvent(event, e)} className="px-4 py-2 rounded-full text-xs font-semibold bg-gradient-to-r from-indigo-600 to-purple-600 text-white hover:shadow-lg hover:-translate-y-0.5 transition-all shadow-md flex items-center gap-2 btn-press">
+                              {event.event_type === 'call' ? <VideoIcon size={12} strokeWidth={2.5} /> : <Users size={12} strokeWidth={2.5} />} Join
+                            </button>
+                            <button onClick={(e) => { e.stopPropagation(); handleShareEvent(event); }} className="px-4 py-2 rounded-full text-xs font-semibold bg-white border border-gray-200 text-gray-700 hover:bg-gray-50 hover:shadow-md transition-all shadow-sm flex items-center gap-2 btn-press">
+                              <Share2 size={12} strokeWidth={2.5} /> Share
+                            </button>
+                          </div>
+                        </div>
+                      );
+                    })}
                   </div>
                 </div>
-              ))}
+              </div>
+            ))}
+          </div>
+        )}
+      </div>
+     
+      {/* Event Modal - ALWAYS CENTERED */}
+      {showEventModal && selectedEvents.length > 0 && (
+        <div className="fixed inset-0 bg-black/40 backdrop-blur-md flex items-center justify-center z-50 p-4 animate-fadeIn" onClick={() => setShowEventModal(false)}>
+          <div className="bg-white rounded-3xl w-[450px] max-w-full shadow-2xl border border-gray-200 animate-fade-in-scale max-h-[85vh] flex flex-col" onClick={e => e.stopPropagation()}>
+            <div className="p-6 border-b border-gray-100 flex justify-between items-center flex-shrink-0">
+              <h3 className="text-lg font-serif font-semibold text-gray-900">Events on {monthNames[currentMonth]} {selectedDate}</h3>
+              <button onClick={() => setShowEventModal(false)} className="w-9 h-9 border border-gray-200 rounded-xl flex items-center justify-center hover:border-gray-300 hover:bg-gray-50 transition-all text-gray-500 btn-press">
+                <X size={15} strokeWidth={2.5} />
+              </button>
+            </div>
+            <div className="p-6 space-y-3 overflow-y-auto flex-1">
+              {selectedEvents.map(event => {
+                const eventType = getEventTypeById(event.event_type);
+                return (
+                  <div key={event.id} className={`p-4 rounded-2xl border-[1px] ${eventType.border} bg-white hover:shadow-lg transition-all btn-press`}>
+                    <div className="flex justify-between items-start mb-3">
+                      <div className="flex items-center gap-3">
+                        <div className={`p-2 rounded-lg border ${eventType.badge}`}>
+                          {eventType.icon}
+                        </div>
+                        <div>
+                          <div className="text-sm font-bold text-gray-900">{event.title}</div>
+                          <div className="text-[11px] text-gray-400 font-medium">{event.time}</div>
+                        </div>
+                      </div>
+                    </div>
+                    {event.description && (
+                      <div className="text-xs text-gray-600 mb-2 ml-11 font-medium">{event.description}</div>
+                    )}
+                    <div className="text-xs text-gray-500 space-y-1 ml-11 font-medium">
+                      <div>Duration: {event.duration}</div>
+                      <div>Participants: {event.participants?.join(', ') || 'None'}</div>
+                    </div>
+                    <div className="flex gap-2 mt-3 ml-11">
+                      <button onClick={(e) => handleJoinEvent(event, e)} className="text-xs font-semibold px-4 py-2 rounded-full bg-gradient-to-r from-indigo-600 to-purple-600 text-white hover:shadow-lg hover:-translate-y-0.5 transition-all shadow-md flex items-center gap-2 btn-press">
+                        {event.event_type === 'call' ? <VideoIcon size={12} strokeWidth={2.5} /> : <Users size={12} strokeWidth={2.5} />} Join
+                      </button>
+                      <button onClick={(e) => { e.stopPropagation(); handleShareEvent(event); }} className="text-xs font-semibold px-3 py-2 rounded-full bg-white border border-gray-200 text-gray-700 hover:bg-gray-50 hover:shadow-md transition-all btn-press flex items-center gap-1.5">
+                        <Share2 size={12} strokeWidth={2.5} /> Share
+                      </button>
+                      <button onClick={(e) => handleDeleteEvent(event.id, e)} className="text-xs font-semibold px-3 py-2 rounded-full bg-gray-50 text-gray-500 hover:bg-rose-50 hover:text-rose-600 transition-all border border-gray-100 btn-press">
+                        Delete
+                      </button>
+                    </div>
+                  </div>
+                );
+              })}
             </div>
           </div>
         </div>
       )}
 
+      {/* Add Event Modal - ALWAYS CENTERED */}
       {showAddModal && (
-        <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4" onClick={() => { setShowAddModal(false); resetAddForm(); }}>
-          <div className="bg-white rounded-2xl w-[450px] max-w-full shadow-2xl p-5 animate-fadeIn" onClick={e => e.stopPropagation()}>
-            <h3 className="text-[18px] font-medium text-[#1a1a1a] mb-4">Add New Event</h3>
-            <div className="space-y-3">
-              <input type="text" placeholder="Event title" value={newEventTitle} onChange={e => setNewEventTitle(e.target.value)} className="w-full border border-[#e8e7e3] rounded-lg px-3 py-2 text-sm focus:outline-none focus:border-[#4f46e5] transition" />
-              <input type="date" value={newEventDate} onChange={e => setNewEventDate(e.target.value)} className="w-full border border-[#e8e7e3] rounded-lg px-3 py-2 text-sm focus:outline-none focus:border-[#4f46e5] transition" />
-              <label className="flex items-center gap-2 text-sm"><input type="checkbox" checked={newEventAllDay} onChange={e => setNewEventAllDay(e.target.checked)} className="rounded border-[#e8e7e3]" /> All day</label>
+        <div className="fixed inset-0 bg-black/40 backdrop-blur-md flex items-center justify-center z-50 p-4 animate-fadeIn" onClick={() => { setShowAddModal(false); resetAddForm(); }}>
+          <div className="bg-white rounded-3xl w-[450px] max-w-full shadow-2xl border border-gray-200 p-6 animate-fade-in-scale max-h-[85vh] flex flex-col" onClick={e => e.stopPropagation()}>
+            <div className="flex-shrink-0 mb-5">
+              <h3 className="text-lg font-serif font-semibold text-gray-900">Add New Event</h3>
+            </div>
+            <div className="space-y-4 overflow-y-auto flex-1">
+              <input type="text" placeholder="Event title" value={newEventTitle} onChange={e => setNewEventTitle(e.target.value)} className="w-full border border-gray-200 rounded-xl px-4 py-3 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500 transition-all" />
+              <textarea placeholder="Description (optional)" value={newEventDescription} onChange={e => setNewEventDescription(e.target.value)} className="w-full border border-gray-200 rounded-xl px-4 py-3 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500 transition-all resize-none" rows={3} />
+              <input type="date" value={newEventDate} onChange={e => setNewEventDate(e.target.value)} className="w-full border border-gray-200 rounded-xl px-4 py-3 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500 transition-all" />
+              <label className="flex items-center gap-2 text-sm font-medium text-gray-700">
+                <input type="checkbox" checked={newEventAllDay} onChange={e => setNewEventAllDay(e.target.checked)} className="rounded border-gray-200" /> All day
+              </label>
               {!newEventAllDay && (
                 <div className="flex gap-2">
-                  <input type="time" value={newEventStart} onChange={e => setNewEventStart(e.target.value)} className="flex-1 border border-[#e8e7e3] rounded-lg px-3 py-2 text-sm focus:outline-none focus:border-[#4f46e5]" />
-                  <input type="time" value={newEventEnd} onChange={e => setNewEventEnd(e.target.value)} className="flex-1 border border-[#e8e7e3] rounded-lg px-3 py-2 text-sm focus:outline-none focus:border-[#4f46e5]" />
+                  <input type="time" value={newEventStart} onChange={e => setNewEventStart(e.target.value)} className="flex-1 border border-gray-200 rounded-xl px-4 py-3 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500 transition-all" />
+                  <input type="time" value={newEventEnd} onChange={e => setNewEventEnd(e.target.value)} className="flex-1 border border-gray-200 rounded-xl px-4 py-3 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500 transition-all" />
                 </div>
               )}
-              <select value={newEventType} onChange={e => setNewEventType(e.target.value as any)} className="w-full border border-[#e8e7e3] rounded-lg px-3 py-2 text-sm focus:outline-none focus:border-[#4f46e5]">
-                <option value="call">📞 Call</option>
-                <option value="meeting">👥 Meeting</option>
-                <option value="reminder">⏰ Reminder</option>
-              </select>
-              <input type="text" placeholder="Participants (comma separated)" value={newEventParticipants} onChange={e => setNewEventParticipants(e.target.value)} className="w-full border border-[#e8e7e3] rounded-lg px-3 py-2 text-sm focus:outline-none focus:border-[#4f46e5]" />
-              <div className="flex justify-end gap-2 pt-2">
-                <button onClick={() => { setShowAddModal(false); resetAddForm(); }} className="px-4 py-2 rounded-full text-sm text-[#777] hover:bg-[#f2f1ee] transition">Cancel</button>
-                <button onClick={handleCreateEvent} className="px-4 py-2 rounded-full text-sm font-medium bg-gradient-to-r from-[#4f46e5] to-[#0891b2] text-white hover:from-[#5b21b6] hover:to-[#06b6d4] transition">Save</button>
+              <div>
+                <label className="text-xs font-bold text-gray-400 uppercase tracking-wider mb-2 block">Event Type</label>
+                <div className="grid grid-cols-2 gap-2">
+                  {eventTypes.map(type => (
+                    <button
+                      key={type.id}
+                      onClick={() => setNewEventType(type.id)}
+                      className={`flex items-center gap-2 px-3 py-2 rounded-xl border transition-all btn-press ${
+                        newEventType === type.id 
+                          ? `${type.badge} border-current` 
+                          : 'bg-white border-gray-200 text-gray-600 hover:bg-gray-50'
+                      }`}
+                    >
+                      {type.icon}
+                      <span className="text-xs font-semibold">{type.label}</span>
+                    </button>
+                  ))}
+                </div>
               </div>
+              <input type="text" placeholder="Participants (comma separated)" value={newEventParticipants} onChange={e => setNewEventParticipants(e.target.value)} className="w-full border border-gray-200 rounded-xl px-4 py-3 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500 transition-all" />
+            </div>
+            <div className="flex justify-end gap-2 pt-4 mt-4 border-t border-gray-100 flex-shrink-0">
+              <button onClick={() => { setShowAddModal(false); resetAddForm(); }} className="px-5 py-3 rounded-full text-sm font-semibold text-gray-500 hover:bg-gray-50 transition-all border border-gray-200 btn-press">
+                Cancel
+              </button>
+              <button onClick={handleCreateEvent} className="px-5 py-3 rounded-full text-sm font-semibold bg-gradient-to-r from-indigo-600 to-purple-600 text-white hover:shadow-xl hover:-translate-y-0.5 transition-all shadow-lg btn-press">
+                Save
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Share Event Modal - ALWAYS CENTERED */}
+      {showShareModal && eventToShare && (
+        <div className="fixed inset-0 bg-black/40 backdrop-blur-md flex items-center justify-center z-50 p-4 animate-fadeIn" onClick={() => setShowShareModal(false)}>
+          <div className="bg-white rounded-3xl w-[450px] max-w-full shadow-2xl border border-gray-200 p-6 animate-fade-in-scale max-h-[85vh] flex flex-col" onClick={e => e.stopPropagation()}>
+            <div className="flex-shrink-0 mb-5">
+              <h3 className="text-lg font-serif font-semibold text-gray-900 mb-2">Share Event</h3>
+              <div className="p-3 bg-gray-50 rounded-xl border border-gray-200">
+                <div className="text-sm font-bold text-gray-900">{eventToShare.title}</div>
+                <div className="text-xs text-gray-500 mt-1">{eventToShare.time} • {eventToShare.duration}</div>
+              </div>
+            </div>
+            <div className="space-y-4 overflow-y-auto flex-1">
+              <div>
+                <label className="text-xs font-bold text-gray-400 uppercase tracking-wider mb-2 block">Search for Memu user</label>
+                <div className="relative">
+                  <Search size={16} className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400" />
+                  <input
+                    type="text"
+                    value={shareHandle}
+                    onChange={(e) => setShareHandle(e.target.value)}
+                    placeholder="Enter handle or name..."
+                    className="w-full pl-10 pr-4 py-3 border border-gray-200 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500 transition-all"
+                  />
+                </div>
+              </div>
+              {shareSearchResults.length > 0 && (
+                <div className="space-y-2">
+                  <label className="text-xs font-bold text-gray-400 uppercase tracking-wider">Select user to share with:</label>
+                  {shareSearchResults.map(user => (
+                    <button
+                      key={user.id}
+                      onClick={() => handleSendShare(user.id, user.username)}
+                      disabled={sharingEvent}
+                      className="w-full flex items-center gap-3 p-3 rounded-xl border border-gray-200 hover:bg-gray-50 hover:border-indigo-200 transition-all btn-press disabled:opacity-50"
+                    >
+                      <div className="w-8 h-8 rounded-full bg-gradient-to-br from-indigo-500 to-purple-600 flex items-center justify-center text-white text-xs font-bold">
+                        {(user.full_name || user.username || '?').charAt(0).toUpperCase()}
+                      </div>
+                      <div className="flex-1 text-left">
+                        <div className="text-sm font-semibold text-gray-900">{user.full_name || user.username}</div>
+                        <div className="text-xs text-gray-500">@{user.username}.memu</div>
+                      </div>
+                      {sharingEvent ? <Loader2 size={16} className="animate-spin text-gray-400" /> : <Send size={16} className="text-indigo-600" />}
+                    </button>
+                  ))}
+                </div>
+              )}
+              {searchingHandles && (
+                <div className="flex justify-center py-4">
+                  <Loader2 size={20} className="animate-spin text-gray-400" />
+                </div>
+              )}
+            </div>
+            <div className="flex justify-end gap-2 pt-4 mt-4 border-t border-gray-100 flex-shrink-0">
+              <button onClick={() => setShowShareModal(false)} className="px-5 py-3 rounded-full text-sm font-semibold text-gray-500 hover:bg-gray-50 transition-all border border-gray-200 btn-press">
+                Cancel
+              </button>
             </div>
           </div>
         </div>

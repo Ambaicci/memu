@@ -277,7 +277,7 @@ export default function SheetsPanel() {
   const activeWorkbook = workbooks.find(w => w.id === activeWorkbookId);
 
   return (
-    <div className={`${isFullscreen ? 'fixed inset-0 z-50 bg-[#fafaf8]' : 'flex h-full'} bg-[#fafaf8]`}>
+    <div className={`${isFullscreen ? 'fixed inset-0 z-50 bg-memu-canvas' : 'flex h-full'} bg-memu-canvas`}>
       {/* Sidebar */}
       <div className="w-64 border-r border-[#e8e7e3] bg-white flex flex-col">
         <div className="px-4 pt-6 pb-2">
@@ -564,3 +564,4 @@ export default function SheetsPanel() {
     </div>
   );
 }
+

@@ -52,7 +52,7 @@ export default function NavigationHeader({
   };
 
   return (
-    <div className="sticky top-0 z-10 bg-[#fafaf8]/80 backdrop-blur-sm border-b border-[#e8e7e3] px-4 md:px-6 py-2 md:py-3">
+    <div className="sticky top-0 z-10 bg-memu-canvas/80 backdrop-blur-sm border-b border-[#e8e7e3] px-4 md:px-6 py-2 md:py-3">
       <div className="flex items-center gap-3">
         {/* Back Button */}
         {showBack && (
@@ -96,3 +96,4 @@ export default function NavigationHeader({
     </div>
   );
 }
+

@@ -15,3 +15,4 @@ export default function ComposeButton({ onClick }: ComposeButtonProps) {
     </button>
   );
 }
+

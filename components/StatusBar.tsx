@@ -141,3 +141,4 @@ export default function StatusBar({ status, deliveredAt, openedAt, readAt, size 
     </div>
   );
 }
+

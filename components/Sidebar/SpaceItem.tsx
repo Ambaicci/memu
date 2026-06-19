@@ -114,3 +114,4 @@ export default function SpaceItem({ space, onOpenSpace, onRenameSpace, onDeleteS
     </div>
   );
 }
+

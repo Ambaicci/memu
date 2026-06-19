@@ -201,7 +201,7 @@ export default function DirectMemoInbox({ onClose }: DirectMemoInboxProps) {
                   <div
                     key={memo.id}
                     onClick={() => !isMine && markAsRead(memo.id)}
-                    className={`p-4 hover:bg-[#fafaf8] transition cursor-pointer group ${
+                    className={`p-4 hover:bg-memu-canvas transition cursor-pointer group ${
                       !isMine && !memo.is_read ? 'bg-gradient-to-r from-[#ede9fe]/30 to-transparent' : 'bg-white'
                     }`}
                   >
@@ -294,3 +294,4 @@ export default function DirectMemoInbox({ onClose }: DirectMemoInboxProps) {
     </>
   );
 }
+

@@ -334,7 +334,7 @@ export default function DocsPanel() {
   }
 
   return (
-    <div className={`${isFullscreen ? 'fixed inset-0 z-50' : 'flex h-full'} bg-[#fafaf8] transition-all duration-300 ${isFocusMode ? 'focus-mode' : ''}`}>
+    <div className={`${isFullscreen ? 'fixed inset-0 z-50' : 'flex h-full'} bg-memu-canvas transition-all duration-300 ${isFocusMode ? 'focus-mode' : ''} animate-page-enter`}>
       {/* Sidebar */}
       <div className="w-64 border-r border-[#e8e7e3] bg-white flex flex-col shadow-sm">
         <div className="px-4 pt-6 pb-4 border-b border-[#f2f1ee]">
@@ -349,7 +349,7 @@ export default function DocsPanel() {
         <div className="p-3">
           <button
             onClick={() => setShowNewDocModal(true)}
-            className="w-full flex items-center justify-center gap-2 py-2.5 btn-primary text-white rounded-lg text-[13px] font-medium"
+            className="w-full flex items-center justify-center gap-2 py-2.5 btn-primary text-white rounded-lg text-[13px] font-medium btn-press"
           >
             <Plus size={14} />
             New Document
@@ -371,18 +371,18 @@ export default function DocsPanel() {
           <div className="relative" ref={filterRef}>
             <button
               onClick={() => setIsFilterOpen(!isFilterOpen)}
-              className="w-full flex items-center justify-between gap-2 bg-white border border-[#e8e7e3] rounded-lg px-3 py-1.5 text-[12px] text-[#777] hover:border-[#4f46e5] transition"
+              className="w-full flex items-center justify-between gap-2 bg-white border border-[#e8e7e3] rounded-lg px-3 py-1.5 text-[12px] text-[#777] hover:border-[#4f46e5] transition btn-press"
             >
               <span className="flex items-center gap-1"><Filter size={10} /> {currentFilterLabel}</span>
               <ChevronDown size={10} />
             </button>
             {isFilterOpen && (
-              <div className="absolute left-0 right-0 mt-1 bg-white rounded-lg shadow-xl border border-[#e8e7e3] z-20">
+              <div className="absolute left-0 right-0 mt-1 bg-white rounded-lg shadow-xl border border-[#e8e7e3] z-20 animate-fade-in-scale">
                 {filterOptions.map((opt) => (
                   <button
                     key={opt.id}
                     onClick={() => { setFilter(opt.id as any); setIsFilterOpen(false); }}
-                    className={`w-full flex items-center gap-2 px-3 py-2 text-[12px] transition ${filter === opt.id ? 'bg-[#ede9fe] text-[#4f46e5]' : 'text-[#777] hover:bg-[#fafaf8]'}`}
+                    className={`w-full flex items-center gap-2 px-3 py-2 text-[12px] transition ${filter === opt.id ? 'bg-[#ede9fe] text-[#4f46e5]' : 'text-[#777] hover:bg-memu-canvas'}`}
                   >
                     {opt.icon}
                     {opt.label}
@@ -395,21 +395,22 @@ export default function DocsPanel() {
         
         <div className="flex-1 overflow-y-auto px-2 pb-4">
           {filteredDocs.length === 0 ? (
-            <div className="p-6 text-center">
+            <div className="p-6 text-center animate-fade-in-scale">
               <FileText size={32} className="text-[#aaa] mx-auto mb-3" />
               <p className="text-[12px] text-[#777] mb-2">No documents found</p>
             </div>
           ) : (
             <div className="space-y-1">
-              {filteredDocs.map((doc) => (
+              {filteredDocs.map((doc, idx) => (
                 <div
                   key={doc.id}
                   onClick={() => handleSelectDoc(doc)}
-                  className={`group p-3 rounded-lg cursor-pointer transition-all ${
+                  className={`group p-3 rounded-lg cursor-pointer transition-all animate-slide-up btn-press ${
                     activeDocId === doc.id 
                       ? 'bg-[#ede9fe] ring-1 ring-[#4f46e5]/40' 
                       : 'hover:bg-[#f9fafb]'
                   }`}
+                  style={{ animationDelay: `${idx * 40}ms`, opacity: 0 }}
                 >
                   <div className="flex items-center justify-between mb-1">
                     <div className="flex items-center gap-2 flex-1 min-w-0">
@@ -418,7 +419,7 @@ export default function DocsPanel() {
                     </div>
                     <button
                       onClick={(e) => { e.stopPropagation(); handleDeleteDoc(doc.id); }}
-                      className="opacity-0 group-hover:opacity-100 p-1 rounded hover:bg-red-100 transition"
+                      className="opacity-0 group-hover:opacity-100 p-1 rounded hover:bg-red-100 transition btn-press"
                     >
                       <Trash2 size={11} className="text-[#777] hover:text-[#dc2626]" />
                     </button>
@@ -438,13 +439,13 @@ export default function DocsPanel() {
             <div className="border-b border-[#e8e7e3] bg-white shadow-sm px-4 py-2.5 flex items-center justify-between flex-wrap gap-2">
               <div className="flex items-center gap-2 flex-wrap">
                 {!isFocusMode && !isFullscreen && (
-                  <button onClick={() => setIsFocusMode(true)} className="p-2 rounded-lg hover:bg-[#f2f1ee] transition text-[#777]" title="Focus Mode"><Eye size={16} /></button>
+                  <button onClick={() => setIsFocusMode(true)} className="p-2 rounded-lg hover:bg-[#f2f1ee] transition text-[#777] btn-press" title="Focus Mode"><Eye size={16} /></button>
                 )}
                 {isFocusMode && (
-                  <button onClick={() => setIsFocusMode(false)} className="p-2 rounded-lg hover:bg-[#f2f1ee] transition text-[#4f46e5]" title="Exit Focus Mode"><EyeOff size={16} /></button>
+                  <button onClick={() => setIsFocusMode(false)} className="p-2 rounded-lg hover:bg-[#f2f1ee] transition text-[#4f46e5] btn-press" title="Exit Focus Mode"><EyeOff size={16} /></button>
                 )}
                 <div className="w-px h-5 bg-[#e8e7e3]" />
-                <button onClick={() => setIsPreviewMode(!isPreviewMode)} className={`px-3 py-1.5 rounded-lg text-[12px] font-medium transition ${isPreviewMode ? 'btn-primary' : 'text-[#777] hover:bg-[#f2f1ee]'}`}>
+                <button onClick={() => setIsPreviewMode(!isPreviewMode)} className={`px-3 py-1.5 rounded-lg text-[12px] font-medium transition btn-press ${isPreviewMode ? 'btn-primary' : 'text-[#777] hover:bg-[#f2f1ee]'}`}>
                   {isPreviewMode ? 'Write' : 'Preview'}
                 </button>
                 {!isPreviewMode && <DocsToolbox onFormat={handleFormat} onInsert={handleInsert} wordCount={wordCount} charCount={charCount} />}
@@ -452,9 +453,9 @@ export default function DocsPanel() {
               <div className="flex items-center gap-3">
                 <div className="text-[11px] text-[#777] hidden sm:block bg-[#f2f1ee] px-2 py-1 rounded">{wordCount} words • {charCount} chars</div>
                 {isSaving && <div className="text-[10px] text-[#059669] animate-pulse flex items-center gap-1"><Loader2 size={10} className="animate-spin" /> Saving...</div>}
-                <button onClick={handleCopy} className="p-2 rounded-lg hover:bg-[#f2f1ee] transition text-[#777]" title="Copy"><Copy size={14} /></button>
-                <button onClick={() => handleExport('md')} className="p-2 rounded-lg hover:bg-[#f2f1ee] transition text-[#777]" title="Export as Markdown"><Download size={14} /></button>
-                <button onClick={() => setIsFullscreen(!isFullscreen)} className="p-2 rounded-lg hover:bg-[#f2f1ee] transition text-[#4f46e5]">{isFullscreen ? <Minimize2 size={16} /> : <Maximize2 size={16} />}</button>
+                <button onClick={handleCopy} className="p-2 rounded-lg hover:bg-[#f2f1ee] transition text-[#777] btn-press" title="Copy"><Copy size={14} /></button>
+                <button onClick={() => handleExport('md')} className="p-2 rounded-lg hover:bg-[#f2f1ee] transition text-[#777] btn-press" title="Export as Markdown"><Download size={14} /></button>
+                <button onClick={() => setIsFullscreen(!isFullscreen)} className="p-2 rounded-lg hover:bg-[#f2f1ee] transition text-[#4f46e5] btn-press">{isFullscreen ? <Minimize2 size={16} /> : <Maximize2 size={16} />}</button>
               </div>
             </div>
 
@@ -472,25 +473,25 @@ export default function DocsPanel() {
             </div>
           </>
         ) : (
-          <div className="flex-1 flex items-center justify-center bg-white">
+          <div className="flex-1 flex items-center justify-center bg-white animate-fade-in-scale">
             <div className="text-center max-w-md">
               <div className="w-20 h-20 rounded-full bg-[#ede9fe] flex items-center justify-center mx-auto mb-4"><FileText size={36} className="text-[#4f46e5]" /></div>
               <h3 className="text-[20px] font-semibold text-[#0f0f0f] mb-2">No document selected</h3>
               <p className="text-[13px] text-[#777] mb-6">Create a new document to start writing</p>
-              <button onClick={() => setShowNewDocModal(true)} className="btn-primary">Create New Document</button>
+              <button onClick={() => setShowNewDocModal(true)} className="btn-primary btn-press">Create New Document</button>
             </div>
           </div>
         )}
       </div>
 
       {showNewDocModal && (
-        <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50" onClick={() => setShowNewDocModal(false)}>
-          <div className="bg-white rounded-2xl w-[400px] max-w-[90%] p-6 shadow-2xl" onClick={(e) => e.stopPropagation()}>
+        <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 animate-fadeIn" onClick={() => setShowNewDocModal(false)}>
+          <div className="bg-white rounded-2xl w-[400px] max-w-[90%] p-6 shadow-2xl animate-fade-in-scale" onClick={(e) => e.stopPropagation()}>
             <h3 className="text-[18px] font-semibold text-[#0f0f0f] mb-4">New Document</h3>
             <input type="text" value={newDocTitle} onChange={(e) => setNewDocTitle(e.target.value)} placeholder="Document title" className="w-full px-4 py-2.5 border border-[#e8e7e3] rounded-lg text-[14px] focus:outline-none focus:border-[#4f46e5] mb-4 transition" autoFocus onKeyDown={(e) => e.key === 'Enter' && handleNewDoc()} />
             <div className="flex gap-3 justify-end">
-              <button onClick={() => setShowNewDocModal(false)} className="px-4 py-2 rounded-lg text-[13px] text-[#777] hover:bg-[#f2f1ee] transition">Cancel</button>
-              <button onClick={handleNewDoc} disabled={!newDocTitle.trim()} className="btn-primary disabled:opacity-50">Create</button>
+              <button onClick={() => setShowNewDocModal(false)} className="px-4 py-2 rounded-lg text-[13px] text-[#777] hover:bg-[#f2f1ee] transition btn-press">Cancel</button>
+              <button onClick={handleNewDoc} disabled={!newDocTitle.trim()} className="btn-primary disabled:opacity-50 btn-press">Create</button>
             </div>
           </div>
         </div>

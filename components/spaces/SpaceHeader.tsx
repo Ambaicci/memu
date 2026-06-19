@@ -95,3 +95,4 @@ export default function SpaceHeader({ spaceName, spaceColor, memberCount, active
     </div>
   );
 }
+

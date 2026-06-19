@@ -25,3 +25,4 @@ export default function Skeleton({ className = '', variant = 'rectangular', widt
     <div className={`${baseStyles} ${variantStyles[variant]} ${className}`} style={style} />
   );
 }
+

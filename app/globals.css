@@ -1,41 +1,80 @@
 @import "tailwindcss";
 
+/* =========================================
+    THE OFFICIAL MEMU DESIGN SYSTEM
+   ========================================= */
+@theme {
+  /* Signature Canvas & Surfaces */
+  --color-memu-canvas: #F4F5F7;
+  --color-memu-surface: #FFFFFF;
+  --color-memu-surface-2: #E2E8F0;
+  
+  /* Typography & Ink */
+  --color-memu-ink: #0B0F19;
+  --color-memu-ink-2: #334155;
+  --color-memu-ink-3: #64748B;
+  --color-memu-ink-4: #94A3B8;
+  
+  /* Brand Accents */
+  --color-memu-purple: #4F46E5;
+  --color-memu-blue: #0891B2;
+  --color-memu-teal: #06B6D4;
+  --color-memu-accent: #8B5CF6;
+
+  /* Typography Families */
+  --font-sans: -apple-system, BlinkMacSystemFont, "SF Pro Text", "DM Sans", system-ui, sans-serif;
+  --font-serif: "Playfair Display", Georgia, serif;
+}
+
+/* Global CSS Variables */
 :root {
-  --ink: #0f0f0f;
-  --ink2: #3a3a3a;
-  --ink3: #777;
-  --ink4: #aaa;
-  --paper: #fafaf8;
-  --paper2: #f2f1ee;
-  --paper3: #e8e7e3;
-  --purple: #4f46e5;
-  --blue: #0891b2;
-  --teal: #06b6d4;
+  --ink: #0B0F19; 
+  --ink2: #334155;
+  --ink3: #64748B;
+  --ink4: #94A3B8;
+  
+  --paper: #F4F5F7; 
+  --paper2: #E2E8F0;
+  --paper3: #CBD5E1;
+  
+  --purple: #4F46E5;
+  --blue: #0891B2;
+  --teal: #06B6D4;
+  --memu-canvas: #F4F5F7;
 }
 
 * {
   box-sizing: border-box;
 }
 
+/* MOBILE INPUT ZOOM FIX */
+@media (max-width: 768px) {
+  input, textarea, select {
+    font-size: 16px !important;
+  }
+}
+
 body {
   font-family: -apple-system, BlinkMacSystemFont, "SF Pro Text", "DM Sans", system-ui, sans-serif;
-  background: var(--paper);
+  background: var(--memu-canvas);
   color: var(--ink);
   -webkit-font-smoothing: antialiased;
   -moz-osx-font-smoothing: grayscale;
-  font-size: 15px;
+  font-size: 14px;
   line-height: 1.5;
   letter-spacing: -0.011em;
+  overflow: hidden;
 }
 
-/* Headings – Playfair Display for elegance */
+/* Headings */
 h1, h2, h3, .heading-serif {
   font-family: "Playfair Display", Georgia, serif;
   font-weight: 500;
   letter-spacing: -0.02em;
+  color: var(--ink);
 }
 
-/* Gradient text for main page titles (purple → ink) */
+/* Gradient text */
 .heading-gradient {
   background: linear-gradient(135deg, var(--ink), var(--purple));
   background-clip: text;
@@ -43,39 +82,39 @@ h1, h2, h3, .heading-serif {
   -webkit-background-clip: text;
 }
 
-/* Large title (Apple's "Large Title" style) */
+/* Large title */
 .title-large {
-  font-size: 34px;
+  font-size: 28px;
   font-weight: 600;
   letter-spacing: -0.003em;
   line-height: 1.2;
 }
 
-/* Responsive heading sizes */
 @media (max-width: 768px) {
   .title-large {
-    font-size: 28px;
+    font-size: 24px;
   }
 }
 
-/* Subtle text for metadata */
+/* Subtle text */
 .text-meta {
   font-size: 12px;
   color: var(--ink3);
   letter-spacing: -0.01em;
 }
 
-/* Scrollbar */
+/* Scrollbars */
 ::-webkit-scrollbar {
-  width: 5px;
-  height: 5px;
+  width: 6px;
+  height: 6px;
 }
 ::-webkit-scrollbar-track {
   background: transparent;
 }
 ::-webkit-scrollbar-thumb {
   background: var(--paper3);
-  border-radius: 8px;
+  border-radius: 10px;
+  border: 2px solid var(--memu-canvas);
 }
 ::-webkit-scrollbar-thumb:hover {
   background: var(--ink4);
@@ -84,13 +123,14 @@ h1, h2, h3, .heading-serif {
 /* Cards */
 .card {
   background: white;
-  border: 1px solid var(--paper3);
-  border-radius: 14px;
-  transition: all 0.2s ease;
+  border: 1px solid rgba(0,0,0,0.04);
+  border-radius: 16px;
+  box-shadow: 0 1px 2px rgba(0,0,0,0.02);
+  transition: all 0.25s cubic-bezier(0.4, 0, 0.2, 1);
 }
 .card:hover {
-  border-color: #d0cfc9;
-  box-shadow: 0 8px 20px rgba(0,0,0,0.04);
+  border-color: rgba(0,0,0,0.08);
+  box-shadow: 0 10px 30px -10px rgba(0,0,0,0.08);
   transform: translateY(-2px);
 }
 
@@ -98,7 +138,7 @@ h1, h2, h3, .heading-serif {
 .btn-primary {
   background: linear-gradient(135deg, var(--purple), var(--blue));
   color: white;
-  border-radius: 10px;
+  border-radius: 12px;
   font-weight: 500;
   font-size: 14px;
   padding: 8px 16px;
@@ -113,7 +153,7 @@ h1, h2, h3, .heading-serif {
   background: white;
   border: 1px solid var(--paper3);
   color: var(--ink3);
-  border-radius: 10px;
+  border-radius: 12px;
   padding: 8px 16px;
   font-size: 14px;
   transition: all 0.2s;
@@ -124,7 +164,7 @@ h1, h2, h3, .heading-serif {
   background: var(--paper2);
 }
 
-/* Animations */
+/* Basic Animations */
 @keyframes spin {
   from { transform: rotate(0deg); }
   to { transform: rotate(360deg); }
@@ -139,20 +179,145 @@ h1, h2, h3, .heading-serif {
   -webkit-box-orient: vertical;
   overflow: hidden;
 }
-/* --- Premium UI: Hide Scrollbars but keep functionality --- */
+
+/* Utility: Hide Scrollbars */
 .no-scrollbar::-webkit-scrollbar {
   display: none;
 }
 .no-scrollbar {
-  -ms-overflow-style: none;  /* IE and Edge */
-  scrollbar-width: none;  /* Firefox */
+  -ms-overflow-style: none;
+  scrollbar-width: none;
 }
 
-/* --- Premium UI: Hide Scrollbars Globally --- */
-* {
-  scrollbar-width: none; /* Firefox */
-  -ms-overflow-style: none;  /* IE and Edge */
+/* =========================================
+    PHASE 2: MICRO-INTERACTIONS & ANIMATIONS
+   ========================================= */
+
+/* Staggered Card Entrance */
+@keyframes slideUp {
+  from {
+    opacity: 0;
+    transform: translateY(20px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
 }
-*::-webkit-scrollbar { 
-  display: none; /* Chrome, Safari, and Opera */
+
+.animate-slide-up {
+  animation: slideUp 0.4s cubic-bezier(0.16, 1, 0.3, 1) forwards;
+}
+
+/* Button Press Effect */
+@keyframes buttonPress {
+  0% { transform: scale(1); }
+  50% { transform: scale(0.95); }
+  100% { transform: scale(1); }
+}
+
+.btn-press:active {
+  animation: buttonPress 0.15s ease-out;
+}
+
+/* Fade In Scale */
+@keyframes fadeInScale {
+  from {
+    opacity: 0;
+    transform: scale(0.95);
+  }
+  to {
+    opacity: 1;
+    transform: scale(1);
+  }
+}
+
+.animate-fade-in-scale {
+  animation: fadeInScale 0.3s cubic-bezier(0.16, 1, 0.3, 1) forwards;
+}
+
+/* Slide In Right */
+@keyframes slideInRight {
+  from {
+    opacity: 0;
+    transform: translateX(20px);
+  }
+  to {
+    opacity: 1;
+    transform: translateX(0);
+  }
+}
+
+.animate-slide-in-right {
+  animation: slideInRight 0.3s cubic-bezier(0.16, 1, 0.3, 1) forwards;
+}
+
+/* Pulse Glow for Active States */
+@keyframes pulseGlow {
+  0%, 100% {
+    box-shadow: 0 0 0 0 rgba(79, 70, 229, 0.4);
+  }
+  50% {
+    box-shadow: 0 0 0 8px rgba(79, 70, 229, 0);
+  }
+}
+
+.animate-pulse-glow {
+  animation: pulseGlow 2s cubic-bezier(0.4, 0, 0.6, 1) infinite;
+}
+
+/* Smooth Page Transition */
+@keyframes pageEnter {
+  from {
+    opacity: 0;
+    transform: translateY(10px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+.animate-page-enter {
+  animation: pageEnter 0.4s cubic-bezier(0.16, 1, 0.3, 1) forwards;
+}
+
+/* Hover Lift Effect */
+.hover-lift {
+  transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+}
+
+.hover-lift:hover {
+  transform: translateY(-4px);
+  box-shadow: 0 12px 24px -8px rgba(0, 0, 0, 0.15);
+}
+
+/* Icon Rotation on Hover */
+.hover-rotate {
+  transition: transform 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+}
+
+.hover-rotate:hover {
+  transform: rotate(12deg);
+}
+
+/* Shimmer Loading Effect */
+@keyframes shimmer {
+  0% {
+    background-position: -200% 0;
+  }
+  100% {
+    background-position: 200% 0;
+  }
+}
+
+.shimmer {
+  background: linear-gradient(
+    90deg,
+    rgba(255, 255, 255, 0) 0%,
+    rgba(255, 255, 255, 0.2) 50%,
+    rgba(255, 255, 255, 0) 100%
+  );
+  background-size: 200% 100%;
+  animation: shimmer 1.5s infinite;
 }

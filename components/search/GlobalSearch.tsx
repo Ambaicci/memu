@@ -344,7 +344,7 @@ export default function GlobalSearch() {
             </div>
 
             {/* Footer */}
-            <div className="p-3 border-t border-[#e8e7e3] bg-[#fafaf8] flex items-center justify-between text-[10px] text-[#aaa]">
+            <div className="p-3 border-t border-[#e8e7e3] bg-memu-canvas flex items-center justify-between text-[10px] text-[#aaa]">
               <div className="flex items-center gap-3">
                 <span>↑↓ to navigate</span>
                 <span>↵ to select</span>
@@ -382,3 +382,4 @@ export default function GlobalSearch() {
     </>
   );
 }
+

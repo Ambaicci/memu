@@ -77,3 +77,4 @@ export default function BoardCard({ board, onClick }: BoardCardProps) {
     </div>
   );
 }
+

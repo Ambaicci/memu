@@ -411,24 +411,24 @@ export default function SlidesPanel() {
   if (isPresentMode && currentSlide) {
     const animClass = currentSlide.animation !== 'none' ? `animate-${currentSlide.animation}` : '';
     return (
-      <div className="fixed inset-0 bg-[#0f0f0f] z-50 flex flex-col">
+      <div className="fixed inset-0 bg-[#0f0f0f] z-50 flex flex-col animate-fadeIn">
         <div className="absolute top-4 right-4 flex gap-2 z-10">
-          <button onClick={() => setIsPresentMode(false)} className="px-4 py-2 rounded-lg bg-white/10 text-white hover:bg-white/20 transition text-[13px] font-medium backdrop-blur-sm">Exit Presentation</button>
+          <button onClick={() => setIsPresentMode(false)} className="px-4 py-2 rounded-lg bg-white/10 text-white hover:bg-white/20 transition text-[13px] font-medium backdrop-blur-sm btn-press">Exit Presentation</button>
         </div>
         <div className="flex-1 flex items-center justify-center p-4 md:p-8">
           <div className={`max-w-5xl w-full rounded-2xl shadow-2xl p-8 md:p-16 min-h-[60vh] flex flex-col justify-center transition-all duration-500 ${animClass}`} style={{ background: currentSlide.background || '#ffffff' }} dangerouslySetInnerHTML={{ __html: renderSlideContent(currentSlide.content) }} />
         </div>
         <div className="absolute bottom-8 left-1/2 -translate-x-1/2 flex items-center gap-6 bg-white/10 backdrop-blur-md px-6 py-3 rounded-full border border-white/10">
-          <button onClick={() => setCurrentSlideIndex(Math.max(0, currentSlideIndex - 1))} disabled={currentSlideIndex === 0} className="p-2 rounded-full hover:bg-white/20 transition disabled:opacity-30 text-white"><ChevronLeft size={24} /></button>
+          <button onClick={() => setCurrentSlideIndex(Math.max(0, currentSlideIndex - 1))} disabled={currentSlideIndex === 0} className="p-2 rounded-full hover:bg-white/20 transition disabled:opacity-30 text-white btn-press"><ChevronLeft size={24} /></button>
           <span className="text-white/80 text-sm font-medium">{currentSlideIndex + 1} / {slides.length}</span>
-          <button onClick={() => setCurrentSlideIndex(Math.min(slides.length - 1, currentSlideIndex + 1))} disabled={currentSlideIndex === slides.length - 1} className="p-2 rounded-full hover:bg-white/20 transition disabled:opacity-30 text-white"><ChevronRight size={24} /></button>
+          <button onClick={() => setCurrentSlideIndex(Math.min(slides.length - 1, currentSlideIndex + 1))} disabled={currentSlideIndex === slides.length - 1} className="p-2 rounded-full hover:bg-white/20 transition disabled:opacity-30 text-white btn-press"><ChevronRight size={24} /></button>
         </div>
       </div>
     );
   }
 
   return (
-    <div className={`${isFullscreen ? 'fixed inset-0 z-50 bg-[#fafaf8]' : 'flex h-full'} bg-[#fafaf8] transition-all duration-300`}>
+    <div className={`${isFullscreen ? 'fixed inset-0 z-50 bg-memu-canvas' : 'flex h-full'} bg-memu-canvas transition-all duration-300 animate-page-enter`}>
       {/* Sidebar */}
       <div className="w-64 border-r border-[#e8e7e3] bg-white flex flex-col shadow-sm">
         <div className="px-4 pt-6 pb-4 border-b border-[#f2f1ee]">
@@ -441,7 +441,7 @@ export default function SlidesPanel() {
         </div>
         
         <div className="p-3">
-          <button onClick={() => setShowNewPresModal(true)} className="w-full flex items-center justify-center gap-2 py-2.5 btn-primary text-white rounded-lg text-[13px] font-medium">
+          <button onClick={() => setShowNewPresModal(true)} className="w-full flex items-center justify-center gap-2 py-2.5 btn-primary text-white rounded-lg text-[13px] font-medium btn-press">
             <Plus size={14} /> New Presentation
           </button>
         </div>
@@ -453,14 +453,14 @@ export default function SlidesPanel() {
             <input type="text" value={searchQuery} onChange={(e) => setSearchQuery(e.target.value)} placeholder="Search presentations..." className="flex-1 text-[12px] outline-none bg-transparent" />
           </div>
           <div className="relative" ref={filterRef}>
-            <button onClick={() => setIsFilterOpen(!isFilterOpen)} className="w-full flex items-center justify-between gap-2 bg-white border border-[#e8e7e3] rounded-lg px-3 py-1.5 text-[12px] text-[#777] hover:border-[#4f46e5] transition">
+            <button onClick={() => setIsFilterOpen(!isFilterOpen)} className="w-full flex items-center justify-between gap-2 bg-white border border-[#e8e7e3] rounded-lg px-3 py-1.5 text-[12px] text-[#777] hover:border-[#4f46e5] transition btn-press">
               <span className="flex items-center gap-1"><Filter size={10} /> {currentFilterLabel}</span>
               <ChevronDown size={10} />
             </button>
             {isFilterOpen && (
-              <div className="absolute left-0 right-0 mt-1 bg-white rounded-lg shadow-xl border border-[#e8e7e3] z-20">
+              <div className="absolute left-0 right-0 mt-1 bg-white rounded-lg shadow-xl border border-[#e8e7e3] z-20 animate-fade-in-scale">
                 {filterOptions.map((opt) => (
-                  <button key={opt.id} onClick={() => { setFilter(opt.id as any); setIsFilterOpen(false); }} className={`w-full flex items-center gap-2 px-3 py-2 text-[12px] transition ${filter === opt.id ? 'bg-[#ede9fe] text-[#4f46e5]' : 'text-[#777] hover:bg-[#fafaf8]'}`}>
+                  <button key={opt.id} onClick={() => { setFilter(opt.id as any); setIsFilterOpen(false); }} className={`w-full flex items-center gap-2 px-3 py-2 text-[12px] transition ${filter === opt.id ? 'bg-[#ede9fe] text-[#4f46e5]' : 'text-[#777] hover:bg-memu-canvas'}`}>
                     {opt.icon} {opt.label}
                   </button>
                 ))}
@@ -471,20 +471,20 @@ export default function SlidesPanel() {
         
         <div className="flex-1 overflow-y-auto px-2 pb-4">
           {filteredPresentations.length === 0 ? (
-            <div className="p-6 text-center">
+            <div className="p-6 text-center animate-fade-in-scale">
               <Layout size={32} className="text-[#aaa] mx-auto mb-3" />
               <p className="text-[12px] text-[#777] mb-2">No presentations found</p>
             </div>
           ) : (
             <div className="space-y-1">
-              {filteredPresentations.map((pres) => (
-                <div key={pres.id} onClick={() => { setActivePresId(pres.id); setPresTitle(pres.title); fetchSlides(pres.id); }} className={`group p-3 rounded-lg cursor-pointer transition-all ${activePresId === pres.id ? 'bg-[#ede9fe] ring-1 ring-[#4f46e5]/40' : 'hover:bg-[#f9fafb]'}`}>
+              {filteredPresentations.map((pres, idx) => (
+                <div key={pres.id} onClick={() => { setActivePresId(pres.id); setPresTitle(pres.title); fetchSlides(pres.id); }} className={`group p-3 rounded-lg cursor-pointer transition-all animate-slide-up btn-press ${activePresId === pres.id ? 'bg-[#ede9fe] ring-1 ring-[#4f46e5]/40' : 'hover:bg-[#f9fafb]'}`} style={{ animationDelay: `${idx * 40}ms`, opacity: 0 }}>
                   <div className="flex items-center justify-between mb-1">
                     <div className="flex items-center gap-2 flex-1 min-w-0">
                       <Layout size={13} className="text-[#7c3aed] flex-shrink-0" />
                       <span className="text-[13px] font-medium text-[#0f0f0f] truncate">{pres.title}</span>
                     </div>
-                    <button onClick={(e) => { e.stopPropagation(); handleDeletePresentation(pres.id); }} className="opacity-0 group-hover:opacity-100 p-1 rounded hover:bg-red-100 transition"><Trash2 size={11} className="text-[#777] hover:text-[#dc2626]" /></button>
+                    <button onClick={(e) => { e.stopPropagation(); handleDeletePresentation(pres.id); }} className="opacity-0 group-hover:opacity-100 p-1 rounded hover:bg-red-100 transition btn-press"><Trash2 size={11} className="text-[#777] hover:text-[#dc2626]" /></button>
                   </div>
                   <div className="text-[10px] text-[#777] pl-6">{formatDate(pres.updated_at)}</div>
                 </div>
@@ -500,13 +500,13 @@ export default function SlidesPanel() {
           <>
             <div className="border-b border-[#e8e7e3] bg-white shadow-sm px-4 py-2.5 flex items-center justify-between flex-wrap gap-2">
               <div className="flex items-center gap-2 flex-wrap">
-                <button onClick={() => setIsPreviewMode(!isPreviewMode)} className={`px-3 py-1.5 rounded-lg text-[12px] font-medium transition ${isPreviewMode ? 'btn-primary' : 'text-[#777] hover:bg-[#f2f1ee]'}`}>{isPreviewMode ? 'Edit' : 'Preview'}</button>
-                <button onClick={() => setIsPresentMode(true)} className="px-3 py-1.5 rounded-lg text-[12px] font-medium bg-[#059669] text-white hover:bg-[#047857] transition flex items-center gap-1.5"><Play size={12} /> Present</button>
+                <button onClick={() => setIsPreviewMode(!isPreviewMode)} className={`px-3 py-1.5 rounded-lg text-[12px] font-medium transition btn-press ${isPreviewMode ? 'btn-primary' : 'text-[#777] hover:bg-[#f2f1ee]'}`}>{isPreviewMode ? 'Edit' : 'Preview'}</button>
+                <button onClick={() => setIsPresentMode(true)} className="px-3 py-1.5 rounded-lg text-[12px] font-medium bg-[#059669] text-white hover:bg-[#047857] transition flex items-center gap-1.5 btn-press"><Play size={12} /> Present</button>
                 {!isPreviewMode && <SlidesToolDrawer onFormat={handleFormat} onInsert={handleInsert} onChangeLayout={(layout) => updateCurrentSlide({ layout })} currentLayout={currentSlide.layout} onAddBackground={(bg) => updateCurrentSlide({ background: bg })} onAddTransition={(t) => { updateCurrentSlide({ transition: t }); showToast(`Transition set to: ${t}`, 'success'); }} onAddAnimation={(a) => { updateCurrentSlide({ animation: a }); showToast(`Animation set to: ${a}`, 'success'); }} onDuplicateSlide={async () => { /* duplicate logic */ }} onMoveSlideUp={async () => { /* move up */ }} onMoveSlideDown={async () => { /* move down */ }} />}
               </div>
               <div className="flex items-center gap-3">
                 {isSaving && <div className="text-[10px] text-[#059669] animate-pulse flex items-center gap-1"><Loader2 size={10} className="animate-spin" /> Saving...</div>}
-                <button onClick={() => setIsFullscreen(!isFullscreen)} className="p-2 rounded-lg hover:bg-[#f2f1ee] transition text-[#7c3aed]">{isFullscreen ? <Minimize2 size={16} /> : <Maximize2 size={16} />}</button>
+                <button onClick={() => setIsFullscreen(!isFullscreen)} className="p-2 rounded-lg hover:bg-[#f2f1ee] transition text-[#7c3aed] btn-press">{isFullscreen ? <Minimize2 size={16} /> : <Maximize2 size={16} />}</button>
               </div>
             </div>
 
@@ -517,21 +517,21 @@ export default function SlidesPanel() {
             <div className="px-6 pt-2 pb-4 border-b border-[#e8e7e3] bg-white">
               <div className="flex gap-2 overflow-x-auto pb-2 custom-scroll">
                 {slides.map((slide, idx) => (
-                  <button key={slide.id} onClick={() => setCurrentSlideIndex(idx)} className={`flex-shrink-0 w-32 p-3 rounded-lg text-left transition border ${currentSlideIndex === idx ? 'bg-[#ede9fe] border-[#7c3aed] shadow-sm' : 'bg-[#f9fafb] border-[#e8e7e3] hover:border-[#c4b5fd]'}`}>
+                  <button key={slide.id} onClick={() => setCurrentSlideIndex(idx)} className={`flex-shrink-0 w-32 p-3 rounded-lg text-left transition border animate-slide-up btn-press ${currentSlideIndex === idx ? 'bg-[#ede9fe] border-[#7c3aed] shadow-sm' : 'bg-[#f9fafb] border-[#e8e7e3] hover:border-[#c4b5fd]'}`} style={{ animationDelay: `${idx * 40}ms`, opacity: 0 }}>
                     <div className="text-[10px] font-semibold text-[#777] mb-1">Slide {idx + 1}</div>
                     <div className="text-[11px] text-[#0f0f0f] truncate font-medium">{slide.title}</div>
                   </button>
                 ))}
-                <button onClick={handleAddSlide} className="flex-shrink-0 w-32 p-3 rounded-lg border border-dashed border-[#e8e7e3] text-[#777] hover:border-[#7c3aed] hover:text-[#7c3aed] transition flex flex-col items-center justify-center gap-1"><Plus size={16} /><span className="text-[11px] font-medium">Add Slide</span></button>
+                <button onClick={handleAddSlide} className="flex-shrink-0 w-32 p-3 rounded-lg border border-dashed border-[#e8e7e3] text-[#777] hover:border-[#7c3aed] hover:text-[#7c3aed] transition flex flex-col items-center justify-center gap-1 btn-press"><Plus size={16} /><span className="text-[11px] font-medium">Add Slide</span></button>
               </div>
             </div>
 
             <div className="flex-1 overflow-auto p-6">
               <div className="max-w-4xl mx-auto space-y-6">
-                <div className="rounded-xl shadow-sm border border-[#e8e7e3] overflow-hidden transition-all duration-300" style={{ background: currentSlide.background || '#ffffff' }}>
+                <div className="rounded-xl shadow-sm border border-[#e8e7e3] overflow-hidden transition-all duration-300 animate-fade-in-scale" style={{ background: currentSlide.background || '#ffffff' }}>
                   <div className="border-b border-black/5 px-4 py-2.5 bg-black/5 flex items-center justify-between">
                     <span className="text-[12px] font-semibold text-[#777] uppercase tracking-wider">Slide {currentSlideIndex + 1} Canvas</span>
-                    <button onClick={() => handleDeleteSlide(currentSlideIndex)} className="text-[11px] text-[#dc2626] hover:underline font-medium flex items-center gap-1"><Trash2 size={12} /> Delete Slide</button>
+                    <button onClick={() => handleDeleteSlide(currentSlideIndex)} className="text-[11px] text-[#dc2626] hover:underline font-medium flex items-center gap-1 btn-press"><Trash2 size={12} /> Delete Slide</button>
                   </div>
                   <div className="p-8 min-h-[400px]">
                     {isPreviewMode ? (
@@ -542,7 +542,7 @@ export default function SlidesPanel() {
                   </div>
                 </div>
 
-                <div className="bg-[#fafaf8] rounded-xl shadow-sm border border-[#e8e7e3] overflow-hidden">
+                <div className="bg-memu-canvas rounded-xl shadow-sm border border-[#e8e7e3] overflow-hidden animate-fade-in-scale">
                   <div className="border-b border-[#e8e7e3] px-4 py-2.5 bg-white flex items-center gap-2"><List size={14} className="text-[#7c3aed]" /><span className="text-[12px] font-semibold text-[#777] uppercase tracking-wider">Speaker Notes</span></div>
                   <textarea value={currentSlide.notes} onChange={(e) => updateCurrentSlide({ notes: e.target.value })} placeholder="Add your speaker notes here..." className="w-full p-4 outline-none resize-none text-[13px] leading-relaxed min-h-[100px] bg-transparent text-[#3a3a3a] placeholder:text-[#aaa]" />
                 </div>
@@ -550,25 +550,25 @@ export default function SlidesPanel() {
             </div>
           </>
         ) : (
-          <div className="flex-1 flex items-center justify-center bg-white">
+          <div className="flex-1 flex items-center justify-center bg-white animate-fade-in-scale">
             <div className="text-center max-w-md">
               <div className="w-20 h-20 rounded-full bg-[#ede9fe] flex items-center justify-center mx-auto mb-4"><Layout size={36} className="text-[#7c3aed]" /></div>
               <h3 className="text-[20px] font-semibold text-[#0f0f0f] mb-2">No presentation selected</h3>
               <p className="text-[13px] text-[#777] mb-6">Create a new presentation to start building your slides</p>
-              <button onClick={() => setShowNewPresModal(true)} className="btn-primary">Create New Presentation</button>
+              <button onClick={() => setShowNewPresModal(true)} className="btn-primary btn-press">Create New Presentation</button>
             </div>
           </div>
         )}
       </div>
 
       {showNewPresModal && (
-        <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50" onClick={() => setShowNewPresModal(false)}>
-          <div className="bg-white rounded-2xl w-[400px] max-w-[90%] p-6 shadow-2xl" onClick={(e) => e.stopPropagation()}>
+        <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 animate-fadeIn" onClick={() => setShowNewPresModal(false)}>
+          <div className="bg-white rounded-2xl w-[400px] max-w-[90%] p-6 shadow-2xl animate-fade-in-scale" onClick={(e) => e.stopPropagation()}>
             <h3 className="text-[18px] font-semibold text-[#0f0f0f] mb-4">New Presentation</h3>
             <input type="text" value={newPresTitle} onChange={(e) => setNewPresTitle(e.target.value)} placeholder="Presentation title" className="w-full px-4 py-2.5 border border-[#e8e7e3] rounded-lg text-[14px] focus:outline-none focus:border-[#7c3aed] mb-4 transition" autoFocus onKeyDown={(e) => e.key === 'Enter' && handleNewPresentation()} />
             <div className="flex gap-3 justify-end">
-              <button onClick={() => setShowNewPresModal(false)} className="px-4 py-2 rounded-lg text-[13px] text-[#777] hover:bg-[#f2f1ee] transition">Cancel</button>
-              <button onClick={handleNewPresentation} disabled={!newPresTitle.trim()} className="btn-primary disabled:opacity-50">Create</button>
+              <button onClick={() => setShowNewPresModal(false)} className="px-4 py-2 rounded-lg text-[13px] text-[#777] hover:bg-[#f2f1ee] transition btn-press">Cancel</button>
+              <button onClick={handleNewPresentation} disabled={!newPresTitle.trim()} className="btn-primary disabled:opacity-50 btn-press">Create</button>
             </div>
           </div>
         </div>

@@ -1,7 +1,7 @@
 'use client';
 
 import { useState, useEffect, useRef } from 'react';
-import { useQuery, useQueryClient } from '@tanstack/react-query'; // <-- NEW IMPORTS
+import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { Upload, File, Download, Trash2, Search, Filter, ChevronDown, Image, FileText, HelpCircle, Cloud, Check, Copy } from 'lucide-react';
 import { createClient } from '@/lib/supabase/client';
 import { useToast } from '@/contexts/ToastContext';
@@ -22,14 +22,35 @@ interface FileItem {
 }
 
 const filterOptions = [
-  { id: 'all', label: 'All', icon: <Cloud size={12} /> },
-  { id: 'image', label: 'Images', icon: <Image size={12} /> },
-  { id: 'document', label: 'Docs', icon: <FileText size={12} /> },
-  { id: 'other', label: 'Other', icon: <HelpCircle size={12} /> },
+  { id: 'all', label: 'All', icon: <Cloud size={14} strokeWidth={2.5} /> },
+  { id: 'image', label: 'Images', icon: <Image size={14} strokeWidth={2.5} /> },
+  { id: 'document', label: 'Docs', icon: <FileText size={14} strokeWidth={2.5} /> },
+  { id: 'other', label: 'Other', icon: <HelpCircle size={14} strokeWidth={2.5} /> },
 ];
 
+const getFileBorderClass = (type: string) => {
+  if (type.startsWith('image/')) return 'border-blue-200/60';
+  if (type.includes('pdf')) return 'border-rose-200/60';
+  if (type.includes('word') || type.includes('text')) return 'border-amber-200/60';
+  return 'border-gray-200/60';
+};
+
+const getFileIcon = (type: string) => {
+  if (type.startsWith('image/')) return <Image size={16} strokeWidth={2.5} className="text-blue-600" />;
+  if (type.includes('pdf')) return <FileText size={16} strokeWidth={2.5} className="text-rose-600" />;
+  if (type.includes('word') || type.includes('text')) return <FileText size={16} strokeWidth={2.5} className="text-amber-600" />;
+  return <File size={16} strokeWidth={2.5} className="text-gray-400" />;
+};
+
+const getFileIconBg = (type: string) => {
+  if (type.startsWith('image/')) return 'bg-blue-50 border-blue-100';
+  if (type.includes('pdf')) return 'bg-rose-50 border-rose-100';
+  if (type.includes('word') || type.includes('text')) return 'bg-amber-50 border-amber-100';
+  return 'bg-gray-50 border-gray-100';
+};
+
 export default function AirSharePanel({ isGuest, requireAuth }: AirSharePanelProps) {
-  const queryClient = useQueryClient(); // <-- NEW HOOK
+  const queryClient = useQueryClient();
   const [uploading, setUploading] = useState(false);
   const [searchQuery, setSearchQuery] = useState('');
   const [filter, setFilter] = useState<string>('all');
@@ -42,13 +63,11 @@ export default function AirSharePanel({ isGuest, requireAuth }: AirSharePanelPro
   const fileInputRef = useRef<HTMLInputElement>(null);
   const { showToast } = useToast();
 
-  // Fetch user once on mount
   useEffect(() => {
     const supabase = createClient();
     supabase.auth.getUser().then(({ data: { user } }) => setUser(user));
   }, []);
 
-  // Close filter dropdown when clicking outside
   useEffect(() => {
     const handleClickOutside = (e: MouseEvent) => {
       if (filterRef.current && !filterRef.current.contains(e.target as Node)) {
@@ -59,7 +78,6 @@ export default function AirSharePanel({ isGuest, requireAuth }: AirSharePanelPro
     return () => document.removeEventListener('mousedown', handleClickOutside);
   }, []);
 
-  // 🚀 THE MAGIC: React Query handles fetching, caching, and loading states!
   const { data: files = [], isLoading } = useQuery({
     queryKey: ['airshare-files', user?.id],
     queryFn: async () => {
@@ -74,8 +92,8 @@ export default function AirSharePanel({ isGuest, requireAuth }: AirSharePanelPro
       if (error) throw error;
       return data || [];
     },
-    enabled: !!user, // Only run query if user is logged in
-    staleTime: 60 * 1000, // Cache data for 1 minute!
+    enabled: !!user,
+    staleTime: 60 * 1000,
   });
 
   const uploadFiles = async (fileList: FileList) => {
@@ -119,7 +137,6 @@ export default function AirSharePanel({ isGuest, requireAuth }: AirSharePanelPro
 
     if (successCount > 0) {
       showToast(`${successCount} file${successCount > 1 ? 's' : ''} uploaded`, 'success');
-      // 🚀 Instantly refresh the cache instead of waiting!
       queryClient.invalidateQueries({ queryKey: ['airshare-files', user.id] });
     }
     setUploading(false);
@@ -164,7 +181,6 @@ export default function AirSharePanel({ isGuest, requireAuth }: AirSharePanelPro
     await supabase.from('airshare_files').delete().eq('id', file.id);
     
     showToast(`${file.name} deleted`, 'success');
-    // 🚀 Instantly refresh the cache!
     queryClient.invalidateQueries({ queryKey: ['airshare-files', user?.id] });
   };
 
@@ -195,12 +211,6 @@ export default function AirSharePanel({ isGuest, requireAuth }: AirSharePanelPro
     return date.toLocaleDateString();
   };
 
-  const getFileIcon = (type: string) => {
-    if (type.startsWith('image/')) return <Image size={20} className="text-[#4f46e5]" />;
-    if (type.includes('pdf')) return <FileText size={20} className="text-[#dc2626]" />;
-    return <File size={20} className="text-[#777]" />;
-  };
-
   const filteredFiles = files.filter((file: FileItem) => {
     if (searchQuery && !file.name.toLowerCase().includes(searchQuery.toLowerCase())) return false;
     if (filter === 'image' && !file.type.startsWith('image/')) return false;
@@ -215,81 +225,99 @@ export default function AirSharePanel({ isGuest, requireAuth }: AirSharePanelPro
     docs: files.filter((f: FileItem) => f.type.includes('pdf') || f.type.includes('word') || f.type.includes('text')).length,
   };
 
-  //  Use isLoading from React Query
   if (isLoading) {
     return (
       <div className="flex items-center justify-center h-full">
-        <div className="w-6 h-6 border-2 border-[#4f46e5] border-t-transparent rounded-full animate-spin" />
+        <div className="w-6 h-6 border-2 border-indigo-600 border-t-transparent rounded-full animate-spin" />
       </div>
     );
   }
 
   return (
-    <div className="flex flex-col h-full bg-[#fafaf8]">
-      {/* Header with elegant stats */}
-      <div className="px-6 md:px-10 pt-8 pb-4">
-        <div className="flex items-center justify-between flex-wrap gap-4">
-          <div>
-            <h1 className="heading-gradient font-['Playfair_Display'] text-3xl md:text-4xl font-medium tracking-tight">AirShare</h1>
-            <div className="flex items-center gap-3 mt-2 text-xs text-[#777]">
-              <span>{stats.total} items</span>
-              {stats.images > 0 && <span>· {stats.images} images</span>}
-              {stats.docs > 0 && <span>· {stats.docs} documents</span>}
+    <div className="flex flex-col h-full bg-memu-canvas animate-page-enter">
+      {/* Header Section */}
+      <div className="px-6 md:px-10 pt-8 pb-6">
+        <div className="flex items-center justify-between flex-wrap gap-4 mb-6">
+          <div className="space-y-2">
+            <div className="flex items-center gap-3 text-indigo-600">
+              <div className="w-11 h-11 rounded-2xl bg-gradient-to-br from-indigo-600 to-purple-600 flex items-center justify-center shadow-lg">
+                <Cloud size={22} className="text-white" strokeWidth={2.5} />
+              </div>
+              <span className="text-sm font-bold uppercase tracking-wider">Storage</span>
+            </div>
+            <h1 className="font-serif text-3xl md:text-4xl font-semibold text-gray-900 leading-tight">AirShare</h1>
+            <div className="flex flex-wrap gap-3 mt-3">
+              <span className="text-sm text-gray-500 font-medium">{stats.total} items</span>
+              {stats.images > 0 && (
+                <>
+                  <span className="text-gray-300">·</span>
+                  <span className="text-sm text-gray-500 font-medium">{stats.images} images</span>
+                </>
+              )}
+              {stats.docs > 0 && (
+                <>
+                  <span className="text-gray-300">·</span>
+                  <span className="text-sm text-gray-500 font-medium">{stats.docs} documents</span>
+                </>
+              )}
             </div>
           </div>
+          
           <button
             onClick={() => fileInputRef.current?.click()}
             disabled={uploading}
-            className="flex items-center gap-2 px-4 py-2 bg-gradient-to-r from-[#4f46e5] to-[#0891b2] text-white rounded-full text-sm font-medium hover:from-[#5b21b6] hover:to-[#06b6d4] transition shadow-sm disabled:opacity-50"
+            className="flex items-center gap-2 px-5 py-3 bg-gradient-to-r from-indigo-600 to-purple-600 text-white rounded-full text-sm font-semibold hover:shadow-xl hover:-translate-y-0.5 transition-all shadow-lg disabled:opacity-50 btn-press"
           >
             {uploading ? (
               <div className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin" />
             ) : (
-              <Upload size={14} />
+              <Upload size={16} strokeWidth={2.5} />
             )}
             {uploading ? 'Uploading...' : 'Upload'}
           </button>
           <input ref={fileInputRef} type="file" multiple onChange={handleFileSelect} className="hidden" />
         </div>
-      </div>
 
-      {/* Search and filter bar */}
-      <div className="px-6 md:px-10 pb-4 flex flex-col sm:flex-row gap-3">
-        <div className="flex-1 relative">
-          <Search size={14} className="absolute left-3 top-1/2 -translate-y-1/2 text-[#aaa]" />
-          <input
-            type="text"
-            value={searchQuery}
-            onChange={(e) => setSearchQuery(e.target.value)}
-            placeholder="Search files..."
-            className="w-full pl-9 pr-4 py-2 bg-white border border-[#e8e7e3] rounded-full text-sm outline-none focus:border-[#4f46e5] transition"
-          />
-        </div>
-        <div className="relative" ref={filterRef}>
-          <button
-            onClick={() => setIsFilterOpen(!isFilterOpen)}
-            className="flex items-center gap-2 px-4 py-2 bg-white border border-[#e8e7e3] rounded-full text-sm text-[#777] hover:border-[#4f46e5] transition"
-          >
-            <Filter size={12} />
-            {filterOptions.find(f => f.id === filter)?.label || 'All'}
-            <ChevronDown size={10} />
-          </button>
-          {isFilterOpen && (
-            <div className="absolute right-0 mt-2 w-36 bg-white rounded-xl shadow-lg border border-[#e8e7e3] overflow-hidden z-20">
-              {filterOptions.map((opt) => (
-                <button
-                  key={opt.id}
-                  onClick={() => { setFilter(opt.id); setIsFilterOpen(false); }}
-                  className={`w-full flex items-center gap-2 px-4 py-2 text-sm text-left transition ${
-                    filter === opt.id ? 'bg-[#ede9fe] text-[#4f46e5]' : 'text-[#777] hover:bg-[#fafaf8]'
-                  }`}
-                >
-                  {opt.icon}
-                  {opt.label}
-                </button>
-              ))}
-            </div>
-          )}
+        {/* Search and Filter */}
+        <div className="flex flex-col sm:flex-row gap-3">
+          <div className="flex-1 relative">
+            <Search size={19} className="absolute left-4 top-1/2 -translate-y-1/2 text-gray-400" />
+            <input
+              type="text"
+              value={searchQuery}
+              onChange={(e) => setSearchQuery(e.target.value)}
+              placeholder="Search files..."
+              className="w-full pl-12 pr-4 py-4 bg-white/80 backdrop-blur-xl border border-gray-200 rounded-2xl text-sm text-gray-900 outline-none focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500 transition-all placeholder:text-gray-400"
+            />
+          </div>
+          <div className="relative" ref={filterRef}>
+            <button
+              onClick={() => setIsFilterOpen(!isFilterOpen)}
+              className="flex items-center gap-3 px-5 py-4 bg-white/80 backdrop-blur-xl border border-gray-200 rounded-2xl text-sm font-medium text-gray-700 hover:bg-white hover:border-gray-300 transition-all shadow-sm btn-press"
+            >
+              <Filter size={15} />
+              <span>{filterOptions.find(f => f.id === filter)?.label || 'All'}</span>
+              <ChevronDown size={13} />
+            </button>
+            {isFilterOpen && (
+              <div className="absolute right-0 mt-3 w-48 bg-white rounded-2xl shadow-2xl border border-gray-200 overflow-hidden z-20 animate-fadeIn">
+                <div className="py-2">
+                  {filterOptions.map((opt) => (
+                    <button
+                      key={opt.id}
+                      onClick={() => { setFilter(opt.id); setIsFilterOpen(false); }}
+                      className={`w-full flex items-center gap-3 px-5 py-3 text-sm text-left transition ${
+                        filter === opt.id ? 'bg-indigo-50 text-indigo-700 font-semibold' : 'text-gray-600 hover:bg-gray-50'
+                      }`}
+                    >
+                      {opt.icon}
+                      {opt.label}
+                    </button>
+                  ))}
+                </div>
+              </div>
+            )}
+          </div>
         </div>
       </div>
 
@@ -302,67 +330,78 @@ export default function AirSharePanel({ isGuest, requireAuth }: AirSharePanelPro
         onDrop={handleDrop}
       >
         {files.length === 0 ? (
-          <div className={`flex flex-col items-center justify-center py-20 text-center rounded-2xl transition-all ${isDragging ? 'bg-[#ede9fe]/30 border-2 border-dashed border-[#4f46e5]' : ''}`}>
-            <div className="w-20 h-20 rounded-full bg-[#f2f1ee] flex items-center justify-center mb-4">
-              <Cloud size={32} className="text-[#aaa]" />
+          <div className={`flex flex-col items-center justify-center py-24 text-center transition-all animate-fade-in-scale ${isDragging ? 'bg-indigo-50/30 border-2 border-dashed border-indigo-300 rounded-3xl' : ''}`}>
+            <div className="relative w-32 h-32 mb-8">
+              <div className="absolute inset-0 bg-gradient-to-br from-indigo-100 to-purple-100 rounded-3xl blur-2xl animate-pulse"></div>
+              <div className="relative bg-white rounded-3xl w-32 h-32 flex items-center justify-center shadow-xl border border-gray-200">
+                <Cloud size={48} className="text-indigo-500" strokeWidth={2} />
+              </div>
             </div>
-            <h3 className="text-[17px] font-medium text-[#1a1a1a] mb-1">Drop files here</h3>
-            <p className="text-[13px] text-[#777] max-w-sm mb-6">
+            <h3 className="font-serif text-xl font-semibold text-gray-900 mb-3">Drop files here</h3>
+            <p className="text-gray-500 text-sm max-w-md mb-6">
               or click the Upload button above.
             </p>
             <button
               onClick={() => fileInputRef.current?.click()}
-              className="inline-flex items-center gap-2 px-5 py-2 bg-gradient-to-r from-[#4f46e5] to-[#0891b2] text-white rounded-full text-sm font-medium hover:from-[#5b21b6] hover:to-[#06b6d4] transition"
+              className="inline-flex items-center gap-2 px-5 py-3 bg-gradient-to-r from-indigo-600 to-purple-600 text-white rounded-full text-sm font-semibold hover:shadow-xl hover:-translate-y-0.5 transition-all shadow-lg btn-press"
             >
-              <Upload size={14} />
+              <Upload size={16} strokeWidth={2.5} />
               Choose files
             </button>
           </div>
         ) : filteredFiles.length === 0 ? (
-          <div className="flex flex-col items-center justify-center py-16 text-center">
-            <Search size={28} className="text-[#aaa] mb-3" />
-            <h3 className="text-[15px] font-medium text-[#1a1a1a]">No matching files</h3>
-            <p className="text-[13px] text-[#777]">Try a different search or filter.</p>
+          <div className="flex flex-col items-center justify-center py-24 text-center animate-fade-in-scale">
+            <div className="relative w-32 h-32 mb-8">
+              <div className="absolute inset-0 bg-gradient-to-br from-gray-100 to-gray-200 rounded-3xl blur-2xl animate-pulse"></div>
+              <div className="relative bg-white rounded-3xl w-32 h-32 flex items-center justify-center shadow-xl border border-gray-200">
+                <Search size={48} className="text-gray-400" strokeWidth={2} />
+              </div>
+            </div>
+            <h3 className="font-serif text-xl font-semibold text-gray-900 mb-3">No matching files</h3>
+            <p className="text-gray-500 text-sm max-w-md">
+              Try a different search or filter.
+            </p>
           </div>
         ) : (
           <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4">
-            {filteredFiles.map((file: FileItem) => (
+            {filteredFiles.map((file: FileItem, idx) => (
               <div
                 key={file.id}
-                className="group bg-white rounded-xl border border-[#e8e7e3] p-4 hover:shadow-md transition-all duration-200 hover:-translate-y-0.5"
+                className={`group relative bg-white rounded-2xl border-[1px] shadow-[0_2px_8px_-2px_rgba(0,0,0,0.04)] hover:shadow-lg hover:-translate-y-0.5 transition-all duration-300 ${getFileBorderClass(file.type)} p-4 animate-slide-up btn-press`}
+                style={{ animationDelay: `${idx * 60}ms`, opacity: 0 }}
               >
                 <div className="flex items-start justify-between mb-3">
-                  <div className="w-10 h-10 rounded-xl bg-[#f2f1ee] flex items-center justify-center">
+                  <div className={`w-10 h-10 rounded-xl flex items-center justify-center border ${getFileIconBg(file.type)}`}>
                     {getFileIcon(file.type)}
                   </div>
-                  <div className="flex gap-1 opacity-0 group-hover:opacity-100 transition">
+                  <div className="flex gap-1 opacity-0 group-hover:opacity-100 transition-opacity duration-200">
                     <button
                       onClick={() => copyLink(file.url, file.id)}
-                      className="p-1.5 rounded-lg hover:bg-[#f2f1ee] text-[#777] hover:text-[#4f46e5] transition"
+                      className="p-1.5 rounded-lg hover:bg-gray-100 text-gray-400 hover:text-indigo-600 transition-all btn-press"
                       title="Copy link"
                     >
-                      {copiedId === file.id ? <Check size={14} className="text-[#059669]" /> : <Copy size={14} />}
+                      {copiedId === file.id ? <Check size={12} strokeWidth={2.5} className="text-emerald-600" /> : <Copy size={12} strokeWidth={2.5} />}
                     </button>
                     <button
                       onClick={() => handleDelete(file)}
-                      className="p-1.5 rounded-lg hover:bg-[#fee2e2] text-[#777] hover:text-[#dc2626] transition"
+                      className="p-1.5 rounded-lg hover:bg-gray-100 text-gray-400 hover:text-rose-600 transition-all btn-press"
                       title="Delete"
                     >
-                      <Trash2 size={14} />
+                      <Trash2 size={12} strokeWidth={2.5} />
                     </button>
                     <a
                       href={file.url}
                       download
-                      className="p-1.5 rounded-lg hover:bg-[#f2f1ee] text-[#777] hover:text-[#4f46e5] transition"
+                      className="p-1.5 rounded-lg hover:bg-gray-100 text-gray-400 hover:text-indigo-600 transition-all btn-press"
                       title="Download"
                     >
-                      <Download size={14} />
+                      <Download size={12} strokeWidth={2.5} />
                     </a>
                   </div>
                 </div>
-                <div className="mb-2">
-                  <p className="font-medium text-[#1a1a1a] text-sm truncate">{file.name}</p>
-                  <p className="text-[10px] text-[#777] mt-0.5">{formatSize(file.size)} · {formatDate(file.created_at)}</p>
+                <div>
+                  <p className="text-sm font-bold text-gray-900 truncate group-hover:text-indigo-600 transition-colors">{file.name}</p>
+                  <p className="text-[11px] text-gray-500 mt-1 font-medium">{formatSize(file.size)} · {formatDate(file.created_at)}</p>
                 </div>
               </div>
             ))}
@@ -370,15 +409,10 @@ export default function AirSharePanel({ isGuest, requireAuth }: AirSharePanelPro
         )}
       </div>
 
-      {/* Floating action button for quick upload (mobile only) */}
-      {files.length > 0 && (
-        <button
-          onClick={() => fileInputRef.current?.click()}
-          className="fixed bottom-8 right-8 w-12 h-12 rounded-full bg-gradient-to-r from-[#4f46e5] to-[#0891b2] text-white shadow-lg flex items-center justify-center hover:scale-105 transition active:scale-95 md:hidden"
-        >
-          <Upload size={20} />
-        </button>
-      )}
+      <style>{`
+        @keyframes fadeIn { from { opacity: 0; transform: scale(0.96); } to { opacity: 1; transform: scale(1); } }
+        .animate-fadeIn { animation: fadeIn 0.2s ease-out; }
+      `}</style>
     </div>
   );
 }

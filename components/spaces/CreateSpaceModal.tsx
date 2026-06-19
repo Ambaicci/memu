@@ -136,3 +136,4 @@ export default function CreateSpaceModal({ isOpen, onClose, onCreate }: CreateSp
     </div>
   );
 }
+

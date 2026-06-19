@@ -212,3 +212,4 @@ export default function SpaceChatsPanel({ space, currentUserId }: SpaceChatsPane
     </div>
   );
 }
+

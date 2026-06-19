@@ -32,3 +32,4 @@ export default function NavItem({ icon, label, badge, isActive, onClick }: NavIt
     </div>
   );
 }
+

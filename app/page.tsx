@@ -15,6 +15,7 @@ import SplashScreen from '@/components/SplashScreen';
 import HomeDashboard from '@/components/HomeDashboard';
 import DirectMemoInbox from '@/components/direct-memos/DirectMemoInbox';
 import { ChevronLeft, Home, Sparkles, Menu } from 'lucide-react';
+import { useSwipeBack } from '@/hooks/useSwipeBack';
 
 const InMemusPanel = dynamic(() => import('@/components/InMemusPanel'), { ssr: false, loading: () => <PanelSkeleton /> });
 const OutMemusPanel = dynamic(() => import('@/components/OutMemusPanel'), { ssr: false, loading: () => <PanelSkeleton /> });
@@ -42,7 +43,9 @@ const PanelSkeleton = () => (
 type PanelType = 'home' | 'inmemus' | 'outmemus' | 'drafts' | 'connections' | 'spaces' | 'confer' | 'calendar' | 'handles' | 'airshare' | 'docs' | 'slides' | 'sheets' | 'space-dashboard' | 'analytics' | 'notes' | 'profile';
 
 export default function MemuApp() {
-  const router = useRouter();
+  const router = useRouter(); 
+ // Enable native-style swipe-to-go-back on mobile
+  useSwipeBack(true);
   const pathname = usePathname();
   const searchParams = useSearchParams();
   

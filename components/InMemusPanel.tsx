@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import { Inbox, Search, Filter, Clock, CheckCircle, AlertCircle, Mail, Sparkles, Loader2, X } from 'lucide-react';
 import { createClient } from '@/lib/supabase/client';
 import { useToast } from '@/contexts/ToastContext';
@@ -52,6 +52,8 @@ export default function InMemusPanel({ isGuest, requireAuth }: InMemusPanelProps
   const [searchQuery, setSearchQuery] = useState('');
   const [showSearch, setShowSearch] = useState(false);
   const { showToast } = useToast();
+  
+  const filterMenuRef = useRef<HTMLDivElement>(null);
 
   const fetchMemus = async () => {
     const supabase = createClient();
@@ -108,6 +110,23 @@ export default function InMemusPanel({ isGuest, requireAuth }: InMemusPanelProps
     fetchMemus();
   }, []);
 
+  // Close filter menu when clicking outside
+  useEffect(() => {
+    const handleClickOutside = (event: MouseEvent) => {
+      if (filterMenuRef.current && !filterMenuRef.current.contains(event.target as Node)) {
+        setShowFilterMenu(false);
+      }
+    };
+
+    if (showFilterMenu) {
+      document.addEventListener('mousedown', handleClickOutside);
+    }
+
+    return () => {
+      document.removeEventListener('mousedown', handleClickOutside);
+    };
+  }, [showFilterMenu]);
+
   const { isRefreshing } = usePullToRefresh(fetchMemus);
 
   const formatDate = (dateStr: string) => {
@@ -136,12 +155,10 @@ export default function InMemusPanel({ isGuest, requireAuth }: InMemusPanelProps
 
   // Filter and search logic
   const filteredMemus = memus.filter(memu => {
-    // Apply nature filter
     if (activeFilter !== 'all' && memu.nature !== activeFilter) {
       return false;
     }
 
-    // Apply search filter
     if (searchQuery) {
       const query = searchQuery.toLowerCase();
       const senderName = getDisplayName(memu.sender).toLowerCase();
@@ -219,7 +236,10 @@ export default function InMemusPanel({ isGuest, requireAuth }: InMemusPanelProps
           <div className="flex items-center gap-2">
             {/* Search Button */}
             <button 
-              onClick={() => setShowSearch(!showSearch)}
+              onClick={() => {
+                setShowSearch(!showSearch);
+                if (showSearch) setSearchQuery('');
+              }}
               className={`w-10 h-10 rounded-xl border flex items-center justify-center transition-all shadow-sm btn-press ${
                 showSearch ? 'bg-indigo-50 border-indigo-200 text-indigo-600' : 'bg-white border-gray-200 text-gray-500 hover:text-indigo-600 hover:border-indigo-200'
               }`}
@@ -227,8 +247,8 @@ export default function InMemusPanel({ isGuest, requireAuth }: InMemusPanelProps
               <Search size={18} strokeWidth={2.5} />
             </button>
 
-            {/* Filter Button */}
-            <div className="relative">
+            {/* Filter Button with Dropdown */}
+            <div className="relative" ref={filterMenuRef}>
               <button 
                 onClick={() => setShowFilterMenu(!showFilterMenu)}
                 className={`w-10 h-10 rounded-xl border flex items-center justify-center transition-all shadow-sm btn-press ${
@@ -240,53 +260,50 @@ export default function InMemusPanel({ isGuest, requireAuth }: InMemusPanelProps
 
               {/* Filter Dropdown Menu */}
               {showFilterMenu && (
-                <>
-                  <div className="fixed inset-0 z-40" onClick={() => setShowFilterMenu(false)} />
-                  <div className="absolute right-0 top-full mt-2 w-48 bg-white rounded-2xl shadow-2xl border border-gray-200 z-50 overflow-hidden animate-fade-in-scale">
-                    <div className="p-2">
-                      <button
-                        onClick={() => handleFilterSelect('all')}
-                        className={`w-full px-4 py-3 text-left text-sm rounded-xl transition-all btn-press ${
-                          activeFilter === 'all' ? 'bg-indigo-50 text-indigo-700 font-semibold' : 'text-gray-700 hover:bg-gray-50'
-                        }`}
-                      >
-                        All Messages
-                      </button>
-                      <button
-                        onClick={() => handleFilterSelect('fyi')}
-                        className={`w-full px-4 py-3 text-left text-sm rounded-xl transition-all btn-press flex items-center gap-2 ${
-                          activeFilter === 'fyi' ? 'bg-amber-50 text-amber-700 font-semibold' : 'text-gray-700 hover:bg-gray-50'
-                        }`}
-                      >
-                        <Mail size={14} /> FYI
-                      </button>
-                      <button
-                        onClick={() => handleFilterSelect('decide')}
-                        className={`w-full px-4 py-3 text-left text-sm rounded-xl transition-all btn-press flex items-center gap-2 ${
-                          activeFilter === 'decide' ? 'bg-indigo-50 text-indigo-700 font-semibold' : 'text-gray-700 hover:bg-gray-50'
-                        }`}
-                      >
-                        <CheckCircle size={14} /> Decide
-                      </button>
-                      <button
-                        onClick={() => handleFilterSelect('resolve')}
-                        className={`w-full px-4 py-3 text-left text-sm rounded-xl transition-all btn-press flex items-center gap-2 ${
-                          activeFilter === 'resolve' ? 'bg-rose-50 text-rose-700 font-semibold' : 'text-gray-700 hover:bg-gray-50'
-                        }`}
-                      >
-                        <AlertCircle size={14} /> Resolve
-                      </button>
-                      <button
-                        onClick={() => handleFilterSelect('urgent')}
-                        className={`w-full px-4 py-3 text-left text-sm rounded-xl transition-all btn-press flex items-center gap-2 ${
-                          activeFilter === 'urgent' ? 'bg-emerald-50 text-emerald-700 font-semibold' : 'text-gray-700 hover:bg-gray-50'
-                        }`}
-                      >
-                        <Sparkles size={14} /> Urgent
-                      </button>
-                    </div>
+                <div className="absolute right-0 top-full mt-2 w-48 bg-white rounded-2xl shadow-2xl border border-gray-200 z-50 overflow-hidden animate-fade-in-scale">
+                  <div className="p-2">
+                    <button
+                      onClick={() => handleFilterSelect('all')}
+                      className={`w-full px-4 py-3 text-left text-sm rounded-xl transition-all btn-press ${
+                        activeFilter === 'all' ? 'bg-indigo-50 text-indigo-700 font-semibold' : 'text-gray-700 hover:bg-gray-50'
+                      }`}
+                    >
+                      All Messages
+                    </button>
+                    <button
+                      onClick={() => handleFilterSelect('fyi')}
+                      className={`w-full px-4 py-3 text-left text-sm rounded-xl transition-all btn-press flex items-center gap-2 ${
+                        activeFilter === 'fyi' ? 'bg-amber-50 text-amber-700 font-semibold' : 'text-gray-700 hover:bg-gray-50'
+                      }`}
+                    >
+                      <Mail size={14} /> FYI
+                    </button>
+                    <button
+                      onClick={() => handleFilterSelect('decide')}
+                      className={`w-full px-4 py-3 text-left text-sm rounded-xl transition-all btn-press flex items-center gap-2 ${
+                        activeFilter === 'decide' ? 'bg-indigo-50 text-indigo-700 font-semibold' : 'text-gray-700 hover:bg-gray-50'
+                      }`}
+                    >
+                      <CheckCircle size={14} /> Decide
+                    </button>
+                    <button
+                      onClick={() => handleFilterSelect('resolve')}
+                      className={`w-full px-4 py-3 text-left text-sm rounded-xl transition-all btn-press flex items-center gap-2 ${
+                        activeFilter === 'resolve' ? 'bg-rose-50 text-rose-700 font-semibold' : 'text-gray-700 hover:bg-gray-50'
+                      }`}
+                    >
+                      <AlertCircle size={14} /> Resolve
+                    </button>
+                    <button
+                      onClick={() => handleFilterSelect('urgent')}
+                      className={`w-full px-4 py-3 text-left text-sm rounded-xl transition-all btn-press flex items-center gap-2 ${
+                        activeFilter === 'urgent' ? 'bg-emerald-50 text-emerald-700 font-semibold' : 'text-gray-700 hover:bg-gray-50'
+                      }`}
+                    >
+                      <Sparkles size={14} /> Urgent
+                    </button>
                   </div>
-                </>
+                </div>
               )}
             </div>
           </div>

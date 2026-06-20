@@ -5,6 +5,7 @@ import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { Inbox, Mail, Clock, Star, Search, Eye, Layers, CheckCircle, BookOpen, Reply, Filter, ChevronDown, Paperclip } from 'lucide-react';
 import { createClient } from '@/lib/supabase/client';
 import { useToast } from '@/contexts/ToastContext';
+import { usePullToRefresh } from '@/hooks/usePullToRefresh';
 
 interface Memu {
   id: string;
@@ -87,6 +88,13 @@ export default function InMemusPanel({ isGuest, requireAuth }: InMemusPanelProps
   const observerRef = useRef<IntersectionObserver | null>(null);
   const contentRefs = useRef<Map<string, HTMLDivElement>>(new Map());
   const { showToast } = useToast();
+    // Pull to refresh logic
+  const handleRefresh = async () => {
+    console.log('Refreshing inbox...');
+    // Simulate a network request for now
+    await new Promise(resolve => setTimeout(resolve, 1000)); 
+  };
+  const { isRefreshing } = usePullToRefresh(handleRefresh);
 
   useEffect(() => {
     const handleClickOutside = (e: MouseEvent) => {
@@ -255,6 +263,11 @@ export default function InMemusPanel({ isGuest, requireAuth }: InMemusPanelProps
   return (
     <>
       <div className="flex flex-col h-full bg-memu-canvas animate-page-enter">
+             {isRefreshing && (
+        <div className="flex justify-center py-4 animate-fadeIn">
+          <div className="w-8 h-8 rounded-full border-4 border-transparent border-t-purple-500 border-r-blue-500 border-b-green-500 animate-spin"></div>
+        </div>
+      )}
         {/* Header Section */}
         <div className="px-6 md:px-10 pt-8 pb-6">
           <div className="flex items-center justify-between flex-wrap gap-4 mb-6">

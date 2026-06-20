@@ -7,6 +7,13 @@ import { useToast } from '@/contexts/ToastContext';
 import SkeletonLoader from '@/components/SkeletonLoader';
 import { usePullToRefresh } from '@/hooks/usePullToRefresh';
 
+interface Sender {
+  id: string;
+  full_name: string | null;
+  username: string | null;
+  avatar_url: string | null;
+}
+
 interface Memu {
   id: string;
   sender_id: string;
@@ -15,11 +22,7 @@ interface Memu {
   nature: string;
   status: string;
   created_at: string;
-  sender?: {
-    full_name: string;
-    username: string;
-    avatar_url: string;
-  };
+  sender?: Sender | null;
 }
 
 interface InMemusPanelProps {
@@ -37,29 +40,59 @@ const natureStyles: Record<string, string> = {
 export default function InMemusPanel({ isGuest, requireAuth }: InMemusPanelProps) {
   const [memus, setMemus] = useState<Memu[]>([]);
   const [loading, setLoading] = useState(true);
-  const [currentUser, setCurrentUser] = useState<any>(null);
   const { showToast } = useToast();
 
   const fetchMemus = async () => {
     const supabase = createClient();
     const { data: { user } } = await supabase.auth.getUser();
-    if (!user) return;
+    if (!user) {
+      setLoading(false);
+      return;
+    }
 
-    setCurrentUser(user);
-
-    const { data, error } = await supabase
+    // Step 1: Fetch raw memus (no complex joins)
+    const { data: memusData, error: memusError } = await supabase
       .from('memus')
-      .select('*, sender:profiles!sender_id(full_name, username, avatar_url)')
+      .select('*')
       .eq('recipient_id', user.id)
       .order('created_at', { ascending: false });
 
-    if (error) {
-      console.error('Error fetching memus:', error);
-      if (!loading) showToast('Failed to refresh inbox', 'error');
-    } else if (data) {
-      setMemus(data as Memu[]);
+    if (memusError) {
+      console.error('Error fetching memus:', memusError);
+      setLoading(false);
+      return;
     }
-    
+
+    if (!memusData || memusData.length === 0) {
+      setMemus([]);
+      setLoading(false);
+      return;
+    }
+
+    // Step 2: Fetch sender profiles separately
+    const senderIds = [...new Set(memusData.map(m => m.sender_id).filter(Boolean))];
+    let sendersMap: Record<string, Sender> = {};
+
+    if (senderIds.length > 0) {
+      const { data: sendersData } = await supabase
+        .from('profiles')
+        .select('id, full_name, username, avatar_url')
+        .in('id', senderIds);
+
+      if (sendersData) {
+        sendersData.forEach(s => {
+          sendersMap[s.id] = s;
+        });
+      }
+    }
+
+    // Step 3: Merge in JavaScript
+    const merged: Memu[] = memusData.map(m => ({
+      ...m,
+      sender: sendersMap[m.sender_id] || null,
+    }));
+
+    setMemus(merged);
     setLoading(false);
   };
 
@@ -74,14 +107,26 @@ export default function InMemusPanel({ isGuest, requireAuth }: InMemusPanelProps
     const now = new Date();
     const diff = now.getTime() - date.getTime();
     const days = Math.floor(diff / (1000 * 60 * 60 * 24));
-    
+
     if (days === 0) return date.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
     if (days === 1) return 'Yesterday';
     if (days < 7) return date.toLocaleDateString([], { weekday: 'long' });
     return date.toLocaleDateString([], { month: 'short', day: 'numeric' });
   };
 
-  // 1. SKELETON LOADING STATE
+  const getInitial = (sender: Sender | null | undefined) => {
+    if (!sender) return '?';
+    if (sender.full_name) return sender.full_name.charAt(0).toUpperCase();
+    if (sender.username) return sender.username.charAt(0).toUpperCase();
+    return '?';
+  };
+
+  const getDisplayName = (sender: Sender | null | undefined) => {
+    if (!sender) return 'Unknown Sender';
+    return sender.full_name || sender.username || 'Unknown Sender';
+  };
+
+  // SKELETON LOADING STATE
   if (loading) {
     return (
       <div className="flex flex-col h-full bg-memu-canvas p-6 md:p-10 animate-fadeIn">
@@ -107,8 +152,8 @@ export default function InMemusPanel({ isGuest, requireAuth }: InMemusPanelProps
 
   return (
     <div className="flex flex-col h-full bg-memu-canvas animate-page-enter">
-      
-      {/* 2. SIMPLIFIED PURPLE PULL-TO-REFRESH SPINNER */}
+
+      {/* PULL TO REFRESH SPINNER */}
       {isRefreshing && (
         <div className="flex justify-center py-4 animate-fadeIn">
           <div className="w-8 h-8 rounded-full border-4 border-gray-200 border-t-purple-600 animate-spin"></div>
@@ -129,7 +174,7 @@ export default function InMemusPanel({ isGuest, requireAuth }: InMemusPanelProps
               {memus.length} {memus.length === 1 ? 'message' : 'messages'} in your inbox
             </p>
           </div>
-          
+
           <div className="flex items-center gap-2">
             <button className="w-10 h-10 rounded-xl bg-white border border-gray-200 flex items-center justify-center text-gray-500 hover:text-indigo-600 hover:border-indigo-200 transition-all shadow-sm btn-press">
               <Search size={18} strokeWidth={2.5} />
@@ -156,15 +201,15 @@ export default function InMemusPanel({ isGuest, requireAuth }: InMemusPanelProps
         ) : (
           <div className="space-y-3">
             {memus.map((memu) => (
-              <div 
-                key={memu.id} 
+              <div
+                key={memu.id}
                 className="group bg-white rounded-2xl p-4 md:p-5 border border-gray-100 shadow-sm hover:shadow-md hover:border-indigo-100 transition-all cursor-pointer btn-press animate-slide-up"
               >
                 <div className="flex gap-4">
                   {/* Avatar */}
                   <div className="flex-shrink-0">
                     <div className="w-12 h-12 rounded-2xl bg-gradient-to-br from-indigo-100 to-purple-100 flex items-center justify-center text-indigo-700 font-bold text-lg shadow-sm">
-                      {memu.sender?.full_name?.charAt(0) || memu.sender?.username?.charAt(0) || '?'}
+                      {getInitial(memu.sender)}
                     </div>
                   </div>
 
@@ -172,18 +217,18 @@ export default function InMemusPanel({ isGuest, requireAuth }: InMemusPanelProps
                   <div className="flex-1 min-w-0">
                     <div className="flex items-start justify-between gap-2 mb-1">
                       <h3 className="font-semibold text-gray-900 truncate text-base">
-                        {memu.sender?.full_name || memu.sender?.username || 'Unknown Sender'}
+                        {getDisplayName(memu.sender)}
                       </h3>
                       <span className="text-xs text-gray-400 whitespace-nowrap flex items-center gap-1">
                         <Clock size={12} />
                         {formatDate(memu.created_at)}
                       </span>
                     </div>
-                    
+
                     <p className="text-sm font-medium text-gray-800 mb-2 truncate">
                       {memu.subject || '(No subject)'}
                     </p>
-                    
+
                     <p className="text-xs text-gray-500 line-clamp-2 mb-3 leading-relaxed">
                       {memu.body}
                     </p>
@@ -197,7 +242,7 @@ export default function InMemusPanel({ isGuest, requireAuth }: InMemusPanelProps
                         {memu.nature === 'fyi' && <Mail size={10} strokeWidth={3} />}
                         {memu.nature}
                       </span>
-                      
+
                       {memu.status === 'pending' && (
                         <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full bg-amber-50 text-amber-700 text-[10px] font-bold border border-amber-100">
                           <Loader2 size={10} className="animate-spin" /> Pending

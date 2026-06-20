@@ -321,3 +321,24 @@ h1, h2, h3, .heading-serif {
   background-size: 200% 100%;
   animation: shimmer 1.5s infinite;
 }
+
+/* ==========================================
+   MOBILE MASTERY: Touch Targets & iOS Fixes
+   ========================================== */
+@media (max-width: 768px) {
+  /* Prevent iOS Safari from auto-zooming on input focus */
+  input, textarea, select {
+    font-size: 16px !important;
+  }
+  
+  /* Ensure all interactive elements are thumb-friendly (min 44x44px) */
+  button, a, [role="button"], input[type="checkbox"], input[type="radio"] {
+    min-height: 44px;
+    min-width: 44px;
+  }
+
+  /* Make sure small icon buttons still have a large tap area */
+  button svg, a svg {
+    pointer-events: none; /* Let the button handle the click, not the icon */
+  }
+}

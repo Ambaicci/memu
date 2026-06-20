@@ -5,8 +5,9 @@ import {
   Home, Inbox, Plus, Layers, MoreHorizontal, X, 
   FileText, Users, Calendar, Video, Cloud, Mail,
   StickyNote, Presentation, Table, BarChart3,
-  Sparkles, LogIn, User, AtSign
+  Sparkles, LogIn, User, AtSign, Archive
 } from 'lucide-react';
+import { triggerHaptic } from '@/lib/haptics';
 
 type PanelType = 'home' | 'inmemus' | 'outmemus' | 'drafts' | 'connections' | 'spaces' | 'confer' | 'calendar' | 'handles' | 'airshare' | 'docs' | 'slides' | 'sheets' | 'space-dashboard' | 'analytics' | 'notes' | 'profile';
 
@@ -28,7 +29,7 @@ interface MoreMenuItem {
 
 const moreMenuItems: MoreMenuItem[] = [
   { id: 'outmemus', label: 'Sent', icon: <Mail size={16} />, color: 'text-emerald-600 bg-emerald-50', section: 'Communication' },
-  { id: 'drafts', label: 'Drafts', icon: <FileText size={16} />, color: 'text-amber-600 bg-amber-50', section: 'Communication' },
+  { id: 'drafts', label: 'Drafts', icon: <Archive size={16} />, color: 'text-amber-600 bg-amber-50', section: 'Communication' },
   { id: 'connections', label: 'Connections', icon: <Users size={16} />, color: 'text-blue-600 bg-blue-50', section: 'Communication' },
   { id: 'handles', label: 'Handles', icon: <AtSign size={16} />, color: 'text-indigo-600 bg-indigo-50', section: 'Communication' },
   { id: 'calendar', label: 'Calendar', icon: <Calendar size={16} />, color: 'text-rose-600 bg-rose-50', section: 'Productivity' },
@@ -39,7 +40,6 @@ const moreMenuItems: MoreMenuItem[] = [
   { id: 'slides', label: 'Slides', icon: <Presentation size={16} />, color: 'text-emerald-600 bg-emerald-50', section: 'Office' },
   { id: 'sheets', label: 'Sheets', icon: <Table size={16} />, color: 'text-amber-600 bg-amber-50', section: 'Office' },
   { id: 'notes', label: 'Notes', icon: <StickyNote size={16} />, color: 'text-pink-600 bg-pink-50', section: 'Office' },
-  { id: 'profile', label: 'Profile', icon: <User size={16} />, color: 'text-gray-600 bg-gray-50', section: 'Account' },
 ];
 
 export default function BottomNav({ activePanel, onNavigate, onOpenCompose, isGuest, onSignIn }: BottomNavProps) {
@@ -65,11 +65,12 @@ export default function BottomNav({ activePanel, onNavigate, onOpenCompose, isGu
   }, [showMoreMenu]);
 
   const isHomeActive = activePanel === 'home';
-  const isInboxActive = ['inmemus', 'outmemus', 'drafts'].includes(activePanel);
+  const isInboxActive = activePanel === 'inmemus';
   const isSpacesActive = ['spaces', 'space-dashboard'].includes(activePanel);
-  const isMoreActive = !['home', 'inmemus', 'outmemus', 'drafts', 'spaces', 'space-dashboard'].includes(activePanel);
+  const isMoreActive = !['home', 'inmemus', 'spaces', 'space-dashboard'].includes(activePanel);
 
   const handleMoreItemClick = (panel: PanelType) => {
+    triggerHaptic('selection');
     onNavigate(panel);
     setShowMoreMenu(false);
   };
@@ -102,7 +103,7 @@ export default function BottomNav({ activePanel, onNavigate, onOpenCompose, isGu
                 <h3 className="font-serif text-lg font-semibold text-gray-900">Explore</h3>
               </div>
               <button 
-                onClick={() => setShowMoreMenu(false)}
+                onClick={() => { triggerHaptic('light'); setShowMoreMenu(false); }}
                 className="w-9 h-9 border border-gray-200 rounded-xl flex items-center justify-center hover:bg-gray-50 transition btn-press"
               >
                 <X size={15} strokeWidth={2.5} />
@@ -116,7 +117,7 @@ export default function BottomNav({ activePanel, onNavigate, onOpenCompose, isGu
                 </div>
                 <p className="text-[11px] text-indigo-700 mb-2">Sign in to unlock all features</p>
                 <button 
-                  onClick={() => { setShowMoreMenu(false); onSignIn(); }}
+                  onClick={() => { triggerHaptic('medium'); setShowMoreMenu(false); onSignIn(); }}
                   className="w-full py-2 bg-gradient-to-r from-indigo-600 to-purple-600 text-white rounded-xl text-xs font-semibold btn-press flex items-center justify-center gap-1.5"
                 >
                   <LogIn size={12} /> Sign In
@@ -166,7 +167,7 @@ export default function BottomNav({ activePanel, onNavigate, onOpenCompose, isGu
         <div className="bg-white/80 backdrop-blur-xl border-t border-gray-200/60 shadow-[0_-4px_20px_-4px_rgba(0,0,0,0.08)]">
           <div className="flex items-center justify-around px-2 py-2">
             <button
-              onClick={() => onNavigate('home')}
+              onClick={() => { triggerHaptic('selection'); onNavigate('home'); }}
               className={`flex flex-col items-center gap-0.5 px-3 py-1.5 rounded-xl transition-all btn-press min-w-[60px] ${isHomeActive ? 'text-indigo-600' : 'text-gray-500'}`}
             >
               <div className={`p-1.5 rounded-xl transition-all ${isHomeActive ? 'bg-indigo-50' : ''}`}>
@@ -176,7 +177,7 @@ export default function BottomNav({ activePanel, onNavigate, onOpenCompose, isGu
             </button>
 
             <button
-              onClick={() => onNavigate('inmemus')}
+              onClick={() => { triggerHaptic('selection'); onNavigate('inmemus'); }}
               className={`flex flex-col items-center gap-0.5 px-3 py-1.5 rounded-xl transition-all btn-press min-w-[60px] ${isInboxActive ? 'text-indigo-600' : 'text-gray-500'}`}
             >
               <div className={`p-1.5 rounded-xl transition-all ${isInboxActive ? 'bg-indigo-50' : ''}`}>
@@ -186,7 +187,7 @@ export default function BottomNav({ activePanel, onNavigate, onOpenCompose, isGu
             </button>
 
             <button
-              onClick={onOpenCompose}
+              onClick={() => { triggerHaptic('medium'); onOpenCompose(); }}
               className="relative -mt-6 btn-press"
               aria-label="Compose"
             >
@@ -199,7 +200,7 @@ export default function BottomNav({ activePanel, onNavigate, onOpenCompose, isGu
             </button>
 
             <button
-              onClick={() => onNavigate('spaces')}
+              onClick={() => { triggerHaptic('selection'); onNavigate('spaces'); }}
               className={`flex flex-col items-center gap-0.5 px-3 py-1.5 rounded-xl transition-all btn-press min-w-[60px] ${isSpacesActive ? 'text-indigo-600' : 'text-gray-500'}`}
             >
               <div className={`p-1.5 rounded-xl transition-all ${isSpacesActive ? 'bg-indigo-50' : ''}`}>
@@ -209,7 +210,7 @@ export default function BottomNav({ activePanel, onNavigate, onOpenCompose, isGu
             </button>
 
             <button
-              onClick={() => setShowMoreMenu(true)}
+              onClick={() => { triggerHaptic('selection'); setShowMoreMenu(true); }}
               className={`flex flex-col items-center gap-0.5 px-3 py-1.5 rounded-xl transition-all btn-press min-w-[60px] ${isMoreActive ? 'text-indigo-600' : 'text-gray-500'}`}
             >
               <div className={`p-1.5 rounded-xl transition-all ${isMoreActive ? 'bg-indigo-50' : ''}`}>

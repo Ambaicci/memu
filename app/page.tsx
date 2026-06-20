@@ -14,6 +14,7 @@ import NotificationCenter from '@/components/notifications/NotificationCenter';
 import SplashScreen from '@/components/SplashScreen';
 import HomeDashboard from '@/components/HomeDashboard';
 import DirectMemoInbox from '@/components/direct-memos/DirectMemoInbox';
+import OnboardingTour from '@/components/OnboardingTour';
 import { ChevronLeft, Home, Sparkles, Menu } from 'lucide-react';
 import { useSwipeBack } from '@/hooks/useSwipeBack';
 
@@ -62,8 +63,9 @@ export default function MemuApp() {
   const [replyToMemuId, setReplyToMemuId] = useState<string | null>(null);
   const [isMobileSidebarOpen, setIsMobileSidebarOpen] = useState(false);
   const [isDirectMemosOpen, setIsDirectMemosOpen] = useState(false);
-
-  useEffect(() => {
+  const [showTour, setShowTour] = useState(false);
+  
+useEffect(() => {
     const handleOnline = () => setIsOnline(true);
     const handleOffline = () => setIsOnline(false);
     window.addEventListener('online', handleOnline);
@@ -116,6 +118,15 @@ export default function MemuApp() {
     window.addEventListener('openCompose', handleOpenComposeEvent as EventListener);
     return () => window.removeEventListener('openCompose', handleOpenComposeEvent as EventListener);
   }, []);
+
+    useEffect(() => {
+    // Check if user has completed the onboarding tour
+    const tourCompleted = localStorage.getItem('memu_tour_completed');
+    if (!tourCompleted && session) {
+      // Show tour after a brief delay so the app loads first
+      setTimeout(() => setShowTour(true), 1000);
+    }
+  }, [session]);
 
   const isValidPanel = (panel: string): panel is PanelType => {
     return ['home', 'inmemus', 'outmemus', 'drafts', 'connections', 'spaces', 'confer', 'calendar', 'handles', 'airshare', 'docs', 'slides', 'sheets', 'space-dashboard', 'analytics', 'notes', 'profile'].includes(panel);
@@ -357,6 +368,11 @@ export default function MemuApp() {
           }} 
           onClose={() => setShowAuthModal(false)}
         />
+      )}
+
+      {/* Onboarding Tour */}
+      {showTour && (
+        <OnboardingTour onComplete={() => setShowTour(false)} />
       )}
     </>
   );

@@ -1,4 +1,6 @@
-@import "tailwindcss";
+
+
+ @import "tailwindcss";
 
 /* =========================================
     THE OFFICIAL MEMU DESIGN SYSTEM v2.0
@@ -435,8 +437,8 @@ h3 { font-size: 20px; }
   animation: shimmer 1.5s infinite;
 }
 
-/* Focus States - Accessibility */
-*:focus-visible {
+/* Focus States - Accessibility (Excludes form inputs to prevent ugly rings) */
+*:focus-visible:not(input):not(textarea):not(select) {
   outline: 2px solid var(--purple);
   outline-offset: 2px;
   border-radius: var(--radius-sm);

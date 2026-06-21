@@ -7,11 +7,29 @@ import { triggerHaptic } from '@/lib/haptics';
 import { 
   Camera, Loader2, Save, User, Building2, Briefcase, AtSign, LogOut, 
   Bell, Shield, Eye, Palette, AlertTriangle, Trash2, Lock, Mail, 
-  Globe, Users, CheckCircle, X, ChevronRight
+  CheckCircle
 } from 'lucide-react';
 
 interface ProfilePanelProps {
   user: any;
+}
+
+interface NotificationPreferences {
+  emailNotifications: boolean;
+  pushNotifications: boolean;
+  memuNotifications: boolean;
+  broadcastNotifications: boolean;
+}
+
+interface PrivacySettings {
+  whoCanSend: 'everyone' | 'connections' | 'nobody';
+  showReadReceipts: boolean;
+  showOnlineStatus: boolean;
+  profileVisibility: 'public' | 'private';
+}
+
+interface AppearanceSettings {
+  theme: 'light' | 'dark' | 'system';
 }
 
 type TabType = 'profile' | 'account' | 'notifications' | 'privacy' | 'appearance' | 'danger';
@@ -36,19 +54,25 @@ export default function ProfilePanel({ user }: ProfilePanelProps) {
   const [email, setEmail] = useState(user?.email || '');
   
   // Notification State
-  const [emailNotifications, setEmailNotifications] = useState(true);
-  const [pushNotifications, setPushNotifications] = useState(true);
-  const [memuNotifications, setMemuNotifications] = useState(true);
-  const [broadcastNotifications, setBroadcastNotifications] = useState(true);
+  const [notificationPrefs, setNotificationPrefs] = useState<NotificationPreferences>({
+    emailNotifications: true,
+    pushNotifications: true,
+    memuNotifications: true,
+    broadcastNotifications: true,
+  });
   
   // Privacy State
-  const [whoCanSend, setWhoCanSend] = useState<'everyone' | 'connections' | 'nobody'>('everyone');
-  const [showReadReceipts, setShowReadReceipts] = useState(true);
-  const [showOnlineStatus, setShowOnlineStatus] = useState(true);
-  const [profileVisibility, setProfileVisibility] = useState<'public' | 'private'>('public');
+  const [privacySettings, setPrivacySettings] = useState<PrivacySettings>({
+    whoCanSend: 'everyone',
+    showReadReceipts: true,
+    showOnlineStatus: true,
+    profileVisibility: 'public',
+  });
   
   // Appearance State
-  const [theme, setTheme] = useState<'light' | 'dark' | 'system'>('light');
+  const [appearanceSettings, setAppearanceSettings] = useState<AppearanceSettings>({
+    theme: 'light',
+  });
   
   // Danger Zone State
   const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
@@ -67,7 +91,7 @@ export default function ProfilePanel({ user }: ProfilePanelProps) {
     const supabase = createClient();
     const { data, error } = await supabase
       .from('profiles')
-      .select('full_name, username, bio, organization, occupation, avatar_url')
+      .select('full_name, username, bio, organization, occupation, avatar_url, notification_preferences, privacy_settings, appearance_settings')
       .eq('id', user.id)
       .single();
 
@@ -78,6 +102,17 @@ export default function ProfilePanel({ user }: ProfilePanelProps) {
       setOrganization(data.organization || '');
       setOccupation(data.occupation || '');
       setAvatarUrl(data.avatar_url || '');
+      
+      // Load settings from database
+      if (data.notification_preferences) {
+        setNotificationPrefs(data.notification_preferences);
+      }
+      if (data.privacy_settings) {
+        setPrivacySettings(data.privacy_settings);
+      }
+      if (data.appearance_settings) {
+        setAppearanceSettings(data.appearance_settings);
+      }
     }
   };
 
@@ -191,21 +226,76 @@ export default function ProfilePanel({ user }: ProfilePanelProps) {
   };
 
   const handleSaveNotifications = async () => {
-    triggerHaptic('success');
-    showToast('Notification preferences saved!', 'success');
-    // TODO: Save to database
+    triggerHaptic('medium');
+    setLoading(true);
+    const supabase = createClient();
+
+    try {
+      const { error } = await supabase
+        .from('profiles')
+        .update({ notification_preferences: notificationPrefs })
+        .eq('id', user.id);
+
+      if (error) throw error;
+
+      triggerHaptic('success');
+      showToast('Notification preferences saved!', 'success');
+    } catch (err: any) {
+      console.error('Save error:', err);
+      triggerHaptic('error');
+      showToast(err.message || 'Failed to save notification preferences', 'error');
+    } finally {
+      setLoading(false);
+    }
   };
 
   const handleSavePrivacy = async () => {
-    triggerHaptic('success');
-    showToast('Privacy settings saved!', 'success');
-    // TODO: Save to database
+    triggerHaptic('medium');
+    setLoading(true);
+    const supabase = createClient();
+
+    try {
+      const { error } = await supabase
+        .from('profiles')
+        .update({ privacy_settings: privacySettings })
+        .eq('id', user.id);
+
+      if (error) throw error;
+
+      triggerHaptic('success');
+      showToast('Privacy settings saved!', 'success');
+    } catch (err: any) {
+      console.error('Save error:', err);
+      triggerHaptic('error');
+      showToast(err.message || 'Failed to save privacy settings', 'error');
+    } finally {
+      setLoading(false);
+    }
   };
 
   const handleSaveAppearance = async () => {
-    triggerHaptic('success');
-    showToast('Appearance settings saved!', 'success');
-    // TODO: Save to database and apply theme
+    triggerHaptic('medium');
+    setLoading(true);
+    const supabase = createClient();
+
+    try {
+      const { error } = await supabase
+        .from('profiles')
+        .update({ appearance_settings: appearanceSettings })
+        .eq('id', user.id);
+
+      if (error) throw error;
+
+      triggerHaptic('success');
+      showToast('Appearance settings saved!', 'success');
+      // TODO: Apply theme change here
+    } catch (err: any) {
+      console.error('Save error:', err);
+      triggerHaptic('error');
+      showToast(err.message || 'Failed to save appearance settings', 'error');
+    } finally {
+      setLoading(false);
+    }
   };
 
   const handleDeleteAccount = async () => {
@@ -217,12 +307,15 @@ export default function ProfilePanel({ user }: ProfilePanelProps) {
 
     triggerHaptic('error');
     setLoading(true);
-    const supabase = createClient();
 
     try {
       // TODO: Implement actual account deletion
-      // This is a placeholder - you'll need to implement proper deletion logic
-      showToast('Account deletion is not yet implemented', 'error');
+      // This requires:
+      // 1. Delete user from auth.users
+      // 2. Delete profile from profiles table
+      // 3. Delete all related data (memus, spaces, etc.)
+      // 4. Sign out user
+      showToast('Account deletion is not yet implemented. Please contact support.', 'error');
       setShowDeleteConfirm(false);
       setDeleteConfirmText('');
     } catch (err: any) {
@@ -515,11 +608,11 @@ export default function ProfilePanel({ user }: ProfilePanelProps) {
                       <button
                         onClick={() => {
                           triggerHaptic('light');
-                          setEmailNotifications(!emailNotifications);
+                          setNotificationPrefs({ ...notificationPrefs, emailNotifications: !notificationPrefs.emailNotifications });
                         }}
-                        className={`relative w-12 h-6 rounded-full transition-colors ${emailNotifications ? 'bg-indigo-600' : 'bg-gray-300'}`}
+                        className={`relative w-12 h-6 rounded-full transition-colors ${notificationPrefs.emailNotifications ? 'bg-indigo-600' : 'bg-gray-300'}`}
                       >
-                        <div className={`absolute top-0.5 left-0.5 w-5 h-5 bg-white rounded-full transition-transform ${emailNotifications ? 'translate-x-6' : 'translate-x-0'}`} />
+                        <div className={`absolute top-0.5 left-0.5 w-5 h-5 bg-white rounded-full transition-transform ${notificationPrefs.emailNotifications ? 'translate-x-6' : 'translate-x-0'}`} />
                       </button>
                     </div>
 
@@ -534,11 +627,11 @@ export default function ProfilePanel({ user }: ProfilePanelProps) {
                       <button
                         onClick={() => {
                           triggerHaptic('light');
-                          setPushNotifications(!pushNotifications);
+                          setNotificationPrefs({ ...notificationPrefs, pushNotifications: !notificationPrefs.pushNotifications });
                         }}
-                        className={`relative w-12 h-6 rounded-full transition-colors ${pushNotifications ? 'bg-indigo-600' : 'bg-gray-300'}`}
+                        className={`relative w-12 h-6 rounded-full transition-colors ${notificationPrefs.pushNotifications ? 'bg-indigo-600' : 'bg-gray-300'}`}
                       >
-                        <div className={`absolute top-0.5 left-0.5 w-5 h-5 bg-white rounded-full transition-transform ${pushNotifications ? 'translate-x-6' : 'translate-x-0'}`} />
+                        <div className={`absolute top-0.5 left-0.5 w-5 h-5 bg-white rounded-full transition-transform ${notificationPrefs.pushNotifications ? 'translate-x-6' : 'translate-x-0'}`} />
                       </button>
                     </div>
                   </div>
@@ -555,11 +648,11 @@ export default function ProfilePanel({ user }: ProfilePanelProps) {
                       <button
                         onClick={() => {
                           triggerHaptic('light');
-                          setMemuNotifications(!memuNotifications);
+                          setNotificationPrefs({ ...notificationPrefs, memuNotifications: !notificationPrefs.memuNotifications });
                         }}
-                        className={`relative w-12 h-6 rounded-full transition-colors ${memuNotifications ? 'bg-indigo-600' : 'bg-gray-300'}`}
+                        className={`relative w-12 h-6 rounded-full transition-colors ${notificationPrefs.memuNotifications ? 'bg-indigo-600' : 'bg-gray-300'}`}
                       >
-                        <div className={`absolute top-0.5 left-0.5 w-5 h-5 bg-white rounded-full transition-transform ${memuNotifications ? 'translate-x-6' : 'translate-x-0'}`} />
+                        <div className={`absolute top-0.5 left-0.5 w-5 h-5 bg-white rounded-full transition-transform ${notificationPrefs.memuNotifications ? 'translate-x-6' : 'translate-x-0'}`} />
                       </button>
                     </div>
 
@@ -571,11 +664,11 @@ export default function ProfilePanel({ user }: ProfilePanelProps) {
                       <button
                         onClick={() => {
                           triggerHaptic('light');
-                          setBroadcastNotifications(!broadcastNotifications);
+                          setNotificationPrefs({ ...notificationPrefs, broadcastNotifications: !notificationPrefs.broadcastNotifications });
                         }}
-                        className={`relative w-12 h-6 rounded-full transition-colors ${broadcastNotifications ? 'bg-indigo-600' : 'bg-gray-300'}`}
+                        className={`relative w-12 h-6 rounded-full transition-colors ${notificationPrefs.broadcastNotifications ? 'bg-indigo-600' : 'bg-gray-300'}`}
                       >
-                        <div className={`absolute top-0.5 left-0.5 w-5 h-5 bg-white rounded-full transition-transform ${broadcastNotifications ? 'translate-x-6' : 'translate-x-0'}`} />
+                        <div className={`absolute top-0.5 left-0.5 w-5 h-5 bg-white rounded-full transition-transform ${notificationPrefs.broadcastNotifications ? 'translate-x-6' : 'translate-x-0'}`} />
                       </button>
                     </div>
                   </div>
@@ -584,9 +677,10 @@ export default function ProfilePanel({ user }: ProfilePanelProps) {
                 <div className="pt-4 flex justify-end">
                   <button
                     onClick={handleSaveNotifications}
-                    className="px-6 py-2.5 bg-gradient-to-r from-indigo-600 to-cyan-600 text-white rounded-xl font-semibold hover:shadow-lg hover:shadow-indigo-500/25 hover:-translate-y-0.5 transition-all btn-press"
+                    disabled={loading}
+                    className="flex items-center gap-2 px-6 py-2.5 bg-gradient-to-r from-indigo-600 to-cyan-600 text-white rounded-xl font-semibold hover:shadow-lg hover:shadow-indigo-500/25 hover:-translate-y-0.5 transition-all disabled:opacity-50 btn-press"
                   >
-                    Save Preferences
+                    {loading ? <Loader2 size={16} className="animate-spin" /> : <><Save size={16} /> Save Preferences</>}
                   </button>
                 </div>
               </div>
@@ -613,10 +707,10 @@ export default function ProfilePanel({ user }: ProfilePanelProps) {
                         key={option.value}
                         onClick={() => {
                           triggerHaptic('light');
-                          setWhoCanSend(option.value as any);
+                          setPrivacySettings({ ...privacySettings, whoCanSend: option.value as any });
                         }}
                         className={`w-full flex items-center justify-between p-4 rounded-xl transition-all btn-press ${
-                          whoCanSend === option.value
+                          privacySettings.whoCanSend === option.value
                             ? 'bg-indigo-50 border-2 border-indigo-500'
                             : 'bg-gray-50 border-2 border-transparent hover:bg-gray-100'
                         }`}
@@ -625,7 +719,7 @@ export default function ProfilePanel({ user }: ProfilePanelProps) {
                           <p className="text-sm font-medium text-gray-900">{option.label}</p>
                           <p className="text-xs text-gray-500">{option.desc}</p>
                         </div>
-                        {whoCanSend === option.value && <CheckCircle size={20} className="text-indigo-600" />}
+                        {privacySettings.whoCanSend === option.value && <CheckCircle size={20} className="text-indigo-600" />}
                       </button>
                     ))}
                   </div>
@@ -642,11 +736,11 @@ export default function ProfilePanel({ user }: ProfilePanelProps) {
                       <button
                         onClick={() => {
                           triggerHaptic('light');
-                          setShowReadReceipts(!showReadReceipts);
+                          setPrivacySettings({ ...privacySettings, showReadReceipts: !privacySettings.showReadReceipts });
                         }}
-                        className={`relative w-12 h-6 rounded-full transition-colors ${showReadReceipts ? 'bg-indigo-600' : 'bg-gray-300'}`}
+                        className={`relative w-12 h-6 rounded-full transition-colors ${privacySettings.showReadReceipts ? 'bg-indigo-600' : 'bg-gray-300'}`}
                       >
-                        <div className={`absolute top-0.5 left-0.5 w-5 h-5 bg-white rounded-full transition-transform ${showReadReceipts ? 'translate-x-6' : 'translate-x-0'}`} />
+                        <div className={`absolute top-0.5 left-0.5 w-5 h-5 bg-white rounded-full transition-transform ${privacySettings.showReadReceipts ? 'translate-x-6' : 'translate-x-0'}`} />
                       </button>
                     </div>
 
@@ -658,11 +752,11 @@ export default function ProfilePanel({ user }: ProfilePanelProps) {
                       <button
                         onClick={() => {
                           triggerHaptic('light');
-                          setShowOnlineStatus(!showOnlineStatus);
+                          setPrivacySettings({ ...privacySettings, showOnlineStatus: !privacySettings.showOnlineStatus });
                         }}
-                        className={`relative w-12 h-6 rounded-full transition-colors ${showOnlineStatus ? 'bg-indigo-600' : 'bg-gray-300'}`}
+                        className={`relative w-12 h-6 rounded-full transition-colors ${privacySettings.showOnlineStatus ? 'bg-indigo-600' : 'bg-gray-300'}`}
                       >
-                        <div className={`absolute top-0.5 left-0.5 w-5 h-5 bg-white rounded-full transition-transform ${showOnlineStatus ? 'translate-x-6' : 'translate-x-0'}`} />
+                        <div className={`absolute top-0.5 left-0.5 w-5 h-5 bg-white rounded-full transition-transform ${privacySettings.showOnlineStatus ? 'translate-x-6' : 'translate-x-0'}`} />
                       </button>
                     </div>
 
@@ -672,10 +766,10 @@ export default function ProfilePanel({ user }: ProfilePanelProps) {
                         <p className="text-xs text-gray-500">Who can see your profile</p>
                       </div>
                       <select
-                        value={profileVisibility}
+                        value={privacySettings.profileVisibility}
                         onChange={(e) => {
                           triggerHaptic('light');
-                          setProfileVisibility(e.target.value as any);
+                          setPrivacySettings({ ...privacySettings, profileVisibility: e.target.value as any });
                         }}
                         className="px-3 py-1.5 bg-white border border-gray-200 rounded-lg text-sm font-medium text-gray-700 focus:outline-none focus:ring-2 focus:ring-indigo-500/20"
                       >
@@ -689,9 +783,10 @@ export default function ProfilePanel({ user }: ProfilePanelProps) {
                 <div className="pt-4 flex justify-end">
                   <button
                     onClick={handleSavePrivacy}
-                    className="px-6 py-2.5 bg-gradient-to-r from-indigo-600 to-cyan-600 text-white rounded-xl font-semibold hover:shadow-lg hover:shadow-indigo-500/25 hover:-translate-y-0.5 transition-all btn-press"
+                    disabled={loading}
+                    className="flex items-center gap-2 px-6 py-2.5 bg-gradient-to-r from-indigo-600 to-cyan-600 text-white rounded-xl font-semibold hover:shadow-lg hover:shadow-indigo-500/25 hover:-translate-y-0.5 transition-all disabled:opacity-50 btn-press"
                   >
-                    Save Settings
+                    {loading ? <Loader2 size={16} className="animate-spin" /> : <><Save size={16} /> Save Settings</>}
                   </button>
                 </div>
               </div>
@@ -718,10 +813,10 @@ export default function ProfilePanel({ user }: ProfilePanelProps) {
                         key={option.value}
                         onClick={() => {
                           triggerHaptic('light');
-                          setTheme(option.value as any);
+                          setAppearanceSettings({ theme: option.value as any });
                         }}
                         className={`flex flex-col items-center gap-2 p-4 rounded-xl transition-all btn-press ${
-                          theme === option.value
+                          appearanceSettings.theme === option.value
                             ? 'bg-indigo-50 border-2 border-indigo-500'
                             : 'bg-gray-50 border-2 border-transparent hover:bg-gray-100'
                         }`}
@@ -732,16 +827,17 @@ export default function ProfilePanel({ user }: ProfilePanelProps) {
                     ))}
                   </div>
                   <p className="text-xs text-gray-500 mt-3 text-center">
-                    {theme === 'dark' ? 'Dark mode coming soon!' : theme === 'system' ? 'Will match your device settings' : 'Currently using light theme'}
+                    {appearanceSettings.theme === 'dark' ? 'Dark mode coming soon!' : appearanceSettings.theme === 'system' ? 'Will match your device settings' : 'Currently using light theme'}
                   </p>
                 </div>
 
                 <div className="pt-4 flex justify-end">
                   <button
                     onClick={handleSaveAppearance}
-                    className="px-6 py-2.5 bg-gradient-to-r from-indigo-600 to-cyan-600 text-white rounded-xl font-semibold hover:shadow-lg hover:shadow-indigo-500/25 hover:-translate-y-0.5 transition-all btn-press"
+                    disabled={loading}
+                    className="flex items-center gap-2 px-6 py-2.5 bg-gradient-to-r from-indigo-600 to-cyan-600 text-white rounded-xl font-semibold hover:shadow-lg hover:shadow-indigo-500/25 hover:-translate-y-0.5 transition-all disabled:opacity-50 btn-press"
                   >
-                    Save Appearance
+                    {loading ? <Loader2 size={16} className="animate-spin" /> : <><Save size={16} /> Save Appearance</>}
                   </button>
                 </div>
               </div>

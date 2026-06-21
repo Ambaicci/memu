@@ -41,15 +41,15 @@ const PanelSkeleton = () => (
   </div>
 );
 
-type PanelType = 'home' | 'inmemus' | 'outmemus' | 'drafts' | 'connections' | 'spaces' | 'confer' | 'calendar' | 'handles' | 'airshare' | 'docs' | 'slides' | 'sheets' | 'space-dashboard' | 'analytics' | 'notes' | 'profile';
+type PanelType = 'home' | 'dashboard' | 'inmemus' | 'outmemus' | 'drafts' | 'connections' | 'spaces' | 'confer' | 'calendar' | 'handles' | 'airshare' | 'docs' | 'slides' | 'sheets' | 'space-dashboard' | 'analytics' | 'notes' | 'profile';
 
 export default function MemuApp() {
   const router = useRouter(); 
- // Enable native-style swipe-to-go-back on mobile
   useSwipeBack(true);
   const pathname = usePathname();
   const searchParams = useSearchParams();
   
+  // Default to 'home' which is now Inbox (InMemusPanel)
   const [activePanel, setActivePanel] = useState<PanelType>('home');
   const [isComposeOpen, setIsComposeOpen] = useState(false);
   const [composeToHandle, setComposeToHandle] = useState<string | null>(null);
@@ -65,7 +65,7 @@ export default function MemuApp() {
   const [isDirectMemosOpen, setIsDirectMemosOpen] = useState(false);
   const [showTour, setShowTour] = useState(false);
   
-useEffect(() => {
+  useEffect(() => {
     const handleOnline = () => setIsOnline(true);
     const handleOffline = () => setIsOnline(false);
     window.addEventListener('online', handleOnline);
@@ -119,17 +119,15 @@ useEffect(() => {
     return () => window.removeEventListener('openCompose', handleOpenComposeEvent as EventListener);
   }, []);
 
-    useEffect(() => {
-    // Check if user has completed the onboarding tour
+  useEffect(() => {
     const tourCompleted = localStorage.getItem('memu_tour_completed');
     if (!tourCompleted && session) {
-      // Show tour after a brief delay so the app loads first
       setTimeout(() => setShowTour(true), 1000);
     }
   }, [session]);
 
   const isValidPanel = (panel: string): panel is PanelType => {
-    return ['home', 'inmemus', 'outmemus', 'drafts', 'connections', 'spaces', 'confer', 'calendar', 'handles', 'airshare', 'docs', 'slides', 'sheets', 'space-dashboard', 'analytics', 'notes', 'profile'].includes(panel);
+    return ['home', 'dashboard', 'inmemus', 'outmemus', 'drafts', 'connections', 'spaces', 'confer', 'calendar', 'handles', 'airshare', 'docs', 'slides', 'sheets', 'space-dashboard', 'analytics', 'notes', 'profile'].includes(panel);
   };
 
   const updateUrl = useCallback((panel: PanelType, spaceId?: string | null) => {
@@ -189,7 +187,10 @@ useEffect(() => {
 
   const renderPanel = useCallback(() => {
     switch (activePanel) {
-      case 'home': return <HomeDashboard />;
+      // 'home' is now Inbox (InMemusPanel) - inbox-first experience
+      case 'home': return <InMemusPanel isGuest={!session} requireAuth={requireAuth} />;
+      // 'dashboard' is the HomeDashboard - accessible via logo
+      case 'dashboard': return <HomeDashboard onNavigate={handleNavigate} />;
       case 'inmemus': return <InMemusPanel isGuest={!session} requireAuth={requireAuth} />;
       case 'outmemus': return <OutMemusPanel isGuest={!session} requireAuth={requireAuth} />;
       case 'drafts': return <DraftsPanel isGuest={!session} requireAuth={requireAuth} onEditDraft={(draft) => handleOpenCompose(undefined, draft)} />;
@@ -206,9 +207,9 @@ useEffect(() => {
       case 'analytics': return <AnalyticsPanel />;
       case 'notes': return <NotesPanel />;
       case 'profile': return <ProfilePanel user={session?.user} />;
-      default: return <HomeDashboard />;
+      default: return <InMemusPanel isGuest={!session} requireAuth={requireAuth} />;
     }
-  }, [activePanel, session, requireAuth, handleOpenCompose, searchParams]);
+  }, [activePanel, session, requireAuth, handleOpenCompose, searchParams, handleNavigate]);
 
   if (showSplash) {
     return <SplashScreen onComplete={() => setShowSplash(false)} />;
@@ -246,63 +247,92 @@ useEffect(() => {
         
         <main className="flex-1 overflow-auto pb-28 md:pb-24">
           {/* Mobile Header with Hamburger Menu */}
-          <div className="lg:hidden sticky top-0 z-30 bg-memu-canvas/95 backdrop-blur-sm border-b border-[#e8e7e3] px-4 py-3">
-            <div className="flex items-center justify-between">
-              <div className="flex items-center gap-3">
-                <button
-                  onClick={() => setIsMobileSidebarOpen(true)}
-                  className="p-2 rounded-lg hover:bg-[#e8e7e3] transition text-[#3a3a3a]"
-                  aria-label="Open menu"
-                >
-                  <Menu size={20} />
-                </button>
-                <button onClick={() => handleNavigate('home')} className="flex items-center gap-2">
-                  <div className="w-7 h-7 rounded-lg bg-gradient-to-br from-indigo-500 to-purple-600 flex items-center justify-center shadow">
-                    <Sparkles size={14} className="text-white" />
-                  </div>
-                  <span className="font-['Playfair_Display'] text-lg font-semibold text-[#1a1a1a]">
-                    memu
-                  </span>
-                </button>
-              </div>
-              <div className="flex items-center gap-1">
-                <GlobalSearch />
-                <NotificationCenter />
-              </div>
-            </div>
-          </div>
-
+<div className="lg:hidden sticky top-0 z-[60] bg-memu-canvas/95 backdrop-blur-sm border-b border-[#e8e7e3] px-4 py-3 relative pointer-events-auto">
+  <div className="flex items-center justify-between relative z-10">
+    <div className="flex items-center gap-3">
+      <button
+        onClick={() => setIsMobileSidebarOpen(true)}
+        className="p-2 rounded-lg hover:bg-[#e8e7e3] transition text-[#3a3a3a] relative z-20"
+        aria-label="Open menu"
+      >
+        <Menu size={20} />
+      </button>
+      
+      {/* Logo - HIGHLY CLICKABLE with visual feedback */}
+      <button 
+        onClick={(e) => {
+          e.preventDefault();
+          e.stopPropagation();
+          console.log('Logo clicked! Navigating to dashboard...');
+          handleNavigate('dashboard');
+        }}
+        className="flex items-center gap-2 px-3 py-2 rounded-xl bg-white border border-gray-200 hover:border-indigo-300 hover:bg-indigo-50 active:bg-indigo-100 transition-all cursor-pointer group relative z-20 shadow-sm"
+        title="Go to Dashboard"
+        type="button"
+      >
+        <div className="w-7 h-7 rounded-lg bg-gradient-to-br from-indigo-500 to-purple-600 flex items-center justify-center shadow group-hover:scale-110 group-active:scale-95 transition-transform">
+          <Sparkles size={14} className="text-white" />
+        </div>
+        <span className="font-['Playfair_Display'] text-lg font-semibold text-[#1a1a1a] group-hover:text-indigo-600 transition-colors">
+          memu
+        </span>
+      </button>
+    </div>
+    <div className="flex items-center gap-1 relative z-20">
+      <GlobalSearch />
+      <NotificationCenter />
+    </div>
+  </div>
+</div>
           {/* Desktop Breadcrumb Header */}
-          <div className="hidden lg:block sticky top-0 z-20 bg-memu-canvas/80 backdrop-blur-sm border-b border-[#e8e7e3] px-6 py-2">
-            <div className="flex items-center justify-between">
-              <div className="flex items-center gap-2">
-                <button
-                  onClick={() => { if (window.history.length > 1) window.history.back(); else handleNavigate('home'); }}
-                  className="p-1.5 rounded-full hover:bg-[#e8e7e3] transition text-[#3a3a3a] hover:text-[#4f46e5]"
-                  aria-label="Go back"
-                >
-                  <ChevronLeft size={18} />
-                </button>
-                <button
-                  onClick={() => handleNavigate('home')}
-                  className="p-1.5 rounded-full hover:bg-[#e8e7e3] transition text-[#3a3a3a] hover:text-[#4f46e5]"
-                  aria-label="Home"
-                >
-                  <Home size={18} />
-                </button>
-                <div className="flex items-center gap-1.5 text-[13px] ml-1">
-                  <span className="text-[#777] font-medium">memu</span>
-                  <span className="text-[#aaa]">/</span>
-                  <span className="heading-gradient font-medium capitalize">{activePanel.replace('-', ' ')}</span>
-                </div>
-              </div>
-              <div className="flex items-center gap-2">
-                <GlobalSearch />
-                <NotificationCenter />
-              </div>
-            </div>
-          </div>
-          
+<div className="hidden lg:block sticky top-0 z-[60] bg-memu-canvas/80 backdrop-blur-sm border-b border-[#e8e7e3] px-6 py-2 relative pointer-events-auto">
+  <div className="flex items-center justify-between relative z-10">
+    <div className="flex items-center gap-2">
+      <button
+        onClick={() => { if (window.history.length > 1) window.history.back(); else handleNavigate('home'); }}
+        className="p-1.5 rounded-full hover:bg-[#e8e7e3] transition text-[#3a3a3a] hover:text-[#4f46e5] relative z-20"
+        aria-label="Go back"
+        type="button"
+      >
+        <ChevronLeft size={18} />
+      </button>
+      
+      {/* Home icon navigates to Inbox */}
+      <button
+        onClick={() => handleNavigate('home')}
+        className="p-1.5 rounded-full hover:bg-[#e8e7e3] transition text-[#3a3a3a] hover:text-[#4f46e5] relative z-20"
+        aria-label="Inbox"
+        title="Go to Inbox"
+        type="button"
+      >
+        <Home size={18} />
+      </button>
+      
+      {/* Logo breadcrumb - HIGHLY CLICKABLE */}
+      <button
+        onClick={(e) => {
+          e.preventDefault();
+          e.stopPropagation();
+          console.log('Logo breadcrumb clicked! Navigating to dashboard...');
+          handleNavigate('dashboard');
+        }}
+        className="flex items-center gap-1.5 text-[13px] ml-1 px-3 py-1.5 rounded-lg bg-white border border-gray-200 hover:border-indigo-300 hover:bg-indigo-50 active:bg-indigo-100 transition-all cursor-pointer group relative z-20 shadow-sm"
+        title="Go to Dashboard"
+        type="button"
+      >
+        <span className="text-[#777] font-medium group-hover:text-indigo-600 transition-colors">memu</span>
+        <span className="text-[#aaa]">/</span>
+        <span className="heading-gradient font-medium capitalize">
+          {activePanel === 'home' ? 'inbox' : activePanel === 'dashboard' ? 'dashboard' : activePanel.replace('-', ' ')}
+        </span>
+      </button>
+    </div>
+    <div className="flex items-center gap-2 relative z-20">
+      <GlobalSearch />
+      <NotificationCenter />
+    </div>
+  </div>
+</div>          
           {isGuest && (
             <div className="bg-gradient-to-r from-indigo-600/90 to-cyan-600/90 backdrop-blur-md text-white px-4 py-2.5 text-center text-sm flex items-center justify-center gap-2 shadow-sm">
               <Sparkles size={14} />
@@ -319,7 +349,7 @@ useEffect(() => {
           </Suspense>
         </main>
 
-        {/* OfficeFAB - Desktop Only (hidden on mobile to avoid conflict with BottomNav) */}
+        {/* OfficeFAB - Desktop Only */}
         <div className="hidden lg:block">
           <OfficeFAB 
             isGuest={isGuest}

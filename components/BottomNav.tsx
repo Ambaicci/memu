@@ -9,7 +9,8 @@ import {
 } from 'lucide-react';
 import { triggerHaptic } from '@/lib/haptics';
 
-type PanelType = 'home' | 'inmemus' | 'outmemus' | 'drafts' | 'connections' | 'spaces' | 'confer' | 'calendar' | 'handles' | 'airshare' | 'docs' | 'slides' | 'sheets' | 'space-dashboard' | 'analytics' | 'notes' | 'profile';
+// Added 'dashboard' to PanelType
+type PanelType = 'home' | 'dashboard' | 'inmemus' | 'outmemus' | 'drafts' | 'connections' | 'spaces' | 'confer' | 'calendar' | 'handles' | 'airshare' | 'docs' | 'slides' | 'sheets' | 'space-dashboard' | 'analytics' | 'notes' | 'profile';
 
 interface BottomNavProps {
   activePanel: PanelType;
@@ -67,7 +68,8 @@ export default function BottomNav({ activePanel, onNavigate, onOpenCompose, isGu
   const isHomeActive = activePanel === 'home';
   const isInboxActive = activePanel === 'inmemus';
   const isSpacesActive = ['spaces', 'space-dashboard'].includes(activePanel);
-  const isMoreActive = !['home', 'inmemus', 'spaces', 'space-dashboard'].includes(activePanel);
+  // Updated to exclude 'dashboard' from "more" active state
+  const isMoreActive = !['home', 'dashboard', 'inmemus', 'spaces', 'space-dashboard'].includes(activePanel);
 
   const handleMoreItemClick = (panel: PanelType) => {
     triggerHaptic('selection');

@@ -10,7 +10,8 @@ import SpacesList from './SpacesList';
 import UserChip from './UserChip';
 import DeleteConfirmModal from './DeleteConfirmModal';
 
-type PanelType = 'home' | 'inmemus' | 'outmemus' | 'drafts' | 'connections' | 'spaces' | 'confer' | 'calendar' | 'handles' | 'airshare' | 'docs' | 'slides' | 'sheets' | 'space-dashboard' | 'analytics' | 'notes' | 'profile';
+// Added 'dashboard' to PanelType
+type PanelType = 'home' | 'dashboard' | 'inmemus' | 'outmemus' | 'drafts' | 'connections' | 'spaces' | 'confer' | 'calendar' | 'handles' | 'airshare' | 'docs' | 'slides' | 'sheets' | 'space-dashboard' | 'analytics' | 'notes' | 'profile';
 
 interface SidebarProps {
   onNavigate: (panel: PanelType, spaceId?: string | null) => void;
@@ -106,7 +107,7 @@ export default function Sidebar({
       {/* Sidebar Container */}
       <aside
         className={`fixed lg:static top-0 left-0 h-screen bg-white/90 backdrop-blur-xl border-r border-gray-200/60 shadow-xl z-50 flex flex-col transition-all duration-300 ease-out ${
-          isMobileOpen ? 'translate-x-0' : '-translate-x-full lg:translate-x-0'
+          isMobileOpen ? 'translate-x-0 pointer-events-auto' : '-translate-x-full lg:translate-x-0 pointer-events-none lg:pointer-events-auto'
         } ${collapsed ? 'lg:w-20' : 'lg:w-72'}`}
       >
         {/* THE ARTISTIC FLOATING COLLAPSE BUTTON */}
@@ -118,9 +119,13 @@ export default function Sidebar({
           {collapsed ? <ChevronRight size={14} strokeWidth={3} /> : <ChevronLeft size={14} strokeWidth={3} />}
         </button>
 
-        {/* 1. Header with ACTUAL LOGO */}
+        {/* 1. Header with ACTUAL LOGO - FIXED: Now navigates to dashboard */}
         <div className="flex-shrink-0 flex items-center justify-center lg:justify-start px-5 py-6 border-b border-gray-100/80">
-          <button onClick={() => handleNavigate('home')} className="flex items-center gap-3 group">
+          <button 
+            onClick={() => handleNavigate('dashboard')} 
+            className="flex items-center gap-3 group"
+            title="Go to Dashboard"
+          >
             {/* YOUR LOGO */}
             <div className="w-9 h-9 rounded-xl overflow-hidden shadow-md group-hover:shadow-lg group-hover:scale-105 transition-all duration-300 bg-white">
               <img 
@@ -188,7 +193,7 @@ export default function Sidebar({
               <p className="px-3 mb-3 text-[10px] font-bold text-gray-400 uppercase tracking-widest">My Spaces</p>
             )}
             
-            {/* All Spaces Button - Using LayoutGrid instead of Globe */}
+            {/* All Spaces Button */}
             <button 
               onClick={() => handleNavigate('spaces')}
               className={`group relative flex items-center gap-3 w-full px-3 py-2.5 rounded-xl transition-all duration-200 text-left mb-3 ${
@@ -202,7 +207,7 @@ export default function Sidebar({
               <span className={`text-sm font-medium truncate transition-all duration-300 ${collapsed ? 'lg:opacity-0 lg:w-0' : 'opacity-100'}`}>All Spaces</span>
             </button>
 
-            {/* 🎨 THE MICROSCREEN */}
+            {/* THE MICROSCREEN */}
             <SpacesList 
               onOpenSpace={(spaceId) => handleNavigate('space-dashboard', spaceId)}
               activePanel={activePanel}
@@ -253,4 +258,3 @@ export default function Sidebar({
     </>
   );
 }
-

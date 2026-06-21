@@ -6,7 +6,7 @@ import { createClient } from '@/lib/supabase/client';
 import { useToast } from '@/contexts/ToastContext';
 import { 
   Send, Search, CheckCheck, Clock, AlertCircle, Filter,
-  Eye, BookOpen, Reply, CheckCircle, X, ChevronDown, Paperclip, Layers
+  Eye, BookOpen, Reply, CheckCircle, X, ChevronDown, Paperclip, Calendar
 } from 'lucide-react';
 
 interface OutMemu {
@@ -30,14 +30,30 @@ interface OutMemusPanelProps {
   requireAuth?: (action: string, callback: () => void) => void;
 }
 
-const filterOptions = [
-  { id: 'all', label: 'All memus', icon: <Send size={14} /> },
+const statusFilterOptions = [
+  { id: 'all', label: 'All statuses', icon: <Send size={14} /> },
   { id: 'delivered', label: 'Delivered', icon: <CheckCircle size={14} /> },
   { id: 'opened', label: 'Opened', icon: <Eye size={14} /> },
   { id: 'fully_read', label: 'Fully read', icon: <BookOpen size={14} /> },
   { id: 'replied', label: 'Replied', icon: <Reply size={14} /> },
   { id: 'pending', label: 'Pending', icon: <Clock size={14} /> },
   { id: 'failed', label: 'Failed', icon: <AlertCircle size={14} /> },
+];
+
+const natureFilterOptions = [
+  { id: 'all', label: 'All natures' },
+  { id: 'fyi', label: 'FYI' },
+  { id: 'decide', label: 'Decide' },
+  { id: 'resolve', label: 'Resolve' },
+  { id: 'urgent', label: 'Urgent' },
+  { id: 'broadcast', label: 'Broadcast' },
+];
+
+const dateFilterOptions = [
+  { id: 'all', label: 'All time' },
+  { id: 'today', label: 'Today' },
+  { id: 'week', label: 'This week' },
+  { id: 'month', label: 'This month' },
 ];
 
 const getNatureStyles = (nature: string) => {
@@ -89,9 +105,12 @@ const OutMemusSkeleton = () => (
 export default function OutMemusPanel({ isGuest, requireAuth }: OutMemusPanelProps = {}) {
   const [searchQuery, setSearchQuery] = useState('');
   const [filterStatus, setFilterStatus] = useState<string>('all');
+  const [filterNature, setFilterNature] = useState<string>('all');
+  const [filterDate, setFilterDate] = useState<string>('all');
   const [currentUserId, setCurrentUserId] = useState<string | null>(null);
   const [selectedMemu, setSelectedMemu] = useState<OutMemu | null>(null);
   const [isFilterOpen, setIsFilterOpen] = useState(false);
+  const [activeFilterType, setActiveFilterType] = useState<'status' | 'nature' | 'date'>('status');
   const filterRef = useRef<HTMLDivElement>(null);
   const { showToast } = useToast();
 
@@ -151,17 +170,47 @@ export default function OutMemusPanel({ isGuest, requireAuth }: OutMemusPanelPro
     staleTime: 60 * 1000,
   });
 
-  const filteredMemus = memus.filter(m => {
-    const matchesSearch = (m.content || '').toLowerCase().includes(searchQuery.toLowerCase()) || (m.subject || '').toLowerCase().includes(searchQuery.toLowerCase()) || m.recipient_name.toLowerCase().includes(searchQuery.toLowerCase());
-    let matchesFilter = filterStatus === 'all';
-    if (!matchesFilter) {
-      if (filterStatus === 'delivered') matchesFilter = !!(m.delivered_at || m.status === 'sent') && !m.opened_at;
-      else if (filterStatus === 'opened') matchesFilter = !!m.opened_at && !m.read_completely_at;
-      else if (filterStatus === 'fully_read') matchesFilter = !!m.read_completely_at;
-      else if (filterStatus === 'replied') matchesFilter = !!m.replied_at;
-      else matchesFilter = m.status === filterStatus;
+  const isWithinDateRange = (dateStr: string, range: string) => {
+    const date = new Date(dateStr);
+    const now = new Date();
+    
+    if (range === 'today') {
+      return date.toDateString() === now.toDateString();
     }
-    return matchesSearch && matchesFilter;
+    if (range === 'week') {
+      const weekAgo = new Date(now.getTime() - 7 * 24 * 60 * 60 * 1000);
+      return date >= weekAgo;
+    }
+    if (range === 'month') {
+      return date.getMonth() === now.getMonth() && date.getFullYear() === now.getFullYear();
+    }
+    return true;
+  };
+
+  const filteredMemus = memus.filter(m => {
+    // Search filter
+    const matchesSearch = !searchQuery || 
+      (m.content || '').toLowerCase().includes(searchQuery.toLowerCase()) || 
+      (m.subject || '').toLowerCase().includes(searchQuery.toLowerCase()) || 
+      m.recipient_name.toLowerCase().includes(searchQuery.toLowerCase());
+    
+    // Status filter
+    let matchesStatus = filterStatus === 'all';
+    if (!matchesStatus) {
+      if (filterStatus === 'delivered') matchesStatus = !!(m.delivered_at || m.status === 'sent') && !m.opened_at;
+      else if (filterStatus === 'opened') matchesStatus = !!m.opened_at && !m.read_completely_at;
+      else if (filterStatus === 'fully_read') matchesStatus = !!m.read_completely_at;
+      else if (filterStatus === 'replied') matchesStatus = !!m.replied_at;
+      else matchesStatus = m.status === filterStatus;
+    }
+    
+    // Nature filter
+    const matchesNature = filterNature === 'all' || m.nature === filterNature;
+    
+    // Date filter
+    const matchesDate = filterDate === 'all' || isWithinDateRange(m.created_at, filterDate);
+    
+    return matchesSearch && matchesStatus && matchesNature && matchesDate;
   });
 
   const formatDate = (dateStr: string) => {
@@ -185,7 +234,21 @@ export default function OutMemusPanel({ isGuest, requireAuth }: OutMemusPanelPro
     replied: memus.filter(m => m.replied_at).length,
   };
 
-  const currentFilterLabel = filterOptions.find(f => f.id === filterStatus)?.label || 'All memus';
+  const clearAllFilters = () => {
+    setFilterStatus('all');
+    setFilterNature('all');
+    setFilterDate('all');
+    setSearchQuery('');
+  };
+
+  const hasActiveFilters = filterStatus !== 'all' || filterNature !== 'all' || filterDate !== 'all' || searchQuery;
+
+  const getCurrentFilterLabel = () => {
+    if (activeFilterType === 'status') return statusFilterOptions.find(f => f.id === filterStatus)?.label || 'All statuses';
+    if (activeFilterType === 'nature') return natureFilterOptions.find(f => f.id === filterNature)?.label || 'All natures';
+    if (activeFilterType === 'date') return dateFilterOptions.find(f => f.id === filterDate)?.label || 'All time';
+    return 'Filter';
+  };
 
   if (isLoading) return <OutMemusSkeleton />;
 
@@ -204,7 +267,7 @@ export default function OutMemusPanel({ isGuest, requireAuth }: OutMemusPanelPro
               </div>
               <h1 className="font-serif text-3xl md:text-4xl font-semibold text-gray-900 leading-tight">Out-memus</h1>
               <div className="flex flex-wrap gap-3 mt-3">
-                <span className="text-sm text-gray-500 font-medium">{memus.length} sent</span>
+                <span className="text-sm text-gray-500 font-medium">{filteredMemus.length} of {memus.length}</span>
                 {stats.delivered > 0 && (<><span className="text-gray-300">·</span><span className="text-sm text-gray-500 font-medium">{stats.delivered} delivered</span></>)}
                 {stats.opened > 0 && (<><span className="text-gray-300">·</span><span className="text-sm text-gray-500 font-medium">{stats.opened} opened</span></>)}
                 {stats.fullyRead > 0 && (<><span className="text-gray-300">·</span><span className="text-sm text-emerald-600 font-bold">{stats.fullyRead} fully read</span></>)}
@@ -213,27 +276,146 @@ export default function OutMemusPanel({ isGuest, requireAuth }: OutMemusPanelPro
             </div>
             
             <div className="relative" ref={filterRef}>
-              <button onClick={() => setIsFilterOpen(!isFilterOpen)} className="flex items-center gap-3 px-5 py-3 bg-white/80 backdrop-blur-xl border border-gray-200 rounded-2xl text-sm font-medium text-gray-700 hover:bg-white hover:border-gray-300 transition-all shadow-sm btn-press">
-                <Filter size={15} /><span>{currentFilterLabel}</span><ChevronDown size={13} />
+              <button onClick={() => setIsFilterOpen(!isFilterOpen)} className={`flex items-center gap-3 px-5 py-3 backdrop-blur-xl border rounded-2xl text-sm font-medium transition-all shadow-sm btn-press ${
+                hasActiveFilters ? 'bg-indigo-50 border-indigo-200 text-indigo-700' : 'bg-white/80 border-gray-200 text-gray-700 hover:bg-white hover:border-gray-300'
+              }`}>
+                <Filter size={15} /><span>{getCurrentFilterLabel()}</span><ChevronDown size={13} />
               </button>
+              
               {isFilterOpen && (
-                <div className="absolute right-0 mt-3 w-52 bg-white rounded-2xl shadow-2xl border border-gray-200 overflow-hidden z-20 animate-fadeIn">
-                  <div className="py-2">
-                    {filterOptions.map((opt) => (
-                      <button key={opt.id} onClick={() => { setFilterStatus(opt.id); setIsFilterOpen(false); }} className={`w-full flex items-center gap-3 px-5 py-3 text-sm text-left transition ${filterStatus === opt.id ? 'bg-indigo-50 text-indigo-700 font-semibold' : 'text-gray-600 hover:bg-gray-50'}`}>
+                <div className="absolute right-0 mt-3 w-64 bg-white rounded-2xl shadow-2xl border border-gray-200 overflow-hidden z-20 animate-fadeIn">
+                  {/* Filter Type Tabs */}
+                  <div className="flex border-b border-gray-100">
+                    <button 
+                      onClick={() => setActiveFilterType('status')}
+                      className={`flex-1 px-4 py-3 text-xs font-semibold transition-all ${
+                        activeFilterType === 'status' ? 'text-indigo-600 border-b-2 border-indigo-600' : 'text-gray-500 hover:text-gray-700'
+                      }`}
+                    >
+                      Status
+                    </button>
+                    <button 
+                      onClick={() => setActiveFilterType('nature')}
+                      className={`flex-1 px-4 py-3 text-xs font-semibold transition-all ${
+                        activeFilterType === 'nature' ? 'text-indigo-600 border-b-2 border-indigo-600' : 'text-gray-500 hover:text-gray-700'
+                      }`}
+                    >
+                      Nature
+                    </button>
+                    <button 
+                      onClick={() => setActiveFilterType('date')}
+                      className={`flex-1 px-4 py-3 text-xs font-semibold transition-all ${
+                        activeFilterType === 'date' ? 'text-indigo-600 border-b-2 border-indigo-600' : 'text-gray-500 hover:text-gray-700'
+                      }`}
+                    >
+                      Date
+                    </button>
+                  </div>
+                  
+                  {/* Filter Options */}
+                  <div className="py-2 max-h-64 overflow-y-auto">
+                    {activeFilterType === 'status' && statusFilterOptions.map((opt) => (
+                      <button 
+                        key={opt.id} 
+                        onClick={() => { setFilterStatus(opt.id); }} 
+                        className={`w-full flex items-center gap-3 px-5 py-3 text-sm text-left transition ${
+                          filterStatus === opt.id ? 'bg-indigo-50 text-indigo-700 font-semibold' : 'text-gray-600 hover:bg-gray-50'
+                        }`}
+                      >
                         {opt.icon} {opt.label}
                       </button>
                     ))}
+                    
+                    {activeFilterType === 'nature' && natureFilterOptions.map((opt) => (
+                      <button 
+                        key={opt.id} 
+                        onClick={() => { setFilterNature(opt.id); }} 
+                        className={`w-full px-5 py-3 text-sm text-left transition ${
+                          filterNature === opt.id ? 'bg-indigo-50 text-indigo-700 font-semibold' : 'text-gray-600 hover:bg-gray-50'
+                        }`}
+                      >
+                        {opt.label}
+                      </button>
+                    ))}
+                    
+                    {activeFilterType === 'date' && dateFilterOptions.map((opt) => (
+                      <button 
+                        key={opt.id} 
+                        onClick={() => { setFilterDate(opt.id); }} 
+                        className={`w-full flex items-center gap-3 px-5 py-3 text-sm text-left transition ${
+                          filterDate === opt.id ? 'bg-indigo-50 text-indigo-700 font-semibold' : 'text-gray-600 hover:bg-gray-50'
+                        }`}
+                      >
+                        <Calendar size={14} /> {opt.label}
+                      </button>
+                    ))}
                   </div>
+                  
+                  {/* Clear All Button */}
+                  {hasActiveFilters && (
+                    <div className="border-t border-gray-100 p-3">
+                      <button 
+                        onClick={clearAllFilters}
+                        className="w-full px-4 py-2 text-sm font-semibold text-indigo-600 hover:bg-indigo-50 rounded-lg transition-all btn-press"
+                      >
+                        Clear all filters
+                      </button>
+                    </div>
+                  )}
                 </div>
               )}
             </div>
           </div>
           
-          <div className="relative">
+          {/* Search Bar */}
+          <div className="relative mb-4">
             <Search size={19} className="absolute left-4 top-1/2 -translate-y-1/2 text-gray-400" />
-            <input type="text" value={searchQuery} onChange={(e) => setSearchQuery(e.target.value)} placeholder="Search sent memus..." className="w-full pl-12 pr-4 py-4 bg-white/80 backdrop-blur-xl border border-gray-200 rounded-2xl text-sm text-gray-900 outline-none focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500 transition-all placeholder:text-gray-400" />
+            <input 
+              type="text" 
+              value={searchQuery} 
+              onChange={(e) => setSearchQuery(e.target.value)} 
+              placeholder="Search sent memus..." 
+              className="w-full pl-12 pr-12 py-4 bg-white/80 backdrop-blur-xl border border-gray-200 rounded-2xl text-sm text-gray-900 outline-none focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500 transition-all placeholder:text-gray-400" 
+            />
+            {searchQuery && (
+              <button 
+                onClick={() => setSearchQuery('')}
+                className="absolute right-4 top-1/2 -translate-y-1/2 text-gray-400 hover:text-gray-600 btn-press"
+              >
+                <X size={18} />
+              </button>
+            )}
           </div>
+          
+          {/* Active Filters Display */}
+          {hasActiveFilters && (
+            <div className="flex items-center gap-2 flex-wrap animate-fadeIn">
+              {filterStatus !== 'all' && (
+                <div className="inline-flex items-center gap-2 px-3 py-1.5 rounded-full text-xs font-semibold bg-indigo-50 text-indigo-700 border border-indigo-200">
+                  Status: {statusFilterOptions.find(f => f.id === filterStatus)?.label}
+                  <button onClick={() => setFilterStatus('all')} className="opacity-60 hover:opacity-100 btn-press">✕</button>
+                </div>
+              )}
+              {filterNature !== 'all' && (
+                <div className="inline-flex items-center gap-2 px-3 py-1.5 rounded-full text-xs font-semibold bg-purple-50 text-purple-700 border border-purple-200">
+                  Nature: {natureFilterOptions.find(f => f.id === filterNature)?.label}
+                  <button onClick={() => setFilterNature('all')} className="opacity-60 hover:opacity-100 btn-press">✕</button>
+                </div>
+              )}
+              {filterDate !== 'all' && (
+                <div className="inline-flex items-center gap-2 px-3 py-1.5 rounded-full text-xs font-semibold bg-emerald-50 text-emerald-700 border border-emerald-200">
+                  Date: {dateFilterOptions.find(f => f.id === filterDate)?.label}
+                  <button onClick={() => setFilterDate('all')} className="opacity-60 hover:opacity-100 btn-press">✕</button>
+                </div>
+              )}
+              {searchQuery && (
+                <div className="inline-flex items-center gap-2 px-3 py-1.5 rounded-full text-xs font-semibold bg-gray-100 text-gray-700 border border-gray-200">
+                  Search: "{searchQuery}"
+                  <button onClick={() => setSearchQuery('')} className="opacity-60 hover:opacity-100 btn-press">✕</button>
+                </div>
+              )}
+            </div>
+          )}
         </div>
 
         {/* Memus List */}
@@ -247,11 +429,19 @@ export default function OutMemusPanel({ isGuest, requireAuth }: OutMemusPanelPro
                 </div>
               </div>
               <h3 className="font-serif text-xl font-semibold text-gray-900 mb-3">
-                {searchQuery ? 'No matching memus' : 'No sent memus yet'}
+                {hasActiveFilters ? 'No matching memus' : 'No sent memus yet'}
               </h3>
               <p className="text-gray-500 text-sm max-w-md">
-                {searchQuery ? 'Try a different search term.' : 'When you send a memu, it will appear here.'}
+                {hasActiveFilters ? 'Try adjusting your filters or search query.' : 'When you send a memu, it will appear here.'}
               </p>
+              {hasActiveFilters && (
+                <button 
+                  onClick={clearAllFilters}
+                  className="mt-6 px-6 py-2.5 bg-gradient-to-r from-indigo-600 to-purple-600 text-white rounded-xl text-sm font-semibold hover:shadow-lg transition-all btn-press"
+                >
+                  Clear Filters
+                </button>
+              )}
             </div>
           ) : (
             <div className="space-y-3">

@@ -3,6 +3,7 @@
 import { useState, useRef, useEffect, useCallback } from 'react';
 import { createClient } from '@/lib/supabase/client';
 import { useToast } from '@/contexts/ToastContext';
+import { useTheme } from '@/contexts/ThemeContext';
 import { triggerHaptic } from '@/lib/haptics';
 import { 
   Camera, Loader2, Save, User, Building2, Briefcase, AtSign, LogOut, 
@@ -39,6 +40,9 @@ export default function ProfilePanel({ user }: ProfilePanelProps) {
   const [loading, setLoading] = useState(false);
   const [uploading, setUploading] = useState(false);
   
+  // Theme Context
+  const { theme, setTheme } = useTheme();
+  
   // Profile State
   const [fullName, setFullName] = useState(user?.user_metadata?.full_name || '');
   const [username, setUsername] = useState(user?.user_metadata?.username || '');
@@ -69,9 +73,9 @@ export default function ProfilePanel({ user }: ProfilePanelProps) {
     profileVisibility: 'public',
   });
   
-  // Appearance State
+  // Appearance State - Initialize from theme context
   const [appearanceSettings, setAppearanceSettings] = useState<AppearanceSettings>({
-    theme: 'light',
+    theme: theme,
   });
   
   // Danger Zone State
@@ -81,6 +85,11 @@ export default function ProfilePanel({ user }: ProfilePanelProps) {
   const fileInputRef = useRef<HTMLInputElement>(null);
   const { showToast } = useToast();
 
+  // Sync appearanceSettings with theme context
+  useEffect(() => {
+    setAppearanceSettings({ theme });
+  }, [theme]);
+
   // ============================================
   // BROWSER BACK BUTTON SUPPORT
   // ============================================
@@ -89,26 +98,22 @@ export default function ProfilePanel({ user }: ProfilePanelProps) {
     setActiveTab(tab);
     
     if (pushToHistory) {
-      // Update URL with the current tab
       const url = new URL(window.location.href);
       url.searchParams.set('settingsTab', tab);
       window.history.pushState({ settingsTab: tab }, '', url.toString());
     }
   }, []);
 
-  // Handle browser back/forward buttons
   useEffect(() => {
     const handlePopState = (event: PopStateEvent) => {
       if (event.state?.settingsTab) {
         setActiveTab(event.state.settingsTab as TabType);
       } else {
-        // Check URL for settingsTab param
         const url = new URL(window.location.href);
         const tab = url.searchParams.get('settingsTab') as TabType | null;
         if (tab && ['profile', 'account', 'notifications', 'privacy', 'appearance', 'danger'].includes(tab)) {
           setActiveTab(tab);
         } else {
-          // No tab in history state or URL — go back to profile
           setActiveTab('profile');
         }
       }
@@ -116,14 +121,12 @@ export default function ProfilePanel({ user }: ProfilePanelProps) {
 
     window.addEventListener('popstate', handlePopState);
 
-    // Initialize from URL on mount
     const url = new URL(window.location.href);
     const initialTab = url.searchParams.get('settingsTab') as TabType | null;
     if (initialTab && ['profile', 'account', 'notifications', 'privacy', 'appearance', 'danger'].includes(initialTab)) {
       setActiveTab(initialTab);
     }
 
-    // Replace current history entry with tab state
     window.history.replaceState({ settingsTab: initialTab || 'profile' }, '', window.location.href);
 
     return () => {
@@ -159,7 +162,11 @@ export default function ProfilePanel({ user }: ProfilePanelProps) {
       
       if (data.notification_preferences) setNotificationPrefs(data.notification_preferences);
       if (data.privacy_settings) setPrivacySettings(data.privacy_settings);
-      if (data.appearance_settings) setAppearanceSettings(data.appearance_settings);
+      if (data.appearance_settings) {
+        setAppearanceSettings(data.appearance_settings);
+        // Also sync with theme context
+        setTheme(data.appearance_settings.theme);
+      }
     }
   };
 
@@ -325,6 +332,7 @@ export default function ProfilePanel({ user }: ProfilePanelProps) {
 
       if (error) throw error;
 
+      // Theme is already applied via setTheme, just save to database
       triggerHaptic('success');
       showToast('Appearance settings saved!', 'success');
     } catch (err: any) {
@@ -381,10 +389,8 @@ export default function ProfilePanel({ user }: ProfilePanelProps) {
   const handleBack = () => {
     triggerHaptic('light');
     if (canGoBack) {
-      // Go to previous tab using browser history
       window.history.back();
     } else {
-      // Already on first tab, go back to profile home
       navigateToTab('profile');
     }
   };
@@ -687,7 +693,13 @@ export default function ProfilePanel({ user }: ProfilePanelProps) {
                   ].map((option) => (
                     <button
                       key={option.value}
-                      onClick={() => { triggerHaptic('light'); setAppearanceSettings({ theme: option.value as any }); }}
+                      onClick={() => { 
+                        triggerHaptic('light'); 
+                        const newTheme = option.value as 'light' | 'dark' | 'system';
+                        setAppearanceSettings({ theme: newTheme });
+                        // Apply theme immediately via context
+                        setTheme(newTheme);
+                      }}
                       className={`flex flex-col items-center gap-2 p-4 rounded-xl transition-all btn-press ${
                         appearanceSettings.theme === option.value ? 'bg-indigo-50 border-2 border-indigo-500' : 'bg-gray-50 border-2 border-transparent hover:bg-gray-100'
                       }`}
@@ -698,7 +710,7 @@ export default function ProfilePanel({ user }: ProfilePanelProps) {
                   ))}
                 </div>
                 <p className="text-xs text-gray-500 mt-3 text-center">
-                  {appearanceSettings.theme === 'dark' ? 'Dark mode coming soon!' : appearanceSettings.theme === 'system' ? 'Will match your device settings' : 'Currently using light theme'}
+                  {appearanceSettings.theme === 'dark' ? 'Dark mode enabled' : appearanceSettings.theme === 'system' ? 'Will match your device settings' : 'Light mode enabled'}
                 </p>
               </div>
 
@@ -782,7 +794,6 @@ export default function ProfilePanel({ user }: ProfilePanelProps) {
         {/* Content */}
         <div className="flex-1 overflow-y-auto p-10">
           <div className="max-w-3xl">
-            {/* Back Button for Desktop */}
             {canGoBack && (
               <button onClick={handleBack} className="flex items-center gap-2 text-sm font-semibold text-gray-500 hover:text-indigo-600 mb-6 transition-all btn-press">
                 <ChevronLeft size={18} strokeWidth={2.5} /> Back to {tabs[currentTabIndex - 1].label}

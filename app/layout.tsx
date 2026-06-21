@@ -1,7 +1,8 @@
 import type { Metadata } from "next";
 import { ToastProvider } from '@/contexts/ToastContext';
+import { ThemeProvider } from '@/contexts/ThemeContext';
 import { createClient } from '@/lib/supabase/server';
-import QueryProvider from '@/components/QueryProvider'; // <-- NEW IMPORT
+import QueryProvider from '@/components/QueryProvider';
 import "./globals.css";
 
 export const metadata: Metadata = {
@@ -19,7 +20,7 @@ export default async function RootLayout({
   const { data: { user } } = await supabase.auth.getUser();
 
   return (
-    <html lang="en">
+    <html lang="en" suppressHydrationWarning>
       <head>
         <link 
           href="https://fonts.googleapis.com/css2?family=DM+Sans:ital,wght@0,300;0,400;0,500;1,300&family=Playfair+Display:ital,wght@0,400;0,500;1,400&display=swap" 
@@ -27,14 +28,15 @@ export default async function RootLayout({
         />
       </head>
       <body className="antialiased">
-        <ToastProvider>
-          {/* Wrapping your entire app in the caching engine! */}
-          <QueryProvider>
-            {children}
-          </QueryProvider>
-        </ToastProvider>
+        <ThemeProvider>
+          <ToastProvider>
+            {/* Wrapping your entire app in the caching engine! */}
+            <QueryProvider>
+              {children}
+            </QueryProvider>
+          </ToastProvider>
+        </ThemeProvider>
       </body>
     </html>
   );
 }
-

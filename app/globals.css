@@ -342,3 +342,64 @@ h1, h2, h3, .heading-serif {
     pointer-events: none; /* Let the button handle the click, not the icon */
   }
 }
+
+/* Dark Mode Variables */
+:root {
+  --bg-primary: #ffffff;
+  --bg-secondary: #f9fafb;
+  --bg-tertiary: #f3f4f6;
+  --text-primary: #111827;
+  --text-secondary: #6b7280;
+  --text-tertiary: #9ca3af;
+  --border-primary: #e5e7eb;
+  --border-secondary: #d1d5db;
+}
+
+.dark {
+  --bg-primary: #111827;
+  --bg-secondary: #1f2937;
+  --bg-tertiary: #374151;
+  --text-primary: #f9fafb;
+  --text-secondary: #d1d5db;
+  --text-tertiary: #9ca3af;
+  --border-primary: #374151;
+  --border-secondary: #4b5563;
+}
+
+/* Smooth theme transitions */
+* {
+  transition: background-color 0.3s ease, border-color 0.3s ease, color 0.2s ease;
+}
+
+/* Dark mode overrides for common Tailwind classes */
+.dark .bg-white {
+  background-color: var(--bg-primary);
+}
+
+.dark .bg-gray-50 {
+  background-color: var(--bg-secondary);
+}
+
+.dark .bg-gray-100 {
+  background-color: var(--bg-tertiary);
+}
+
+.dark .text-gray-900 {
+  color: var(--text-primary);
+}
+
+.dark .text-gray-700 {
+  color: var(--text-secondary);
+}
+
+.dark .text-gray-500 {
+  color: var(--text-tertiary);
+}
+
+.dark .border-gray-200 {
+  border-color: var(--border-primary);
+}
+
+.dark .border-gray-300 {
+  border-color: var(--border-secondary);
+}

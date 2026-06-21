@@ -6,7 +6,7 @@ import { createClient } from '@/lib/supabase/client';
 import { useToast } from '@/contexts/ToastContext';
 import { 
   Send, Search, CheckCheck, Clock, AlertCircle, Filter,
-  Eye, BookOpen, Reply, CheckCircle, X, ChevronDown, Paperclip, Calendar
+  Eye, BookOpen, Reply, CheckCircle, X, Paperclip, Sparkles
 } from 'lucide-react';
 
 interface OutMemu {
@@ -30,97 +30,78 @@ interface OutMemusPanelProps {
   requireAuth?: (action: string, callback: () => void) => void;
 }
 
-const statusFilterOptions = [
-  { id: 'all', label: 'All statuses', icon: <Send size={14} /> },
-  { id: 'delivered', label: 'Delivered', icon: <CheckCircle size={14} /> },
-  { id: 'opened', label: 'Opened', icon: <Eye size={14} /> },
-  { id: 'fully_read', label: 'Fully read', icon: <BookOpen size={14} /> },
-  { id: 'replied', label: 'Replied', icon: <Reply size={14} /> },
-  { id: 'pending', label: 'Pending', icon: <Clock size={14} /> },
-  { id: 'failed', label: 'Failed', icon: <AlertCircle size={14} /> },
-];
-
-const natureFilterOptions = [
-  { id: 'all', label: 'All natures' },
-  { id: 'fyi', label: 'FYI' },
-  { id: 'decide', label: 'Decide' },
-  { id: 'resolve', label: 'Resolve' },
-  { id: 'urgent', label: 'Urgent' },
-  { id: 'broadcast', label: 'Broadcast' },
-];
-
-const dateFilterOptions = [
-  { id: 'all', label: 'All time' },
-  { id: 'today', label: 'Today' },
-  { id: 'week', label: 'This week' },
-  { id: 'month', label: 'This month' },
-];
-
-const getNatureStyles = (nature: string) => {
-  switch (nature) {
-    case 'fyi': return { border: 'border-amber-200/60', badge: 'bg-amber-50 text-amber-700 border border-amber-100' };
-    case 'decide': return { border: 'border-indigo-200/60', badge: 'bg-indigo-50 text-indigo-700 border border-indigo-100' };
-    case 'resolve': return { border: 'border-rose-200/60', badge: 'bg-rose-50 text-rose-700 border border-rose-100' };
-    case 'urgent': return { border: 'border-emerald-200/60', badge: 'bg-emerald-50 text-emerald-700 border border-emerald-100' };
-    case 'broadcast': return { border: 'border-pink-200/60', badge: 'bg-pink-50 text-pink-700 border border-pink-100' };
-    default: return { border: 'border-gray-200/60', badge: 'bg-gray-50 text-gray-700 border border-gray-100' };
-  }
+const natureStyles: Record<string, string> = {
+  fyi: 'bg-amber-100 text-amber-800 border-amber-200',
+  decide: 'bg-indigo-100 text-indigo-800 border-indigo-200',
+  resolve: 'bg-rose-100 text-rose-800 border-rose-200',
+  urgent: 'bg-emerald-100 text-emerald-800 border-emerald-200',
+  broadcast: 'bg-pink-100 text-pink-800 border-pink-200',
 };
 
-const getStatusStyles = (memu: OutMemu) => {
-  if (memu.replied_at) return { label: 'Replied', icon: Reply, color: 'text-purple-600' };
-  if (memu.read_completely_at) return { label: 'Fully read', icon: BookOpen, color: 'text-emerald-600' };
-  if (memu.opened_at) return { label: 'Opened', icon: Eye, color: 'text-blue-600' };
-  if (memu.delivered_at || memu.status === 'sent') return { label: 'Delivered', icon: CheckCircle, color: 'text-indigo-600' };
-  if (memu.status === 'pending') return { label: 'Pending', icon: Clock, color: 'text-gray-500' };
-  if (memu.status === 'failed') return { label: 'Failed', icon: AlertCircle, color: 'text-rose-600' };
-  return { label: 'Sent', icon: CheckCheck, color: 'text-gray-500' };
+const natureLabels: Record<string, string> = {
+  fyi: 'FYI',
+  decide: 'Decide',
+  resolve: 'Resolve',
+  urgent: 'Urgent',
+  broadcast: 'Broadcast',
 };
 
-const getInitials = (name: string) => name.split(' ').map(part => part[0]).join('').toUpperCase().slice(0, 2);
-const stringToColor = (str: string) => {
-  let hash = 0;
-  for (let i = 0; i < str.length; i++) hash = str.charCodeAt(i) + ((hash << 5) - hash);
-  return `hsl(${hash % 360}, 65%, 55%)`;
+const statusLabels: Record<string, string> = {
+  all: 'All',
+  delivered: 'Delivered',
+  opened: 'Opened',
+  fully_read: 'Fully Read',
+  replied: 'Replied',
+  pending: 'Pending',
+  failed: 'Failed',
 };
 
 const OutMemusSkeleton = () => (
-  <div className="space-y-3 px-6 md:px-10 pt-8">
-    {[1, 2, 3].map((i) => (
-      <div key={i} className="bg-white border border-gray-200/60 rounded-2xl p-4 animate-pulse">
-        <div className="flex items-center justify-between mb-3">
-          <div className="flex items-center gap-3">
-            <div className="w-8 h-8 bg-gray-100 rounded-lg" />
-            <div className="w-24 h-3 bg-gray-100 rounded" />
+  <div className="flex flex-col h-full bg-memu-canvas p-6 md:p-10 animate-fadeIn">
+    <div className="mb-8 space-y-3">
+      <div className="w-48 h-8 bg-gradient-to-r from-gray-200 via-gray-100 to-gray-200 bg-[length:200%_100%] rounded-xl animate-shimmer" />
+      <div className="w-32 h-4 bg-gradient-to-r from-gray-200 via-gray-100 to-gray-200 bg-[length:200%_100%] rounded-md animate-shimmer" />
+    </div>
+    <div className="space-y-4">
+      {[...Array(6)].map((_, i) => (
+        <div key={i} className="flex gap-4 p-4 bg-white rounded-2xl border border-gray-100 shadow-sm">
+          <div className="w-12 h-12 rounded-full bg-gradient-to-r from-gray-200 via-gray-100 to-gray-200 bg-[length:200%_100%] animate-shimmer" />
+          <div className="flex-1 space-y-3 py-1">
+            <div className="w-3/4 h-4 bg-gradient-to-r from-gray-200 via-gray-100 to-gray-200 bg-[length:200%_100%] animate-shimmer" />
+            <div className="w-full h-3 bg-gradient-to-r from-gray-200 via-gray-100 to-gray-200 bg-[length:200%_100%] animate-shimmer" />
+            <div className="w-1/2 h-3 bg-gradient-to-r from-gray-200 via-gray-100 to-gray-200 bg-[length:200%_100%] animate-shimmer" />
           </div>
-          <div className="w-12 h-3 bg-gray-100 rounded" />
         </div>
-        <div className="w-3/4 h-4 bg-gray-100 rounded mb-2" />
-        <div className="w-full h-3 bg-gray-100 rounded" />
-      </div>
-    ))}
+      ))}
+    </div>
   </div>
 );
 
 export default function OutMemusPanel({ isGuest, requireAuth }: OutMemusPanelProps = {}) {
   const [searchQuery, setSearchQuery] = useState('');
+  const [showSearch, setShowSearch] = useState(false);
   const [filterStatus, setFilterStatus] = useState<string>('all');
-  const [filterNature, setFilterNature] = useState<string>('all');
-  const [filterDate, setFilterDate] = useState<string>('all');
+  const [showFilterMenu, setShowFilterMenu] = useState(false);
   const [currentUserId, setCurrentUserId] = useState<string | null>(null);
   const [selectedMemu, setSelectedMemu] = useState<OutMemu | null>(null);
-  const [isFilterOpen, setIsFilterOpen] = useState(false);
-  const [activeFilterType, setActiveFilterType] = useState<'status' | 'nature' | 'date'>('status');
-  const filterRef = useRef<HTMLDivElement>(null);
+  const filterMenuRef = useRef<HTMLDivElement>(null);
   const { showToast } = useToast();
 
   useEffect(() => {
-    const handleClickOutside = (e: MouseEvent) => {
-      if (filterRef.current && !filterRef.current.contains(e.target as Node)) setIsFilterOpen(false);
+    const handleClickOutside = (event: MouseEvent) => {
+      if (filterMenuRef.current && !filterMenuRef.current.contains(event.target as Node)) {
+        setShowFilterMenu(false);
+      }
     };
-    document.addEventListener('mousedown', handleClickOutside);
-    return () => document.removeEventListener('mousedown', handleClickOutside);
-  }, []);
+
+    if (showFilterMenu) {
+      document.addEventListener('mousedown', handleClickOutside);
+    }
+
+    return () => {
+      document.removeEventListener('mousedown', handleClickOutside);
+    };
+  }, [showFilterMenu]);
 
   useEffect(() => {
     const getUser = async () => {
@@ -170,21 +151,34 @@ export default function OutMemusPanel({ isGuest, requireAuth }: OutMemusPanelPro
     staleTime: 60 * 1000,
   });
 
-  const isWithinDateRange = (dateStr: string, range: string) => {
-    const date = new Date(dateStr);
-    const now = new Date();
-    
-    if (range === 'today') {
-      return date.toDateString() === now.toDateString();
-    }
-    if (range === 'week') {
-      const weekAgo = new Date(now.getTime() - 7 * 24 * 60 * 60 * 1000);
-      return date >= weekAgo;
-    }
-    if (range === 'month') {
-      return date.getMonth() === now.getMonth() && date.getFullYear() === now.getFullYear();
-    }
-    return true;
+  const getStatusLabel = (memu: OutMemu) => {
+    if (memu.replied_at) return 'Replied';
+    if (memu.read_completely_at) return 'Fully read';
+    if (memu.opened_at) return 'Opened';
+    if (memu.delivered_at || memu.status === 'sent') return 'Delivered';
+    if (memu.status === 'pending') return 'Pending';
+    if (memu.status === 'failed') return 'Failed';
+    return 'Sent';
+  };
+
+  const getStatusIcon = (memu: OutMemu) => {
+    if (memu.replied_at) return Reply;
+    if (memu.read_completely_at) return BookOpen;
+    if (memu.opened_at) return Eye;
+    if (memu.delivered_at || memu.status === 'sent') return CheckCircle;
+    if (memu.status === 'pending') return Clock;
+    if (memu.status === 'failed') return AlertCircle;
+    return CheckCheck;
+  };
+
+  const getStatusColor = (memu: OutMemu) => {
+    if (memu.replied_at) return 'text-purple-600';
+    if (memu.read_completely_at) return 'text-emerald-600';
+    if (memu.opened_at) return 'text-blue-600';
+    if (memu.delivered_at || memu.status === 'sent') return 'text-indigo-600';
+    if (memu.status === 'pending') return 'text-gray-500';
+    if (memu.status === 'failed') return 'text-rose-600';
+    return 'text-gray-500';
   };
 
   const filteredMemus = memus.filter(m => {
@@ -204,13 +198,7 @@ export default function OutMemusPanel({ isGuest, requireAuth }: OutMemusPanelPro
       else matchesStatus = m.status === filterStatus;
     }
     
-    // Nature filter
-    const matchesNature = filterNature === 'all' || m.nature === filterNature;
-    
-    // Date filter
-    const matchesDate = filterDate === 'all' || isWithinDateRange(m.created_at, filterDate);
-    
-    return matchesSearch && matchesStatus && matchesNature && matchesDate;
+    return matchesSearch && matchesStatus;
   });
 
   const formatDate = (dateStr: string) => {
@@ -227,27 +215,14 @@ export default function OutMemusPanel({ isGuest, requireAuth }: OutMemusPanelPro
     return date.toLocaleDateString();
   };
 
-  const stats = {
-    delivered: memus.filter(m => m.delivered_at || m.status === 'sent').length,
-    opened: memus.filter(m => m.opened_at).length,
-    fullyRead: memus.filter(m => m.read_completely_at).length,
-    replied: memus.filter(m => m.replied_at).length,
+  const getInitial = (name: string) => {
+    return name.charAt(0).toUpperCase();
   };
 
-  const clearAllFilters = () => {
+  const clearFilters = () => {
     setFilterStatus('all');
-    setFilterNature('all');
-    setFilterDate('all');
     setSearchQuery('');
-  };
-
-  const hasActiveFilters = filterStatus !== 'all' || filterNature !== 'all' || filterDate !== 'all' || searchQuery;
-
-  const getCurrentFilterLabel = () => {
-    if (activeFilterType === 'status') return statusFilterOptions.find(f => f.id === filterStatus)?.label || 'All statuses';
-    if (activeFilterType === 'nature') return natureFilterOptions.find(f => f.id === filterNature)?.label || 'All natures';
-    if (activeFilterType === 'date') return dateFilterOptions.find(f => f.id === filterDate)?.label || 'All time';
-    return 'Filter';
+    setShowSearch(false);
   };
 
   if (isLoading) return <OutMemusSkeleton />;
@@ -255,6 +230,7 @@ export default function OutMemusPanel({ isGuest, requireAuth }: OutMemusPanelPro
   return (
     <>
       <div className="flex flex-col h-full bg-memu-canvas animate-page-enter">
+
         {/* Header Section */}
         <div className="px-6 md:px-10 pt-8 pb-6">
           <div className="flex items-center justify-between flex-wrap gap-4 mb-6">
@@ -263,149 +239,139 @@ export default function OutMemusPanel({ isGuest, requireAuth }: OutMemusPanelPro
                 <div className="w-11 h-11 rounded-2xl bg-gradient-to-br from-indigo-600 to-purple-600 flex items-center justify-center shadow-lg">
                   <Send size={22} className="text-white" strokeWidth={2.5} />
                 </div>
-                <span className="text-sm font-bold uppercase tracking-wider">Sent</span>
+                <h1 className="font-serif text-2xl md:text-3xl font-bold text-gray-900">Out-memus</h1>
               </div>
-              <h1 className="font-serif text-3xl md:text-4xl font-semibold text-gray-900 leading-tight">Out-memus</h1>
-              <div className="flex flex-wrap gap-3 mt-3">
-                <span className="text-sm text-gray-500 font-medium">{filteredMemus.length} of {memus.length}</span>
-                {stats.delivered > 0 && (<><span className="text-gray-300">·</span><span className="text-sm text-gray-500 font-medium">{stats.delivered} delivered</span></>)}
-                {stats.opened > 0 && (<><span className="text-gray-300">·</span><span className="text-sm text-gray-500 font-medium">{stats.opened} opened</span></>)}
-                {stats.fullyRead > 0 && (<><span className="text-gray-300">·</span><span className="text-sm text-emerald-600 font-bold">{stats.fullyRead} fully read</span></>)}
-                {stats.replied > 0 && (<><span className="text-gray-300">·</span><span className="text-sm text-purple-600 font-bold">{stats.replied} replied</span></>)}
-              </div>
+              <p className="text-sm text-gray-500 font-medium">
+                {filteredMemus.length} {filteredMemus.length === 1 ? 'message' : 'messages'}
+                {filterStatus !== 'all' && ` • ${statusLabels[filterStatus]}`}
+                {searchQuery && ` • Search: "${searchQuery}"`}
+              </p>
             </div>
-            
-            <div className="relative" ref={filterRef}>
-              <button onClick={() => setIsFilterOpen(!isFilterOpen)} className={`flex items-center gap-3 px-5 py-3 backdrop-blur-xl border rounded-2xl text-sm font-medium transition-all shadow-sm btn-press ${
-                hasActiveFilters ? 'bg-indigo-50 border-indigo-200 text-indigo-700' : 'bg-white/80 border-gray-200 text-gray-700 hover:bg-white hover:border-gray-300'
-              }`}>
-                <Filter size={15} /><span>{getCurrentFilterLabel()}</span><ChevronDown size={13} />
+
+            <div className="flex items-center gap-2">
+              {/* Search Button */}
+              <button 
+                onClick={() => {
+                  setShowSearch(!showSearch);
+                  if (showSearch) setSearchQuery('');
+                }}
+                className={`w-10 h-10 rounded-xl border flex items-center justify-center transition-all shadow-sm btn-press ${
+                  showSearch ? 'bg-indigo-50 border-indigo-200 text-indigo-600' : 'bg-white border-gray-200 text-gray-500 hover:text-indigo-600 hover:border-indigo-200'
+                }`}
+              >
+                <Search size={18} strokeWidth={2.5} />
               </button>
-              
-              {isFilterOpen && (
-                <div className="absolute right-0 mt-3 w-64 bg-white rounded-2xl shadow-2xl border border-gray-200 overflow-hidden z-20 animate-fadeIn">
-                  {/* Filter Type Tabs */}
-                  <div className="flex border-b border-gray-100">
-                    <button 
-                      onClick={() => setActiveFilterType('status')}
-                      className={`flex-1 px-4 py-3 text-xs font-semibold transition-all ${
-                        activeFilterType === 'status' ? 'text-indigo-600 border-b-2 border-indigo-600' : 'text-gray-500 hover:text-gray-700'
-                      }`}
-                    >
-                      Status
-                    </button>
-                    <button 
-                      onClick={() => setActiveFilterType('nature')}
-                      className={`flex-1 px-4 py-3 text-xs font-semibold transition-all ${
-                        activeFilterType === 'nature' ? 'text-indigo-600 border-b-2 border-indigo-600' : 'text-gray-500 hover:text-gray-700'
-                      }`}
-                    >
-                      Nature
-                    </button>
-                    <button 
-                      onClick={() => setActiveFilterType('date')}
-                      className={`flex-1 px-4 py-3 text-xs font-semibold transition-all ${
-                        activeFilterType === 'date' ? 'text-indigo-600 border-b-2 border-indigo-600' : 'text-gray-500 hover:text-gray-700'
-                      }`}
-                    >
-                      Date
-                    </button>
-                  </div>
-                  
-                  {/* Filter Options */}
-                  <div className="py-2 max-h-64 overflow-y-auto">
-                    {activeFilterType === 'status' && statusFilterOptions.map((opt) => (
-                      <button 
-                        key={opt.id} 
-                        onClick={() => { setFilterStatus(opt.id); }} 
-                        className={`w-full flex items-center gap-3 px-5 py-3 text-sm text-left transition ${
-                          filterStatus === opt.id ? 'bg-indigo-50 text-indigo-700 font-semibold' : 'text-gray-600 hover:bg-gray-50'
+
+              {/* Filter Button with Dropdown */}
+              <div className="relative" ref={filterMenuRef}>
+                <button 
+                  onClick={() => setShowFilterMenu(!showFilterMenu)}
+                  className={`w-10 h-10 rounded-xl border flex items-center justify-center transition-all shadow-sm btn-press ${
+                    filterStatus !== 'all' ? 'bg-indigo-50 border-indigo-200 text-indigo-600' : 'bg-white border-gray-200 text-gray-500 hover:text-indigo-600 hover:border-indigo-200'
+                  }`}
+                >
+                  <Filter size={18} strokeWidth={2.5} />
+                </button>
+
+                {/* Filter Dropdown Menu */}
+                {showFilterMenu && (
+                  <div className="absolute right-0 top-full mt-2 w-48 bg-white rounded-2xl shadow-2xl border border-gray-200 z-50 overflow-hidden animate-fade-in-scale">
+                    <div className="p-2">
+                      <button
+                        onClick={() => { setFilterStatus('all'); setShowFilterMenu(false); }}
+                        className={`w-full px-4 py-3 text-left text-sm rounded-xl transition-all btn-press ${
+                          filterStatus === 'all' ? 'bg-indigo-50 text-indigo-700 font-semibold' : 'text-gray-700 hover:bg-gray-50'
                         }`}
                       >
-                        {opt.icon} {opt.label}
+                        All Messages
                       </button>
-                    ))}
-                    
-                    {activeFilterType === 'nature' && natureFilterOptions.map((opt) => (
-                      <button 
-                        key={opt.id} 
-                        onClick={() => { setFilterNature(opt.id); }} 
-                        className={`w-full px-5 py-3 text-sm text-left transition ${
-                          filterNature === opt.id ? 'bg-indigo-50 text-indigo-700 font-semibold' : 'text-gray-600 hover:bg-gray-50'
+                      <button
+                        onClick={() => { setFilterStatus('delivered'); setShowFilterMenu(false); }}
+                        className={`w-full px-4 py-3 text-left text-sm rounded-xl transition-all btn-press flex items-center gap-2 ${
+                          filterStatus === 'delivered' ? 'bg-indigo-50 text-indigo-700 font-semibold' : 'text-gray-700 hover:bg-gray-50'
                         }`}
                       >
-                        {opt.label}
+                        <CheckCircle size={14} /> Delivered
                       </button>
-                    ))}
-                    
-                    {activeFilterType === 'date' && dateFilterOptions.map((opt) => (
-                      <button 
-                        key={opt.id} 
-                        onClick={() => { setFilterDate(opt.id); }} 
-                        className={`w-full flex items-center gap-3 px-5 py-3 text-sm text-left transition ${
-                          filterDate === opt.id ? 'bg-indigo-50 text-indigo-700 font-semibold' : 'text-gray-600 hover:bg-gray-50'
+                      <button
+                        onClick={() => { setFilterStatus('opened'); setShowFilterMenu(false); }}
+                        className={`w-full px-4 py-3 text-left text-sm rounded-xl transition-all btn-press flex items-center gap-2 ${
+                          filterStatus === 'opened' ? 'bg-blue-50 text-blue-700 font-semibold' : 'text-gray-700 hover:bg-gray-50'
                         }`}
                       >
-                        <Calendar size={14} /> {opt.label}
+                        <Eye size={14} /> Opened
                       </button>
-                    ))}
-                  </div>
-                  
-                  {/* Clear All Button */}
-                  {hasActiveFilters && (
-                    <div className="border-t border-gray-100 p-3">
-                      <button 
-                        onClick={clearAllFilters}
-                        className="w-full px-4 py-2 text-sm font-semibold text-indigo-600 hover:bg-indigo-50 rounded-lg transition-all btn-press"
+                      <button
+                        onClick={() => { setFilterStatus('fully_read'); setShowFilterMenu(false); }}
+                        className={`w-full px-4 py-3 text-left text-sm rounded-xl transition-all btn-press flex items-center gap-2 ${
+                          filterStatus === 'fully_read' ? 'bg-emerald-50 text-emerald-700 font-semibold' : 'text-gray-700 hover:bg-gray-50'
+                        }`}
                       >
-                        Clear all filters
+                        <BookOpen size={14} /> Fully Read
+                      </button>
+                      <button
+                        onClick={() => { setFilterStatus('replied'); setShowFilterMenu(false); }}
+                        className={`w-full px-4 py-3 text-left text-sm rounded-xl transition-all btn-press flex items-center gap-2 ${
+                          filterStatus === 'replied' ? 'bg-purple-50 text-purple-700 font-semibold' : 'text-gray-700 hover:bg-gray-50'
+                        }`}
+                      >
+                        <Reply size={14} /> Replied
+                      </button>
+                      <button
+                        onClick={() => { setFilterStatus('pending'); setShowFilterMenu(false); }}
+                        className={`w-full px-4 py-3 text-left text-sm rounded-xl transition-all btn-press flex items-center gap-2 ${
+                          filterStatus === 'pending' ? 'bg-gray-50 text-gray-700 font-semibold' : 'text-gray-700 hover:bg-gray-50'
+                        }`}
+                      >
+                        <Clock size={14} /> Pending
+                      </button>
+                      <button
+                        onClick={() => { setFilterStatus('failed'); setShowFilterMenu(false); }}
+                        className={`w-full px-4 py-3 text-left text-sm rounded-xl transition-all btn-press flex items-center gap-2 ${
+                          filterStatus === 'failed' ? 'bg-rose-50 text-rose-700 font-semibold' : 'text-gray-700 hover:bg-gray-50'
+                        }`}
+                      >
+                        <AlertCircle size={14} /> Failed
                       </button>
                     </div>
-                  )}
-                </div>
-              )}
+                  </div>
+                )}
+              </div>
             </div>
           </div>
-          
+
           {/* Search Bar */}
-          <div className="relative mb-4">
-            <Search size={19} className="absolute left-4 top-1/2 -translate-y-1/2 text-gray-400" />
-            <input 
-              type="text" 
-              value={searchQuery} 
-              onChange={(e) => setSearchQuery(e.target.value)} 
-              placeholder="Search sent memus..." 
-              className="w-full pl-12 pr-12 py-4 bg-white/80 backdrop-blur-xl border border-gray-200 rounded-2xl text-sm text-gray-900 outline-none focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500 transition-all placeholder:text-gray-400" 
-            />
-            {searchQuery && (
-              <button 
-                onClick={() => setSearchQuery('')}
-                className="absolute right-4 top-1/2 -translate-y-1/2 text-gray-400 hover:text-gray-600 btn-press"
-              >
-                <X size={18} />
-              </button>
-            )}
-          </div>
-          
+          {showSearch && (
+            <div className="mb-4 animate-fadeIn">
+              <div className="relative">
+                <Search size={18} className="absolute left-4 top-1/2 -translate-y-1/2 text-gray-400" />
+                <input
+                  type="text"
+                  value={searchQuery}
+                  onChange={(e) => setSearchQuery(e.target.value)}
+                  placeholder="Search by recipient, subject, or content..."
+                  className="w-full pl-12 pr-12 py-3 text-sm bg-white border border-gray-200 rounded-2xl focus:outline-none focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500 transition-all"
+                  autoFocus
+                />
+                {searchQuery && (
+                  <button
+                    onClick={() => setSearchQuery('')}
+                    className="absolute right-4 top-1/2 -translate-y-1/2 text-gray-400 hover:text-gray-600 btn-press"
+                  >
+                    <X size={18} />
+                  </button>
+                )}
+              </div>
+            </div>
+          )}
+
           {/* Active Filters Display */}
-          {hasActiveFilters && (
-            <div className="flex items-center gap-2 flex-wrap animate-fadeIn">
+          {(filterStatus !== 'all' || searchQuery) && (
+            <div className="flex items-center gap-2 mb-4 animate-fadeIn">
               {filterStatus !== 'all' && (
                 <div className="inline-flex items-center gap-2 px-3 py-1.5 rounded-full text-xs font-semibold bg-indigo-50 text-indigo-700 border border-indigo-200">
-                  Status: {statusFilterOptions.find(f => f.id === filterStatus)?.label}
+                  {statusLabels[filterStatus]}
                   <button onClick={() => setFilterStatus('all')} className="opacity-60 hover:opacity-100 btn-press">✕</button>
-                </div>
-              )}
-              {filterNature !== 'all' && (
-                <div className="inline-flex items-center gap-2 px-3 py-1.5 rounded-full text-xs font-semibold bg-purple-50 text-purple-700 border border-purple-200">
-                  Nature: {natureFilterOptions.find(f => f.id === filterNature)?.label}
-                  <button onClick={() => setFilterNature('all')} className="opacity-60 hover:opacity-100 btn-press">✕</button>
-                </div>
-              )}
-              {filterDate !== 'all' && (
-                <div className="inline-flex items-center gap-2 px-3 py-1.5 rounded-full text-xs font-semibold bg-emerald-50 text-emerald-700 border border-emerald-200">
-                  Date: {dateFilterOptions.find(f => f.id === filterDate)?.label}
-                  <button onClick={() => setFilterDate('all')} className="opacity-60 hover:opacity-100 btn-press">✕</button>
                 </div>
               )}
               {searchQuery && (
@@ -414,30 +380,36 @@ export default function OutMemusPanel({ isGuest, requireAuth }: OutMemusPanelPro
                   <button onClick={() => setSearchQuery('')} className="opacity-60 hover:opacity-100 btn-press">✕</button>
                 </div>
               )}
+              <button
+                onClick={clearFilters}
+                className="text-xs font-semibold text-indigo-600 hover:text-indigo-700 btn-press"
+              >
+                Clear all
+              </button>
             </div>
           )}
         </div>
 
         {/* Memus List */}
-        <div className="flex-1 overflow-y-auto px-6 md:px-10 pb-10">
+        <div className="flex-1 overflow-y-auto px-6 md:px-10 pb-24 custom-scroll">
           {filteredMemus.length === 0 ? (
-            <div className="flex flex-col items-center justify-center py-24 text-center animate-fade-in-scale">
-              <div className="relative w-32 h-32 mb-8">
-                <div className="absolute inset-0 bg-gradient-to-br from-indigo-100 to-purple-100 rounded-3xl blur-2xl animate-pulse"></div>
-                <div className="relative bg-white rounded-3xl w-32 h-32 flex items-center justify-center shadow-xl border border-gray-200">
-                  <Send size={48} className="text-indigo-500" strokeWidth={2} />
-                </div>
+            <div className="flex flex-col items-center justify-center h-64 text-center animate-fade-in-scale">
+              <div className="w-20 h-20 rounded-3xl bg-indigo-50 flex items-center justify-center mb-4">
+                {memus.length === 0 ? <Sparkles size={32} className="text-indigo-400" /> : <Filter size={32} className="text-indigo-400" />}
               </div>
-              <h3 className="font-serif text-xl font-semibold text-gray-900 mb-3">
-                {hasActiveFilters ? 'No matching memus' : 'No sent memus yet'}
+              <h3 className="font-serif text-xl font-bold text-gray-900 mb-2">
+                {memus.length === 0 ? 'No sent memus yet' : 'No messages found'}
               </h3>
-              <p className="text-gray-500 text-sm max-w-md">
-                {hasActiveFilters ? 'Try adjusting your filters or search query.' : 'When you send a memu, it will appear here.'}
+              <p className="text-sm text-gray-500 max-w-xs">
+                {memus.length === 0 
+                  ? 'When you send a memu, it will appear here with delivery tracking.'
+                  : 'Try adjusting your filters or search query.'
+                }
               </p>
-              {hasActiveFilters && (
-                <button 
-                  onClick={clearAllFilters}
-                  className="mt-6 px-6 py-2.5 bg-gradient-to-r from-indigo-600 to-purple-600 text-white rounded-xl text-sm font-semibold hover:shadow-lg transition-all btn-press"
+              {(filterStatus !== 'all' || searchQuery) && (
+                <button
+                  onClick={clearFilters}
+                  className="mt-4 px-6 py-2.5 bg-gradient-to-r from-indigo-600 to-purple-600 text-white rounded-xl text-sm font-semibold hover:shadow-lg transition-all btn-press"
                 >
                   Clear Filters
                 </button>
@@ -445,61 +417,60 @@ export default function OutMemusPanel({ isGuest, requireAuth }: OutMemusPanelPro
             </div>
           ) : (
             <div className="space-y-3">
-              {filteredMemus.map((memu, idx) => {
-                const statusStyles = getStatusStyles(memu);
-                const StatusIcon = statusStyles.icon;
-                const natureStyles = getNatureStyles(memu.nature || 'fyi');
-                const recipientInitials = getInitials(memu.recipient_name);
-                const avatarColor = stringToColor(memu.recipient_id || memu.recipient_name);
+              {filteredMemus.map((memu) => {
+                const StatusIcon = getStatusIcon(memu);
+                const statusColor = getStatusColor(memu);
                 
                 return (
                   <div
                     key={memu.id}
                     onClick={() => setSelectedMemu(memu)}
-                    className={`group relative bg-white rounded-2xl border-[1px] shadow-[0_2px_8px_-2px_rgba(0,0,0,0.04)] hover:shadow-lg hover:-translate-y-0.5 transition-all duration-300 ${natureStyles.border} p-4 cursor-pointer animate-slide-up btn-press`}
-                    style={{ animationDelay: `${idx * 60}ms`, opacity: 0 }}
+                    className="group bg-white rounded-2xl p-4 md:p-5 border border-gray-100 shadow-sm hover:shadow-md hover:border-indigo-100 transition-all cursor-pointer btn-press animate-slide-up"
                   >
-                    {/* 1. Header: Recipient & Time */}
-                    <div className="flex items-center justify-between mb-2">
-                      <div className="flex items-center gap-2.5">
-                        <div className="w-8 h-8 rounded-lg flex items-center justify-center text-white font-bold text-[10px] shadow-sm" style={{ background: `linear-gradient(135deg, ${avatarColor}, ${avatarColor}dd)` }}>
-                          {recipientInitials}
+                    <div className="flex gap-4">
+                      {/* Avatar */}
+                      <div className="flex-shrink-0">
+                        <div className="w-12 h-12 rounded-2xl bg-gradient-to-br from-indigo-100 to-purple-100 flex items-center justify-center text-indigo-700 font-bold text-lg shadow-sm">
+                          {getInitial(memu.recipient_name)}
                         </div>
-                        <div className="text-sm font-semibold text-gray-900">To: {memu.recipient_name}</div>
                       </div>
-                      <div className="text-[11px] text-gray-400 font-medium">{formatDate(memu.created_at)}</div>
-                    </div>
 
-                    {/* 2. Content: Subject & Body */}
-                    <div className="mb-3">
-                      <h3 className="font-serif text-[15px] font-semibold text-gray-900 mb-1 group-hover:text-indigo-600 transition-colors line-clamp-1">
-                        {memu.subject}
-                      </h3>
-                      <p className="text-[13px] text-gray-500 leading-relaxed line-clamp-2">
-                        {memu.content}
-                      </p>
-                    </div>
-
-                    {/* 3. Footer: Nature, Status, Actions */}
-                    <div className="flex items-center justify-between pt-2 border-t border-gray-100/50">
-                      <div className="flex items-center gap-3">
-                        <span className={`px-2 py-0.5 rounded-md text-[9px] font-bold uppercase tracking-wider ${natureStyles.badge}`}>
-                          {memu.nature}
-                        </span>
-                        <span className={`inline-flex items-center gap-1 text-[11px] font-medium ${statusStyles.color}`}>
-                          <StatusIcon size={10} strokeWidth={2.5} /> {statusStyles.label}
-                        </span>
-                        {memu.attachments && memu.attachments.length > 0 && (
-                          <span className="flex items-center gap-1 text-[11px] text-gray-400">
-                            <Paperclip size={10} /> {memu.attachments.length}
+                      {/* Content */}
+                      <div className="flex-1 min-w-0">
+                        <div className="flex items-start justify-between gap-2 mb-1">
+                          <h3 className="font-semibold text-gray-900 truncate text-base">
+                            To: {memu.recipient_name}
+                          </h3>
+                          <span className="text-xs text-gray-400 whitespace-nowrap flex items-center gap-1">
+                            <Clock size={12} />
+                            {formatDate(memu.created_at)}
                           </span>
-                        )}
-                      </div>
-                      
-                      <div className="flex items-center gap-1 opacity-0 group-hover:opacity-100 transition-opacity duration-200">
-                        <button className="p-1.5 rounded-md hover:bg-gray-100 text-gray-400 hover:text-indigo-600 transition-all btn-press" title="View Details">
-                          <Eye size={12} strokeWidth={2.5} />
-                        </button>
+                        </div>
+
+                        <p className="text-sm font-medium text-gray-800 mb-2 truncate">
+                          {memu.subject}
+                        </p>
+
+                        <p className="text-xs text-gray-500 line-clamp-2 mb-3 leading-relaxed">
+                          {memu.content}
+                        </p>
+
+                        {/* Nature & Status Badges */}
+                        <div className="flex items-center gap-2">
+                          <span className={`inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-[10px] font-bold uppercase tracking-wider border ${natureStyles[memu.nature || 'fyi'] || 'bg-gray-100 text-gray-700 border-gray-200'}`}>
+                            {natureLabels[memu.nature || 'fyi'] || memu.nature}
+                          </span>
+                          
+                          <span className={`inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] font-bold ${statusColor}`}>
+                            <StatusIcon size={10} strokeWidth={3} /> {getStatusLabel(memu)}
+                          </span>
+
+                          {memu.attachments && memu.attachments.length > 0 && (
+                            <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full bg-gray-50 text-gray-600 text-[10px] font-bold border border-gray-200">
+                              <Paperclip size={10} /> {memu.attachments.length}
+                            </span>
+                          )}
+                        </div>
                       </div>
                     </div>
                   </div>
@@ -510,20 +481,20 @@ export default function OutMemusPanel({ isGuest, requireAuth }: OutMemusPanelPro
         </div>
       </div>
 
-      {/* Premium Detail Modal */}
+      {/* Detail Modal */}
       {selectedMemu && (
         <div className="fixed inset-0 bg-black/40 backdrop-blur-md flex items-center justify-center z-50 p-4 animate-fadeIn" onClick={() => setSelectedMemu(null)}>
           <div className="bg-white rounded-3xl max-w-2xl w-full max-h-[85vh] flex flex-col shadow-2xl border border-gray-200 animate-fade-in-scale" onClick={(e) => e.stopPropagation()}>
             <div className="flex items-center justify-between p-6 border-b border-gray-100">
               <div className="flex items-center gap-4">
-                <div className="w-12 h-12 rounded-2xl flex items-center justify-center shadow-md text-white font-bold" style={{ background: `linear-gradient(135deg, ${stringToColor(selectedMemu.recipient_id || selectedMemu.recipient_name)}, ${stringToColor(selectedMemu.recipient_id || selectedMemu.recipient_name)}dd)` }}>
-                  {getInitials(selectedMemu.recipient_name)}
+                <div className="w-12 h-12 rounded-2xl bg-gradient-to-br from-indigo-100 to-purple-100 flex items-center justify-center text-indigo-700 font-bold shadow-md">
+                  {getInitial(selectedMemu.recipient_name)}
                 </div>
                 <div>
                   <div className="text-sm font-bold text-gray-900">To: {selectedMemu.recipient_name}</div>
                   <div className="flex items-center gap-2 mt-1">
-                    <span className={`px-2.5 py-1 rounded-lg text-[10px] font-bold uppercase tracking-wider ${getNatureStyles(selectedMemu.nature || 'fyi').badge}`}>
-                      {selectedMemu.nature}
+                    <span className={`px-2.5 py-1 rounded-lg text-[10px] font-bold uppercase tracking-wider ${natureStyles[selectedMemu.nature || 'fyi'] || 'bg-gray-100 text-gray-700 border border-gray-200'}`}>
+                      {natureLabels[selectedMemu.nature || 'fyi'] || selectedMemu.nature}
                     </span>
                   </div>
                 </div>
@@ -574,10 +545,28 @@ export default function OutMemusPanel({ isGuest, requireAuth }: OutMemusPanelPro
       )}
 
       <style>{`
+        @keyframes shimmer {
+          0% { background-position: 200% 0; }
+          100% { background-position: -200% 0; }
+        }
+        .animate-shimmer {
+          animation: shimmer 2s infinite linear;
+        }
         @keyframes fadeIn { from { opacity: 0; transform: scale(0.96); } to { opacity: 1; transform: scale(1); } }
         .animate-fadeIn { animation: fadeIn 0.2s ease-out; }
-        .line-clamp-1 { display: -webkit-box; -webkit-line-clamp: 1; -webkit-box-orient: vertical; overflow: hidden; }
-        .line-clamp-2 { display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden; }
+        @keyframes fadeInScale {
+          from { opacity: 0; transform: scale(0.95); }
+          to { opacity: 1; transform: scale(1); }
+        }
+        .animate-fade-in-scale { animation: fadeInScale 0.2s ease-out; }
+        .line-clamp-2 {
+          display: -webkit-box;
+          -webkit-line-clamp: 2;
+          -webkit-box-orient: vertical;
+          overflow: hidden;
+        }
+        .custom-scroll::-webkit-scrollbar { width: 6px; }
+        .custom-scroll::-webkit-scrollbar-thumb { background: #e2e8f0; border-radius: 10px; }
       `}</style>
     </>
   );

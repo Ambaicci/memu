@@ -30,13 +30,6 @@ interface InMemusPanelProps {
   requireAuth: (action: string, callback: () => void) => void;
 }
 
-const natureStyles: Record<string, string> = {
-  fyi: 'bg-amber-100 text-amber-800 border-amber-200',
-  decide: 'bg-indigo-100 text-indigo-800 border-indigo-200',
-  resolve: 'bg-rose-100 text-rose-800 border-rose-200',
-  urgent: 'bg-emerald-100 text-emerald-800 border-emerald-200',
-};
-
 const natureLabels: Record<string, string> = {
   fyi: 'FYI',
   decide: 'Decide',
@@ -207,14 +200,14 @@ export default function InMemusPanel({ isGuest, requireAuth }: InMemusPanelProps
   // SKELETON LOADING STATE
   if (loading) {
     return (
-      <div className="flex flex-col h-full bg-memu-canvas p-6 md:p-10 animate-fadeIn">
+      <div className="flex flex-col h-full bg-memu-canvas p-6 md:p-10 animate-page-enter">
         <div className="mb-8 space-y-3">
           <SkeletonLoader width="w-48" height="h-8" rounded="rounded-xl" />
           <SkeletonLoader width="w-32" height="h-4" />
         </div>
         <div className="space-y-4">
           {[...Array(6)].map((_, i) => (
-            <div key={i} className="flex gap-4 p-4 bg-white rounded-2xl border border-gray-100 shadow-sm">
+            <div key={i} className="flex gap-4 p-5 bg-white rounded-2xl border border-gray-100 shadow-xs">
               <SkeletonLoader width="w-12" height="h-12" circle />
               <div className="flex-1 space-y-3 py-1">
                 <SkeletonLoader width="w-3/4" height="h-4" />
@@ -242,9 +235,9 @@ export default function InMemusPanel({ isGuest, requireAuth }: InMemusPanelProps
       <div className="px-6 md:px-10 pt-8 pb-6">
         <div className="flex items-center justify-between flex-wrap gap-4 mb-6">
           <div className="space-y-2">
-            <div className="flex items-center gap-3 text-indigo-600">
-              <div className="w-11 h-11 rounded-2xl bg-gradient-to-br from-indigo-600 to-purple-600 flex items-center justify-center shadow-lg">
-                <Inbox size={22} className="text-white" strokeWidth={2.5} />
+            <div className="flex items-center gap-3">
+              <div className="avatar">
+                <Inbox size={24} strokeWidth={2.5} />
               </div>
               <h1 className="font-serif text-2xl md:text-3xl font-bold text-gray-900">Inmemus</h1>
             </div>
@@ -263,9 +256,7 @@ export default function InMemusPanel({ isGuest, requireAuth }: InMemusPanelProps
                 setShowSearch(!showSearch);
                 if (showSearch) setSearchQuery('');
               }}
-              className={`w-10 h-10 rounded-xl border flex items-center justify-center transition-all shadow-sm btn-press ${
-                showSearch ? 'bg-indigo-50 border-indigo-200 text-indigo-600' : 'bg-white border-gray-200 text-gray-500 hover:text-indigo-600 hover:border-indigo-200'
-              }`}
+              className={`btn-icon ${showSearch ? 'border-purple text-purple bg-purple/5' : ''}`}
             >
               <Search size={18} strokeWidth={2.5} />
             </button>
@@ -274,97 +265,58 @@ export default function InMemusPanel({ isGuest, requireAuth }: InMemusPanelProps
             <div className="relative" ref={filterMenuRef}>
               <button 
                 onClick={() => setShowFilterMenu(!showFilterMenu)}
-                className={`w-10 h-10 rounded-xl border flex items-center justify-center transition-all shadow-sm btn-press ${
-                  hasActiveFilters ? 'bg-indigo-50 border-indigo-200 text-indigo-600' : 'bg-white border-gray-200 text-gray-500 hover:text-indigo-600 hover:border-indigo-200'
-                }`}
+                className={`btn-icon ${hasActiveFilters ? 'border-purple text-purple bg-purple/5' : ''}`}
               >
                 <Filter size={18} strokeWidth={2.5} />
               </button>
 
               {/* Filter Dropdown Menu */}
               {showFilterMenu && (
-                <div className="absolute right-0 top-full mt-2 w-52 bg-white rounded-2xl shadow-2xl border border-gray-200 z-50 overflow-hidden animate-fade-in-scale">
+                <div className="absolute right-0 top-full mt-2 w-56 bg-white rounded-2xl shadow-2xl border border-gray-200 z-50 overflow-hidden animate-fade-in-scale">
                   <div className="p-2 max-h-96 overflow-y-auto">
                     {/* Nature Section */}
-                    <div className="px-3 py-1.5 text-[10px] font-bold uppercase tracking-wider text-gray-400">Nature</div>
+                    <div className="px-3 py-2 text-[10px] font-bold uppercase tracking-wider text-gray-400">Nature</div>
                     <button
                       onClick={() => setActiveFilter('all')}
                       className={`w-full px-4 py-2.5 text-left text-sm rounded-xl transition-all btn-press ${
-                        activeFilter === 'all' ? 'bg-indigo-50 text-indigo-700 font-semibold' : 'text-gray-700 hover:bg-gray-50'
+                        activeFilter === 'all' ? 'bg-purple/5 text-purple font-semibold' : 'text-gray-700 hover:bg-gray-50'
                       }`}
                     >
                       All Messages
                     </button>
-                    <button
-                      onClick={() => setActiveFilter('fyi')}
-                      className={`w-full px-4 py-2.5 text-left text-sm rounded-xl transition-all btn-press flex items-center gap-2 ${
-                        activeFilter === 'fyi' ? 'bg-amber-50 text-amber-700 font-semibold' : 'text-gray-700 hover:bg-gray-50'
-                      }`}
-                    >
-                      <Mail size={14} /> FYI
-                    </button>
-                    <button
-                      onClick={() => setActiveFilter('decide')}
-                      className={`w-full px-4 py-2.5 text-left text-sm rounded-xl transition-all btn-press flex items-center gap-2 ${
-                        activeFilter === 'decide' ? 'bg-indigo-50 text-indigo-700 font-semibold' : 'text-gray-700 hover:bg-gray-50'
-                      }`}
-                    >
-                      <CheckCircle size={14} /> Decide
-                    </button>
-                    <button
-                      onClick={() => setActiveFilter('resolve')}
-                      className={`w-full px-4 py-2.5 text-left text-sm rounded-xl transition-all btn-press flex items-center gap-2 ${
-                        activeFilter === 'resolve' ? 'bg-rose-50 text-rose-700 font-semibold' : 'text-gray-700 hover:bg-gray-50'
-                      }`}
-                    >
-                      <AlertCircle size={14} /> Resolve
-                    </button>
-                    <button
-                      onClick={() => setActiveFilter('urgent')}
-                      className={`w-full px-4 py-2.5 text-left text-sm rounded-xl transition-all btn-press flex items-center gap-2 ${
-                        activeFilter === 'urgent' ? 'bg-emerald-50 text-emerald-700 font-semibold' : 'text-gray-700 hover:bg-gray-50'
-                      }`}
-                    >
-                      <Sparkles size={14} /> Urgent
-                    </button>
+                    {['fyi', 'decide', 'resolve', 'urgent'].map((nature) => (
+                      <button
+                        key={nature}
+                        onClick={() => setActiveFilter(nature)}
+                        className={`w-full px-4 py-2.5 text-left text-sm rounded-xl transition-all btn-press flex items-center gap-2 ${
+                          activeFilter === nature ? `bg-${nature === 'fyi' ? 'amber' : nature === 'decide' ? 'indigo' : nature === 'resolve' ? 'rose' : 'emerald'}-50 text-${nature === 'fyi' ? 'amber' : nature === 'decide' ? 'indigo' : nature === 'resolve' ? 'rose' : 'emerald'}-700 font-semibold` : 'text-gray-700 hover:bg-gray-50'
+                        }`}
+                      >
+                        {nature === 'fyi' && <Mail size={14} />}
+                        {nature === 'decide' && <CheckCircle size={14} />}
+                        {nature === 'resolve' && <AlertCircle size={14} />}
+                        {nature === 'urgent' && <Sparkles size={14} />}
+                        {natureLabels[nature]}
+                      </button>
+                    ))}
 
                     {/* Divider */}
                     <div className="my-2 border-t border-gray-100" />
 
                     {/* Date Range Section */}
-                    <div className="px-3 py-1.5 text-[10px] font-bold uppercase tracking-wider text-gray-400">Time Range</div>
-                    <button
-                      onClick={() => setFilterDate('all')}
-                      className={`w-full px-4 py-2.5 text-left text-sm rounded-xl transition-all btn-press flex items-center gap-2 ${
-                        filterDate === 'all' ? 'bg-indigo-50 text-indigo-700 font-semibold' : 'text-gray-700 hover:bg-gray-50'
-                      }`}
-                    >
-                      <Clock size={14} /> All Time
-                    </button>
-                    <button
-                      onClick={() => setFilterDate('today')}
-                      className={`w-full px-4 py-2.5 text-left text-sm rounded-xl transition-all btn-press flex items-center gap-2 ${
-                        filterDate === 'today' ? 'bg-indigo-50 text-indigo-700 font-semibold' : 'text-gray-700 hover:bg-gray-50'
-                      }`}
-                    >
-                      <Calendar size={14} /> Today
-                    </button>
-                    <button
-                      onClick={() => setFilterDate('week')}
-                      className={`w-full px-4 py-2.5 text-left text-sm rounded-xl transition-all btn-press flex items-center gap-2 ${
-                        filterDate === 'week' ? 'bg-indigo-50 text-indigo-700 font-semibold' : 'text-gray-700 hover:bg-gray-50'
-                      }`}
-                    >
-                      <Calendar size={14} /> This Week
-                    </button>
-                    <button
-                      onClick={() => setFilterDate('month')}
-                      className={`w-full px-4 py-2.5 text-left text-sm rounded-xl transition-all btn-press flex items-center gap-2 ${
-                        filterDate === 'month' ? 'bg-indigo-50 text-indigo-700 font-semibold' : 'text-gray-700 hover:bg-gray-50'
-                      }`}
-                    >
-                      <Calendar size={14} /> This Month
-                    </button>
+                    <div className="px-3 py-2 text-[10px] font-bold uppercase tracking-wider text-gray-400">Time Range</div>
+                    {['all', 'today', 'week', 'month'].map((range) => (
+                      <button
+                        key={range}
+                        onClick={() => setFilterDate(range)}
+                        className={`w-full px-4 py-2.5 text-left text-sm rounded-xl transition-all btn-press flex items-center gap-2 ${
+                          filterDate === range ? 'bg-purple/5 text-purple font-semibold' : 'text-gray-700 hover:bg-gray-50'
+                        }`}
+                      >
+                        <Calendar size={14} />
+                        {dateLabels[range]}
+                      </button>
+                    ))}
                   </div>
                 </div>
               )}
@@ -382,7 +334,7 @@ export default function InMemusPanel({ isGuest, requireAuth }: InMemusPanelProps
                 value={searchQuery}
                 onChange={(e) => setSearchQuery(e.target.value)}
                 placeholder="Search by sender, subject, or content..."
-                className="w-full pl-12 pr-12 py-3 text-sm bg-white border border-gray-200 rounded-2xl focus:outline-none focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500 transition-all"
+                className="w-full pl-12 pr-12 py-3 text-sm bg-white border-2 border-gray-200 rounded-2xl focus:outline-none focus:ring-4 focus:ring-purple-500/20 focus:border-purple-500 transition-all"
                 autoFocus
               />
               {searchQuery && (
@@ -401,26 +353,26 @@ export default function InMemusPanel({ isGuest, requireAuth }: InMemusPanelProps
         {hasActiveFilters && (
           <div className="flex items-center gap-2 flex-wrap mb-4 animate-fadeIn">
             {activeFilter !== 'all' && (
-              <div className={`inline-flex items-center gap-2 px-3 py-1.5 rounded-full text-xs font-semibold border ${natureStyles[activeFilter]}`}>
+              <div className={`badge badge-${activeFilter}`}>
                 {natureLabels[activeFilter]}
                 <button onClick={() => setActiveFilter('all')} className="opacity-60 hover:opacity-100 btn-press">✕</button>
               </div>
             )}
             {filterDate !== 'all' && (
-              <div className="inline-flex items-center gap-2 px-3 py-1.5 rounded-full text-xs font-semibold bg-indigo-50 text-indigo-700 border border-indigo-200">
+              <div className="badge" style={{ background: 'rgba(79, 70, 229, 0.1)', color: '#4F46E5', borderColor: 'rgba(79, 70, 229, 0.2)' }}>
                 {dateLabels[filterDate]}
                 <button onClick={() => setFilterDate('all')} className="opacity-60 hover:opacity-100 btn-press">✕</button>
               </div>
             )}
             {searchQuery && (
-              <div className="inline-flex items-center gap-2 px-3 py-1.5 rounded-full text-xs font-semibold bg-gray-100 text-gray-700 border border-gray-200">
+              <div className="badge" style={{ background: 'rgba(100, 116, 139, 0.1)', color: '#64748B', borderColor: 'rgba(100, 116, 139, 0.2)' }}>
                 Search: "{searchQuery}"
                 <button onClick={() => setSearchQuery('')} className="opacity-60 hover:opacity-100 btn-press">✕</button>
               </div>
             )}
             <button
               onClick={clearFilters}
-              className="text-xs font-semibold text-indigo-600 hover:text-indigo-700 btn-press"
+              className="text-xs font-semibold text-purple hover:text-purple-light btn-press"
             >
               Clear all
             </button>
@@ -431,14 +383,14 @@ export default function InMemusPanel({ isGuest, requireAuth }: InMemusPanelProps
       {/* Memus List */}
       <div className="flex-1 overflow-y-auto px-6 md:px-10 pb-24 custom-scroll">
         {filteredMemus.length === 0 ? (
-          <div className="flex flex-col items-center justify-center h-64 text-center animate-fade-in-scale">
-            <div className="w-20 h-20 rounded-3xl bg-indigo-50 flex items-center justify-center mb-4">
-              {memus.length === 0 ? <Sparkles size={32} className="text-indigo-400" /> : <Filter size={32} className="text-indigo-400" />}
+          <div className="empty-state animate-fade-in-scale">
+            <div className="empty-state-icon">
+              {memus.length === 0 ? <Sparkles size={32} className="text-purple" /> : <Filter size={32} className="text-purple" />}
             </div>
-            <h3 className="font-serif text-xl font-bold text-gray-900 mb-2">
+            <h3 className="empty-state-title">
               {memus.length === 0 ? 'Your inbox is empty' : 'No messages found'}
             </h3>
-            <p className="text-sm text-gray-500 max-w-xs">
+            <p className="empty-state-description">
               {memus.length === 0 
                 ? 'When you receive memus, they will appear here with crystal clear progress tracking.'
                 : 'Try adjusting your filters or search query.'
@@ -447,7 +399,7 @@ export default function InMemusPanel({ isGuest, requireAuth }: InMemusPanelProps
             {hasActiveFilters && (
               <button
                 onClick={clearFilters}
-                className="mt-4 px-6 py-2.5 bg-gradient-to-r from-indigo-600 to-purple-600 text-white rounded-xl text-sm font-semibold hover:shadow-lg transition-all btn-press"
+                className="mt-6 btn-primary"
               >
                 Clear Filters
               </button>
@@ -458,19 +410,19 @@ export default function InMemusPanel({ isGuest, requireAuth }: InMemusPanelProps
             {filteredMemus.map((memu) => (
               <div
                 key={memu.id}
-                className="group bg-white rounded-2xl p-4 md:p-5 border border-gray-100 shadow-sm hover:shadow-md hover:border-indigo-100 transition-all cursor-pointer btn-press animate-slide-up"
+                className="card-premium p-5 animate-slide-up"
               >
                 <div className="flex gap-4">
                   {/* Avatar */}
                   <div className="flex-shrink-0">
-                    <div className="w-12 h-12 rounded-2xl bg-gradient-to-br from-indigo-100 to-purple-100 flex items-center justify-center text-indigo-700 font-bold text-lg shadow-sm">
+                    <div className="avatar">
                       {getInitial(memu.sender)}
                     </div>
                   </div>
 
                   {/* Content */}
                   <div className="flex-1 min-w-0">
-                    <div className="flex items-start justify-between gap-2 mb-1">
+                    <div className="flex items-start justify-between gap-2 mb-2">
                       <h3 className="font-semibold text-gray-900 truncate text-base">
                         {getDisplayName(memu.sender)}
                       </h3>
@@ -490,16 +442,16 @@ export default function InMemusPanel({ isGuest, requireAuth }: InMemusPanelProps
 
                     {/* Nature Badge */}
                     <div className="flex items-center gap-2">
-                      <span className={`inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-[10px] font-bold uppercase tracking-wider border ${natureStyles[memu.nature] || 'bg-gray-100 text-gray-700 border-gray-200'}`}>
+                      <span className={`badge badge-${memu.nature}`}>
                         {memu.nature === 'decide' && <CheckCircle size={10} strokeWidth={3} />}
                         {memu.nature === 'resolve' && <AlertCircle size={10} strokeWidth={3} />}
                         {memu.nature === 'urgent' && <Sparkles size={10} strokeWidth={3} />}
                         {memu.nature === 'fyi' && <Mail size={10} strokeWidth={3} />}
-                        {memu.nature}
+                        {natureLabels[memu.nature]}
                       </span>
 
                       {memu.status === 'pending' && (
-                        <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full bg-amber-50 text-amber-700 text-[10px] font-bold border border-amber-100">
+                        <span className="badge" style={{ background: 'rgba(245, 158, 11, 0.1)', color: '#D97706', borderColor: 'rgba(245, 158, 11, 0.2)' }}>
                           <Loader2 size={10} className="animate-spin" /> Pending
                         </span>
                       )}
@@ -511,30 +463,6 @@ export default function InMemusPanel({ isGuest, requireAuth }: InMemusPanelProps
           </div>
         )}
       </div>
-
-      <style>{`
-        .line-clamp-2 {
-          display: -webkit-box;
-          -webkit-line-clamp: 2;
-          -webkit-box-orient: vertical;
-          overflow: hidden;
-        }
-        .custom-scroll::-webkit-scrollbar { width: 6px; }
-        .custom-scroll::-webkit-scrollbar-thumb { background: #e2e8f0; border-radius: 10px; }
-        
-        @keyframes fadeInScale {
-          from { opacity: 0; transform: scale(0.95); }
-          to { opacity: 1; transform: scale(1); }
-        }
-        
-        @keyframes fadeIn {
-          from { opacity: 0; transform: translateY(-4px); }
-          to { opacity: 1; transform: translateY(0); }
-        }
-        
-        .animate-fade-in-scale { animation: fadeInScale 0.2s ease-out; }
-        .animate-fadeIn { animation: fadeIn 0.2s ease-out; }
-      `}</style>
     </div>
   );
 }

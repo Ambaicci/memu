@@ -245,7 +245,6 @@ export default function MemuApp() {
           onMobileClose={() => setIsMobileSidebarOpen(false)}
         />
         
-
         <main className="flex-1 overflow-auto pb-28 md:pb-24 pt-2">
            {/* Mobile Header - FIXED: No blur, solid background, proper spacing */}
 <div className="lg:hidden sticky top-0 z-40 bg-white border-b border-gray-200 px-4 py-3 shadow-sm">

@@ -245,54 +245,49 @@ export default function MemuApp() {
           onMobileClose={() => setIsMobileSidebarOpen(false)}
         />
         
-        <main className="flex-1 overflow-auto pb-28 md:pb-24">
-          {/* Mobile Header with Hamburger Menu */}
-<div className="lg:hidden sticky top-0 z-[60] bg-memu-canvas/95 backdrop-blur-sm border-b border-[#e8e7e3] px-4 py-3 relative pointer-events-auto">
-  <div className="flex items-center justify-between relative z-10">
+
+        <main className="flex-1 overflow-auto pb-28 md:pb-24 pt-2">
+           {/* Mobile Header - FIXED: No blur, solid background, proper spacing */}
+<div className="lg:hidden sticky top-0 z-40 bg-white border-b border-gray-200 px-4 py-3 shadow-sm">
+  <div className="flex items-center justify-between relative">
     <div className="flex items-center gap-3">
       <button
         onClick={() => setIsMobileSidebarOpen(true)}
-        className="p-2 rounded-lg hover:bg-[#e8e7e3] transition text-[#3a3a3a] relative z-20"
+        className="p-2 rounded-lg hover:bg-gray-100 transition text-gray-700"
         aria-label="Open menu"
       >
         <Menu size={20} />
       </button>
       
-      {/* Logo - HIGHLY CLICKABLE with visual feedback */}
+      {/* Logo navigates to Dashboard */}
       <button 
-        onClick={(e) => {
-          e.preventDefault();
-          e.stopPropagation();
-          console.log('Logo clicked! Navigating to dashboard...');
-          handleNavigate('dashboard');
-        }}
-        className="flex items-center gap-2 px-3 py-2 rounded-xl bg-white border border-gray-200 hover:border-indigo-300 hover:bg-indigo-50 active:bg-indigo-100 transition-all cursor-pointer group relative z-20 shadow-sm"
+        onClick={() => handleNavigate('dashboard')} 
+        className="flex items-center gap-2 px-3 py-1.5 rounded-xl hover:bg-gray-100 active:bg-gray-200 transition-all cursor-pointer group"
         title="Go to Dashboard"
-        type="button"
       >
-        <div className="w-7 h-7 rounded-lg bg-gradient-to-br from-indigo-500 to-purple-600 flex items-center justify-center shadow group-hover:scale-110 group-active:scale-95 transition-transform">
+        <div className="w-7 h-7 rounded-lg bg-gradient-to-br from-indigo-500 to-purple-600 flex items-center justify-center shadow group-hover:scale-105 transition-transform">
           <Sparkles size={14} className="text-white" />
         </div>
-        <span className="font-['Playfair_Display'] text-lg font-semibold text-[#1a1a1a] group-hover:text-indigo-600 transition-colors">
+        <span className="font-['Playfair_Display'] text-lg font-semibold text-gray-900 group-hover:text-indigo-600 transition-colors">
           memu
         </span>
       </button>
     </div>
-    <div className="flex items-center gap-1 relative z-20">
+    <div className="flex items-center gap-1">
       <GlobalSearch />
       <NotificationCenter />
     </div>
   </div>
-</div>
-          {/* Desktop Breadcrumb Header */}
-<div className="hidden lg:block sticky top-0 z-[60] bg-memu-canvas/80 backdrop-blur-sm border-b border-[#e8e7e3] px-6 py-2 relative pointer-events-auto">
-  <div className="flex items-center justify-between relative z-10">
+</div>       
+
+    {/* Desktop Header - FIXED: No blur, solid background, proper spacing */}
+<div className="hidden lg:block sticky top-0 z-40 bg-white border-b border-gray-200 px-6 py-2 shadow-sm">
+  <div className="flex items-center justify-between">
     <div className="flex items-center gap-2">
       <button
         onClick={() => { if (window.history.length > 1) window.history.back(); else handleNavigate('home'); }}
-        className="p-1.5 rounded-full hover:bg-[#e8e7e3] transition text-[#3a3a3a] hover:text-[#4f46e5] relative z-20"
+        className="p-1.5 rounded-full hover:bg-gray-100 transition text-gray-700 hover:text-indigo-600"
         aria-label="Go back"
-        type="button"
       >
         <ChevronLeft size={18} />
       </button>
@@ -300,40 +295,33 @@ export default function MemuApp() {
       {/* Home icon navigates to Inbox */}
       <button
         onClick={() => handleNavigate('home')}
-        className="p-1.5 rounded-full hover:bg-[#e8e7e3] transition text-[#3a3a3a] hover:text-[#4f46e5] relative z-20"
+        className="p-1.5 rounded-full hover:bg-gray-100 transition text-gray-700 hover:text-indigo-600"
         aria-label="Inbox"
         title="Go to Inbox"
-        type="button"
       >
         <Home size={18} />
       </button>
       
-      {/* Logo breadcrumb - HIGHLY CLICKABLE */}
+      {/* Logo breadcrumb navigates to Dashboard */}
       <button
-        onClick={(e) => {
-          e.preventDefault();
-          e.stopPropagation();
-          console.log('Logo breadcrumb clicked! Navigating to dashboard...');
-          handleNavigate('dashboard');
-        }}
-        className="flex items-center gap-1.5 text-[13px] ml-1 px-3 py-1.5 rounded-lg bg-white border border-gray-200 hover:border-indigo-300 hover:bg-indigo-50 active:bg-indigo-100 transition-all cursor-pointer group relative z-20 shadow-sm"
+        onClick={() => handleNavigate('dashboard')}
+        className="flex items-center gap-1.5 text-[13px] ml-1 px-2 py-1 rounded-lg hover:bg-gray-100 active:bg-gray-200 transition-all cursor-pointer group"
         title="Go to Dashboard"
-        type="button"
       >
-        <span className="text-[#777] font-medium group-hover:text-indigo-600 transition-colors">memu</span>
-        <span className="text-[#aaa]">/</span>
+        <span className="text-gray-600 font-medium group-hover:text-indigo-600 transition-colors">memu</span>
+        <span className="text-gray-400">/</span>
         <span className="heading-gradient font-medium capitalize">
           {activePanel === 'home' ? 'inbox' : activePanel === 'dashboard' ? 'dashboard' : activePanel.replace('-', ' ')}
         </span>
       </button>
     </div>
-    <div className="flex items-center gap-2 relative z-20">
+    <div className="flex items-center gap-2">
       <GlobalSearch />
       <NotificationCenter />
     </div>
   </div>
-</div>          
-          {isGuest && (
+</div>     
+ {isGuest && (
             <div className="bg-gradient-to-r from-indigo-600/90 to-cyan-600/90 backdrop-blur-md text-white px-4 py-2.5 text-center text-sm flex items-center justify-center gap-2 shadow-sm">
               <Sparkles size={14} />
               <span>You're exploring in Guest Mode.</span>

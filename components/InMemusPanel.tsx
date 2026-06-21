@@ -1,7 +1,7 @@
 'use client';
 
 import { useState, useEffect, useRef } from 'react';
-import { Inbox, Search, Filter, Clock, CheckCircle, AlertCircle, Mail, Sparkles, Loader2, X } from 'lucide-react';
+import { Inbox, Search, Filter, Clock, CheckCircle, AlertCircle, Mail, Sparkles, Loader2, X, Calendar } from 'lucide-react';
 import { createClient } from '@/lib/supabase/client';
 import { useToast } from '@/contexts/ToastContext';
 import SkeletonLoader from '@/components/SkeletonLoader';
@@ -44,11 +44,19 @@ const natureLabels: Record<string, string> = {
   urgent: 'Urgent',
 };
 
+const dateLabels: Record<string, string> = {
+  all: 'All Time',
+  today: 'Today',
+  week: 'This Week',
+  month: 'This Month',
+};
+
 export default function InMemusPanel({ isGuest, requireAuth }: InMemusPanelProps) {
   const [memus, setMemus] = useState<Memu[]>([]);
   const [loading, setLoading] = useState(true);
   const [showFilterMenu, setShowFilterMenu] = useState(false);
   const [activeFilter, setActiveFilter] = useState<string>('all');
+  const [filterDate, setFilterDate] = useState<string>('all');
   const [searchQuery, setSearchQuery] = useState('');
   const [showSearch, setShowSearch] = useState(false);
   const { showToast } = useToast();
@@ -110,7 +118,6 @@ export default function InMemusPanel({ isGuest, requireAuth }: InMemusPanelProps
     fetchMemus();
   }, []);
 
-  // Close filter menu when clicking outside
   useEffect(() => {
     const handleClickOutside = (event: MouseEvent) => {
       if (filterMenuRef.current && !filterMenuRef.current.contains(event.target as Node)) {
@@ -128,6 +135,25 @@ export default function InMemusPanel({ isGuest, requireAuth }: InMemusPanelProps
   }, [showFilterMenu]);
 
   const { isRefreshing } = usePullToRefresh(fetchMemus);
+
+  const isWithinDateRange = (dateStr: string, range: string) => {
+    if (range === 'all') return true;
+    const date = new Date(dateStr);
+    const now = new Date();
+    
+    if (range === 'today') {
+      return date.toDateString() === now.toDateString();
+    }
+    if (range === 'week') {
+      const weekAgo = new Date(now.getTime() - 7 * 24 * 60 * 60 * 1000);
+      return date >= weekAgo;
+    }
+    if (range === 'month') {
+      const monthAgo = new Date(now.getTime() - 30 * 24 * 60 * 60 * 1000);
+      return date >= monthAgo;
+    }
+    return true;
+  };
 
   const formatDate = (dateStr: string) => {
     const date = new Date(dateStr);
@@ -153,11 +179,9 @@ export default function InMemusPanel({ isGuest, requireAuth }: InMemusPanelProps
     return sender.full_name || sender.username || 'Unknown Sender';
   };
 
-  // Filter and search logic
   const filteredMemus = memus.filter(memu => {
-    if (activeFilter !== 'all' && memu.nature !== activeFilter) {
-      return false;
-    }
+    if (activeFilter !== 'all' && memu.nature !== activeFilter) return false;
+    if (!isWithinDateRange(memu.created_at, filterDate)) return false;
 
     if (searchQuery) {
       const query = searchQuery.toLowerCase();
@@ -171,16 +195,14 @@ export default function InMemusPanel({ isGuest, requireAuth }: InMemusPanelProps
     return true;
   });
 
-  const handleFilterSelect = (filter: string) => {
-    setActiveFilter(filter);
-    setShowFilterMenu(false);
-  };
-
   const clearFilters = () => {
     setActiveFilter('all');
+    setFilterDate('all');
     setSearchQuery('');
     setShowSearch(false);
   };
+
+  const hasActiveFilters = activeFilter !== 'all' || filterDate !== 'all' || searchQuery;
 
   // SKELETON LOADING STATE
   if (loading) {
@@ -229,6 +251,7 @@ export default function InMemusPanel({ isGuest, requireAuth }: InMemusPanelProps
             <p className="text-sm text-gray-500 font-medium">
               {filteredMemus.length} {filteredMemus.length === 1 ? 'message' : 'messages'}
               {activeFilter !== 'all' && ` • ${natureLabels[activeFilter]}`}
+              {filterDate !== 'all' && ` • ${dateLabels[filterDate]}`}
               {searchQuery && ` • Search: "${searchQuery}"`}
             </p>
           </div>
@@ -252,7 +275,7 @@ export default function InMemusPanel({ isGuest, requireAuth }: InMemusPanelProps
               <button 
                 onClick={() => setShowFilterMenu(!showFilterMenu)}
                 className={`w-10 h-10 rounded-xl border flex items-center justify-center transition-all shadow-sm btn-press ${
-                  activeFilter !== 'all' ? 'bg-indigo-50 border-indigo-200 text-indigo-600' : 'bg-white border-gray-200 text-gray-500 hover:text-indigo-600 hover:border-indigo-200'
+                  hasActiveFilters ? 'bg-indigo-50 border-indigo-200 text-indigo-600' : 'bg-white border-gray-200 text-gray-500 hover:text-indigo-600 hover:border-indigo-200'
                 }`}
               >
                 <Filter size={18} strokeWidth={2.5} />
@@ -260,47 +283,87 @@ export default function InMemusPanel({ isGuest, requireAuth }: InMemusPanelProps
 
               {/* Filter Dropdown Menu */}
               {showFilterMenu && (
-                <div className="absolute right-0 top-full mt-2 w-48 bg-white rounded-2xl shadow-2xl border border-gray-200 z-50 overflow-hidden animate-fade-in-scale">
-                  <div className="p-2">
+                <div className="absolute right-0 top-full mt-2 w-52 bg-white rounded-2xl shadow-2xl border border-gray-200 z-50 overflow-hidden animate-fade-in-scale">
+                  <div className="p-2 max-h-96 overflow-y-auto">
+                    {/* Nature Section */}
+                    <div className="px-3 py-1.5 text-[10px] font-bold uppercase tracking-wider text-gray-400">Nature</div>
                     <button
-                      onClick={() => handleFilterSelect('all')}
-                      className={`w-full px-4 py-3 text-left text-sm rounded-xl transition-all btn-press ${
+                      onClick={() => setActiveFilter('all')}
+                      className={`w-full px-4 py-2.5 text-left text-sm rounded-xl transition-all btn-press ${
                         activeFilter === 'all' ? 'bg-indigo-50 text-indigo-700 font-semibold' : 'text-gray-700 hover:bg-gray-50'
                       }`}
                     >
                       All Messages
                     </button>
                     <button
-                      onClick={() => handleFilterSelect('fyi')}
-                      className={`w-full px-4 py-3 text-left text-sm rounded-xl transition-all btn-press flex items-center gap-2 ${
+                      onClick={() => setActiveFilter('fyi')}
+                      className={`w-full px-4 py-2.5 text-left text-sm rounded-xl transition-all btn-press flex items-center gap-2 ${
                         activeFilter === 'fyi' ? 'bg-amber-50 text-amber-700 font-semibold' : 'text-gray-700 hover:bg-gray-50'
                       }`}
                     >
                       <Mail size={14} /> FYI
                     </button>
                     <button
-                      onClick={() => handleFilterSelect('decide')}
-                      className={`w-full px-4 py-3 text-left text-sm rounded-xl transition-all btn-press flex items-center gap-2 ${
+                      onClick={() => setActiveFilter('decide')}
+                      className={`w-full px-4 py-2.5 text-left text-sm rounded-xl transition-all btn-press flex items-center gap-2 ${
                         activeFilter === 'decide' ? 'bg-indigo-50 text-indigo-700 font-semibold' : 'text-gray-700 hover:bg-gray-50'
                       }`}
                     >
                       <CheckCircle size={14} /> Decide
                     </button>
                     <button
-                      onClick={() => handleFilterSelect('resolve')}
-                      className={`w-full px-4 py-3 text-left text-sm rounded-xl transition-all btn-press flex items-center gap-2 ${
+                      onClick={() => setActiveFilter('resolve')}
+                      className={`w-full px-4 py-2.5 text-left text-sm rounded-xl transition-all btn-press flex items-center gap-2 ${
                         activeFilter === 'resolve' ? 'bg-rose-50 text-rose-700 font-semibold' : 'text-gray-700 hover:bg-gray-50'
                       }`}
                     >
                       <AlertCircle size={14} /> Resolve
                     </button>
                     <button
-                      onClick={() => handleFilterSelect('urgent')}
-                      className={`w-full px-4 py-3 text-left text-sm rounded-xl transition-all btn-press flex items-center gap-2 ${
+                      onClick={() => setActiveFilter('urgent')}
+                      className={`w-full px-4 py-2.5 text-left text-sm rounded-xl transition-all btn-press flex items-center gap-2 ${
                         activeFilter === 'urgent' ? 'bg-emerald-50 text-emerald-700 font-semibold' : 'text-gray-700 hover:bg-gray-50'
                       }`}
                     >
                       <Sparkles size={14} /> Urgent
+                    </button>
+
+                    {/* Divider */}
+                    <div className="my-2 border-t border-gray-100" />
+
+                    {/* Date Range Section */}
+                    <div className="px-3 py-1.5 text-[10px] font-bold uppercase tracking-wider text-gray-400">Time Range</div>
+                    <button
+                      onClick={() => setFilterDate('all')}
+                      className={`w-full px-4 py-2.5 text-left text-sm rounded-xl transition-all btn-press flex items-center gap-2 ${
+                        filterDate === 'all' ? 'bg-indigo-50 text-indigo-700 font-semibold' : 'text-gray-700 hover:bg-gray-50'
+                      }`}
+                    >
+                      <Clock size={14} /> All Time
+                    </button>
+                    <button
+                      onClick={() => setFilterDate('today')}
+                      className={`w-full px-4 py-2.5 text-left text-sm rounded-xl transition-all btn-press flex items-center gap-2 ${
+                        filterDate === 'today' ? 'bg-indigo-50 text-indigo-700 font-semibold' : 'text-gray-700 hover:bg-gray-50'
+                      }`}
+                    >
+                      <Calendar size={14} /> Today
+                    </button>
+                    <button
+                      onClick={() => setFilterDate('week')}
+                      className={`w-full px-4 py-2.5 text-left text-sm rounded-xl transition-all btn-press flex items-center gap-2 ${
+                        filterDate === 'week' ? 'bg-indigo-50 text-indigo-700 font-semibold' : 'text-gray-700 hover:bg-gray-50'
+                      }`}
+                    >
+                      <Calendar size={14} /> This Week
+                    </button>
+                    <button
+                      onClick={() => setFilterDate('month')}
+                      className={`w-full px-4 py-2.5 text-left text-sm rounded-xl transition-all btn-press flex items-center gap-2 ${
+                        filterDate === 'month' ? 'bg-indigo-50 text-indigo-700 font-semibold' : 'text-gray-700 hover:bg-gray-50'
+                      }`}
+                    >
+                      <Calendar size={14} /> This Month
                     </button>
                   </div>
                 </div>
@@ -335,12 +398,18 @@ export default function InMemusPanel({ isGuest, requireAuth }: InMemusPanelProps
         )}
 
         {/* Active Filters Display */}
-        {(activeFilter !== 'all' || searchQuery) && (
-          <div className="flex items-center gap-2 mb-4 animate-fadeIn">
+        {hasActiveFilters && (
+          <div className="flex items-center gap-2 flex-wrap mb-4 animate-fadeIn">
             {activeFilter !== 'all' && (
               <div className={`inline-flex items-center gap-2 px-3 py-1.5 rounded-full text-xs font-semibold border ${natureStyles[activeFilter]}`}>
                 {natureLabels[activeFilter]}
                 <button onClick={() => setActiveFilter('all')} className="opacity-60 hover:opacity-100 btn-press">✕</button>
+              </div>
+            )}
+            {filterDate !== 'all' && (
+              <div className="inline-flex items-center gap-2 px-3 py-1.5 rounded-full text-xs font-semibold bg-indigo-50 text-indigo-700 border border-indigo-200">
+                {dateLabels[filterDate]}
+                <button onClick={() => setFilterDate('all')} className="opacity-60 hover:opacity-100 btn-press">✕</button>
               </div>
             )}
             {searchQuery && (
@@ -375,7 +444,7 @@ export default function InMemusPanel({ isGuest, requireAuth }: InMemusPanelProps
                 : 'Try adjusting your filters or search query.'
               }
             </p>
-            {(activeFilter !== 'all' || searchQuery) && (
+            {hasActiveFilters && (
               <button
                 onClick={clearFilters}
                 className="mt-4 px-6 py-2.5 bg-gradient-to-r from-indigo-600 to-purple-600 text-white rounded-xl text-sm font-semibold hover:shadow-lg transition-all btn-press"
@@ -454,34 +523,17 @@ export default function InMemusPanel({ isGuest, requireAuth }: InMemusPanelProps
         .custom-scroll::-webkit-scrollbar-thumb { background: #e2e8f0; border-radius: 10px; }
         
         @keyframes fadeInScale {
-          from {
-            opacity: 0;
-            transform: scale(0.95);
-          }
-          to {
-            opacity: 1;
-            transform: scale(1);
-          }
+          from { opacity: 0; transform: scale(0.95); }
+          to { opacity: 1; transform: scale(1); }
         }
         
         @keyframes fadeIn {
-          from {
-            opacity: 0;
-            transform: translateY(-4px);
-          }
-          to {
-            opacity: 1;
-            transform: translateY(0);
-          }
+          from { opacity: 0; transform: translateY(-4px); }
+          to { opacity: 1; transform: translateY(0); }
         }
         
-        .animate-fade-in-scale {
-          animation: fadeInScale 0.2s ease-out;
-        }
-        
-        .animate-fadeIn {
-          animation: fadeIn 0.2s ease-out;
-        }
+        .animate-fade-in-scale { animation: fadeInScale 0.2s ease-out; }
+        .animate-fadeIn { animation: fadeIn 0.2s ease-out; }
       `}</style>
     </div>
   );

@@ -43,7 +43,6 @@ const filterLabels: Record<string, string> = {
   inactive: 'Inactive',
 };
 
-// Premium gradient backgrounds for cards
 const cardGradients = [
   'from-blue-50/80 via-indigo-50/40 to-white',
   'from-purple-50/80 via-pink-50/30 to-white',
@@ -51,18 +50,6 @@ const cardGradients = [
   'from-amber-50/80 via-orange-50/30 to-white',
   'from-rose-50/80 via-pink-50/30 to-white',
   'from-cyan-50/80 via-blue-50/30 to-white',
-];
-
-// Premium color palette for avatars
-const avatarColors = [
-  '#2563EB', // Blue
-  '#7C3AED', // Purple
-  '#10B981', // Emerald
-  '#F59E0B', // Amber
-  '#EF4444', // Rose
-  '#06B6D4', // Cyan
-  '#8B5CF6', // Violet
-  '#EC4899', // Pink
 ];
 
 const iconGradients = [
@@ -76,7 +63,6 @@ const iconGradients = [
   'from-pink-500 to-rose-600',
 ];
 
-// Helper to get consistent gradient for a space
 const getCardGradient = (id: string) => {
   const index = id ? id.charCodeAt(0) % cardGradients.length : 0;
   return cardGradients[index];
@@ -87,11 +73,44 @@ const getIconGradient = (id: string) => {
   return iconGradients[index];
 };
 
-// Helper: Get initials from space name
 const getInitials = (name: string) => {
   if (!name) return '📁';
   return name.split(' ').map(word => word[0]).join('').toUpperCase().slice(0, 2);
 };
+
+// Skeleton Card Component
+const SkeletonCard = ({ index }: { index: number }) => (
+  <div 
+    className="group relative rounded-3xl p-6 animate-slide-up"
+    style={{ animationDelay: `${index * 50}ms` }}
+  >
+    <div className="absolute inset-0 rounded-3xl bg-gradient-to-br from-gray-100/80 via-gray-50/40 to-white border border-gray-200/40 shadow-sm" />
+    
+    <div className="relative z-10">
+      <div className="flex items-start justify-between mb-4">
+        <div className="w-14 h-14 rounded-2xl bg-gray-200 animate-pulse" />
+      </div>
+
+      <div className="mb-3 space-y-2">
+        <div className="h-6 w-3/4 bg-gray-200 rounded animate-pulse" />
+        <div className="h-4 w-1/2 bg-gray-200 rounded animate-pulse" />
+      </div>
+
+      <div className="space-y-2 mb-5">
+        <div className="h-4 w-full bg-gray-200 rounded animate-pulse" />
+        <div className="h-4 w-2/3 bg-gray-200 rounded animate-pulse" />
+      </div>
+
+      <div className="flex items-center justify-between pt-4 border-t border-gray-200/30">
+        <div className="flex items-center gap-4">
+          <div className="h-4 w-16 bg-gray-200 rounded animate-pulse" />
+          <div className="h-4 w-16 bg-gray-200 rounded animate-pulse" />
+        </div>
+        <div className="h-4 w-12 bg-gray-200 rounded animate-pulse" />
+      </div>
+    </div>
+  </div>
+);
 
 export default function SpacesPanel({ isGuest, requireAuth }: SpacesPanelProps = {}) {
   const router = useRouter();
@@ -126,64 +145,92 @@ export default function SpacesPanel({ isGuest, requireAuth }: SpacesPanelProps =
     getUser();
   }, []);
 
-  // Fetch Spaces
-  const { data: spaces = [], isLoading } = useQuery({
+  // Fetch Spaces - OPTIMIZED WITH RPC
+  const { data: spaces = [], isLoading, error: queryError } = useQuery({
     queryKey: ['spaces', currentUserId],
     queryFn: async () => {
       if (!currentUserId) return [];
       const supabase = createClient();
 
-      const { data: memberships, error: memError } = await supabase
-        .from('space_members')
-        .select('space_id, role')
-        .eq('user_id', currentUserId);
-      
-      if (memError) throw memError;
-      if (!memberships || memberships.length === 0) return [];
+      // Try RPC first (optimized single query)
+      const { data, error } = await supabase.rpc('get_user_spaces_enriched', {
+        user_uuid: currentUserId
+      });
 
-      const spaceIds = memberships.map(m => m.space_id);
-      
-      const { data: spacesData, error: spacesError } = await supabase
-        .from('spaces')
-        .select('*')
-        .in('id', spaceIds)
-        .order('created_at', { ascending: false });
+      if (error) {
+        console.error('RPC Error:', error);
+        // Fallback to regular queries if RPC fails
+        return await fetchSpacesFallback(supabase, currentUserId);
+      }
 
-      if (spacesError) throw spacesError;
-
-      const enriched = await Promise.all(
-        (spacesData || []).map(async (space) => {
-          const role = memberships.find(m => m.space_id === space.id)?.role as 'owner' | 'admin' | 'member' | undefined;
-          
-          let memberCount = 0;
-          try {
-            const { count } = await supabase.from('space_members').select('*', { count: 'exact', head: true }).eq('space_id', space.id);
-            memberCount = count || 0;
-          } catch (e) { memberCount = 0; }
-
-          let messageCount = 0;
-          let lastActive = 'New';
-          try {
-            const { count } = await supabase.from('space_messages').select('*', { count: 'exact', head: true }).eq('space_id', space.id);
-            messageCount = count || 0;
-            
-            const { data: lastMsg } = await supabase.from('space_messages').select('created_at').eq('space_id', space.id).order('created_at', { ascending: false }).limit(1);
-            if (lastMsg?.[0]) {
-              const diff = Date.now() - new Date(lastMsg[0].created_at).getTime();
-              const mins = Math.floor(diff / 60000);
-              lastActive = mins < 1 ? 'Just now' : mins < 60 ? `${mins}m ago` : mins < 1440 ? `${Math.floor(mins/60)}h ago` : `${Math.floor(mins/1440)}d ago`;
-            }
-          } catch (e) { /* table may not exist */ }
-
-          return { ...space, role, memberCount, messageCount, lastActive };
-        })
-      );
-
-      return enriched;
+      return (data || []).map((space: any) => ({
+        id: space.id,
+        name: space.name,
+        description: space.description,
+        icon: space.icon,
+        color: space.color,
+        created_by: space.created_by,
+        created_at: space.created_at,
+        role: space.role as 'owner' | 'admin' | 'member',
+        memberCount: Number(space.member_count),
+        messageCount: Number(space.message_count),
+        lastActive: space.last_active,
+      }));
     },
     enabled: !!currentUserId,
     staleTime: 60 * 1000,
+    refetchOnWindowFocus: false,
   });
+
+  // Fallback function if RPC doesn't exist
+  const fetchSpacesFallback = async (supabase: any, userId: string) => {
+    const { data: memberships, error: memError } = await supabase
+      .from('space_members')
+      .select('space_id, role')
+      .eq('user_id', userId);
+    
+    if (memError || !memberships || memberships.length === 0) return [];
+
+    const spaceIds = memberships.map((m: any) => m.space_id);
+    
+    const { data: spacesData, error: spacesError } = await supabase
+      .from('spaces')
+      .select('*')
+      .in('id', spaceIds)
+      .order('created_at', { ascending: false });
+
+    if (spacesError) return [];
+
+    const enriched = await Promise.all(
+      (spacesData || []).map(async (space: any) => {
+        const role = memberships.find((m: any) => m.space_id === space.id)?.role as 'owner' | 'admin' | 'member' | undefined;
+        
+        let memberCount = 0;
+        try {
+          const { count } = await supabase.from('space_members').select('*', { count: 'exact', head: true }).eq('space_id', space.id);
+          memberCount = count || 0;
+        } catch (e) { memberCount = 0; }
+
+        let messageCount = 0;
+        let lastActive = 'New';
+        try {
+          const { count } = await supabase.from('space_messages').select('*', { count: 'exact', head: true }).eq('space_id', space.id);
+          messageCount = count || 0;
+          
+          const { data: lastMsg } = await supabase.from('space_messages').select('created_at').eq('space_id', space.id).order('created_at', { ascending: false }).limit(1);
+          if (lastMsg?.[0]) {
+            const diff = Date.now() - new Date(lastMsg[0].created_at).getTime();
+            const mins = Math.floor(diff / 60000);
+            lastActive = mins < 1 ? 'Just now' : mins < 60 ? `${mins}m ago` : mins < 1440 ? `${Math.floor(mins/60)}h ago` : `${Math.floor(mins/1440)}d ago`;
+          }
+        } catch (e) { /* table may not exist */ }
+
+        return { ...space, role, memberCount, messageCount, lastActive };
+      })
+    );
+
+    return enriched;
+  };
 
   // Real-time updates
   useEffect(() => {
@@ -220,7 +267,6 @@ export default function SpacesPanel({ isGuest, requireAuth }: SpacesPanelProps =
     queryClient.invalidateQueries({ queryKey: ['spaces', currentUserId] });
   };
 
-  // FIX 1: Use router.push() instead of window.location.href
   const handleOpenSpace = (space: Space) => {
     router.push(`/?panel=space-dashboard&space=${space.id}`);
   };
@@ -258,23 +304,11 @@ export default function SpacesPanel({ isGuest, requireAuth }: SpacesPanelProps =
 
   const hasActiveFilters = filter !== 'all' || searchQuery;
 
-  if (isLoading) {
-    return (
-      <div className="flex items-center justify-center h-full w-full bg-memu-canvas">
-        <div className="relative">
-          <div className="absolute inset-0 rounded-full bg-gradient-to-r from-blue-500/20 to-purple-500/20 blur-xl animate-pulse" />
-          <Layers className="w-8 h-8 animate-spin text-blue-600 relative z-10" />
-        </div>
-      </div>
-    );
-  }
-
   return (
     <div className="flex flex-col h-full w-full bg-memu-canvas overflow-y-auto pb-24 custom-scroll">
       
       {/* ================= PREMIUM HEADER ================= */}
       <div className="relative px-6 md:px-10 pt-8 pb-6 w-full overflow-hidden">
-        {/* Subtle background glow */}
         <div className="absolute -top-40 -right-40 w-96 h-96 bg-gradient-to-r from-blue-500/10 to-purple-500/10 rounded-full blur-3xl pointer-events-none" />
         <div className="absolute -bottom-40 -left-40 w-96 h-96 bg-gradient-to-r from-emerald-500/10 to-teal-500/10 rounded-full blur-3xl pointer-events-none" />
         
@@ -286,14 +320,13 @@ export default function SpacesPanel({ isGuest, requireAuth }: SpacesPanelProps =
             <div>
               <h1 className="text-2xl font-bold text-gray-900 tracking-tight">Spaces</h1>
               <p className="text-sm text-gray-500 font-medium mt-0.5">
-                {filteredSpaces.length} {filteredSpaces.length === 1 ? 'workspace' : 'workspaces'}
-                {filter !== 'all' && ` • ${filterLabels[filter]}`}
+                {isLoading ? 'Loading...' : `${filteredSpaces.length} ${filteredSpaces.length === 1 ? 'workspace' : 'workspaces'}`}
+                {!isLoading && filter !== 'all' && ` • ${filterLabels[filter]}`}
               </p>
             </div>
           </div>
 
           <div className="flex items-center gap-3">
-            {/* Search Toggle */}
             <button 
               onClick={() => { setShowSearch(!showSearch); if (showSearch) setSearchQuery(''); }}
               className={`w-10 h-10 rounded-xl border flex items-center justify-center transition-all shadow-sm hover:shadow-md hover:-translate-y-0.5 ${
@@ -303,7 +336,6 @@ export default function SpacesPanel({ isGuest, requireAuth }: SpacesPanelProps =
               <Search size={18} strokeWidth={2} />
             </button>
 
-            {/* Filter Menu */}
             <div className="relative" ref={filterMenuRef}>
               <button 
                 onClick={() => setShowFilterMenu(!showFilterMenu)}
@@ -334,7 +366,6 @@ export default function SpacesPanel({ isGuest, requireAuth }: SpacesPanelProps =
               )}
             </div>
 
-            {/* Create Button */}
             <button
               onClick={() => setShowCreateModal(true)}
               className="flex items-center gap-2 px-4 py-2.5 bg-gradient-to-r from-blue-600 via-indigo-600 to-purple-600 text-white rounded-xl text-sm font-semibold shadow-lg shadow-blue-500/25 hover:shadow-xl hover:-translate-y-0.5 transition-all"
@@ -345,7 +376,6 @@ export default function SpacesPanel({ isGuest, requireAuth }: SpacesPanelProps =
           </div>
         </div>
 
-        {/* Search Bar */}
         {showSearch && (
           <div className="mb-6 animate-fadeIn w-full relative z-10">
             <div className="relative">
@@ -367,7 +397,6 @@ export default function SpacesPanel({ isGuest, requireAuth }: SpacesPanelProps =
           </div>
         )}
 
-        {/* Active Filters Tags */}
         {hasActiveFilters && (
           <div className="flex items-center gap-2 flex-wrap mb-2 animate-fadeIn relative z-10">
             {filter !== 'all' && (
@@ -387,9 +416,15 @@ export default function SpacesPanel({ isGuest, requireAuth }: SpacesPanelProps =
         )}
       </div>
 
-      {/* ================= SPACES GRID – PREMIUM CARDS ================= */}
+      {/* ================= SPACES GRID ================= */}
       <div className="flex-1 px-6 md:px-10 pb-10 w-full">
-        {filteredSpaces.length === 0 ? (
+        {isLoading ? (
+          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+            {[...Array(6)].map((_, idx) => (
+              <SkeletonCard key={idx} index={idx} />
+            ))}
+          </div>
+        ) : filteredSpaces.length === 0 ? (
           <EmptyState
             icon={<Layers size={40} strokeWidth={1.5} className="text-blue-500" />}
             title={spaces.length === 0 ? 'No workspaces yet' : 'No spaces found'}
@@ -412,10 +447,7 @@ export default function SpacesPanel({ isGuest, requireAuth }: SpacesPanelProps =
               const cardGradient = getCardGradient(space.id);
               const iconGradient = getIconGradient(space.id);
               const isOwnerOrAdmin = space.role === 'owner' || space.role === 'admin';
-              
-              // FIX 2: Use custom icon OR initials as avatar
               const displayIcon = space.icon || getInitials(space.name);
-              const isEmoji = displayIcon.length === 1 && !/[A-Z]/.test(displayIcon);
               
               return (
                 <div
@@ -424,19 +456,14 @@ export default function SpacesPanel({ isGuest, requireAuth }: SpacesPanelProps =
                   className="group relative rounded-3xl p-6 cursor-pointer animate-slide-up transition-all duration-300 hover:-translate-y-2"
                   style={{ animationDelay: `${idx * 50}ms` }}
                 >
-                  {/* Glass card with gradient background */}
                   <div className={`absolute inset-0 rounded-3xl bg-gradient-to-br ${cardGradient} border border-gray-200/40 shadow-sm group-hover:shadow-xl group-hover:border-blue-200/60 transition-all duration-300`} />
                   
-                  {/* Subtle glow on hover */}
                   <div className="absolute inset-0 rounded-3xl opacity-0 group-hover:opacity-100 transition-opacity duration-500 pointer-events-none">
                     <div className="absolute -top-20 -right-20 w-64 h-64 bg-gradient-to-r from-blue-500/10 to-purple-500/10 rounded-full blur-2xl" />
                   </div>
 
-                  {/* Content */}
                   <div className="relative z-10">
-                    {/* Top Row: Avatar & Settings */}
                     <div className="flex items-start justify-between mb-4">
-                      {/* FIX 2: Custom avatar with admin-chosen icon/color */}
                       <div 
                         className={`w-14 h-14 rounded-2xl flex items-center justify-center text-2xl shadow-lg group-hover:scale-110 transition-transform duration-300`}
                         style={{ 
@@ -449,7 +476,6 @@ export default function SpacesPanel({ isGuest, requireAuth }: SpacesPanelProps =
                         {displayIcon}
                       </div>
                       
-                      {/* Admin badge on avatar */}
                       {isOwnerOrAdmin && (
                         <div className="absolute top-0 left-0 -mt-1 -ml-1 w-5 h-5 rounded-full bg-gradient-to-r from-blue-500 to-indigo-500 flex items-center justify-center shadow-md">
                           <Sparkles size={10} className="text-white" strokeWidth={2.5} />
@@ -464,7 +490,6 @@ export default function SpacesPanel({ isGuest, requireAuth }: SpacesPanelProps =
                       </button>
                     </div>
 
-                    {/* Title & Role */}
                     <div className="mb-3">
                       <h3 className="text-lg font-bold text-gray-900 tracking-tight group-hover:text-blue-600 transition-colors mb-1 truncate">
                         {space.name}
@@ -481,12 +506,10 @@ export default function SpacesPanel({ isGuest, requireAuth }: SpacesPanelProps =
                       </div>
                     </div>
 
-                    {/* Description */}
                     <p className="text-sm text-gray-600 font-light leading-relaxed mb-5 line-clamp-2 h-10">
                       {space.description || 'No description provided for this workspace.'}
                     </p>
 
-                    {/* Footer Stats – Premium Bar */}
                     <div className="flex items-center justify-between pt-4 border-t border-gray-200/30">
                       <div className="flex items-center gap-4">
                         <div className="flex items-center gap-1.5 text-xs text-gray-500">

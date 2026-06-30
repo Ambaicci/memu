@@ -1,6 +1,7 @@
 'use client';
 
 import { useState, useEffect, useRef } from 'react';
+import Image from 'next/image';
 import { createClient } from '@/lib/supabase/client';
 import { useToast } from '@/contexts/ToastContext';
 import {
@@ -61,19 +62,16 @@ export default function ProfilePanel({ user }: ProfilePanelProps) {
   const [deleteConfirmationText, setDeleteConfirmationText] = useState('');
   const [deleting, setDeleting] = useState(false);
   
-  // 🔐 Change Password State
   const [showPasswordModal, setShowPasswordModal] = useState(false);
   const [currentPassword, setCurrentPassword] = useState('');
   const [newPassword, setNewPassword] = useState('');
   const [confirmPassword, setConfirmPassword] = useState('');
   const [changingPassword, setChangingPassword] = useState(false);
   
-  // 👁️ Password Visibility State
   const [showCurrentPassword, setShowCurrentPassword] = useState(false);
   const [showNewPassword, setShowNewPassword] = useState(false);
   const [showConfirmPassword, setShowConfirmPassword] = useState(false);
   
-    // 🎨 Appearance State
   const [showAppearanceModal, setShowAppearanceModal] = useState(false);
   const { showToast } = useToast();
 
@@ -105,6 +103,12 @@ export default function ProfilePanel({ user }: ProfilePanelProps) {
     const file = e.target.files?.[0];
     if (!file) return;
 
+    // Validate file size (max 5MB)
+    if (file.size > 5 * 1024 * 1024) {
+      showToast('Image must be less than 5MB', 'error');
+      return;
+    }
+
     setUploadingAvatar(true);
     const supabase = createClient();
 
@@ -115,7 +119,10 @@ export default function ProfilePanel({ user }: ProfilePanelProps) {
 
       const { error: uploadError } = await supabase.storage
         .from('avatars')
-        .upload(filePath, file);
+        .upload(filePath, file, {
+          cacheControl: '3600',
+          upsert: false
+        });
 
       if (uploadError) throw uploadError;
 
@@ -123,7 +130,6 @@ export default function ProfilePanel({ user }: ProfilePanelProps) {
         .from('avatars')
         .getPublicUrl(filePath);
 
-      // 1. Update profiles table
       const { error: updateError } = await supabase
         .from('profiles')
         .update({ avatar_url: urlData.publicUrl })
@@ -131,7 +137,6 @@ export default function ProfilePanel({ user }: ProfilePanelProps) {
 
       if (updateError) throw updateError;
 
-      // 2. Update Auth metadata
       const { error: authError } = await supabase.auth.updateUser({
         data: { avatar_url: urlData.publicUrl },
       });
@@ -140,10 +145,8 @@ export default function ProfilePanel({ user }: ProfilePanelProps) {
         console.warn('Auth metadata update failed:', authError);
       }
 
-      // 3. Show success message
       showToast('Avatar updated successfully!', 'success');
 
-      // 4. Force full page reload to refresh Auth session
       setTimeout(() => {
         window.location.reload();
       }, 500);
@@ -236,16 +239,10 @@ export default function ProfilePanel({ user }: ProfilePanelProps) {
     const supabase = createClient();
 
     try {
-      // 1. Delete user's handles
       await supabase.from('handles').delete().eq('user_id', user.id);
-
-      // 2. Delete user's profile
       await supabase.from('profiles').delete().eq('id', user.id);
-
-      // 3. Delete user's memus
       await supabase.from('memus').delete().or(`sender_id.eq.${user.id},recipient_id.eq.${user.id}`);
 
-      // 4. Delete user's auth account (Note: requires service role key in production, will fail on client)
       const { error } = await supabase.auth.admin.deleteUser(user.id);
 
       if (error) {
@@ -350,15 +347,19 @@ export default function ProfilePanel({ user }: ProfilePanelProps) {
       <div className="flex-1 px-6 md:px-10 pb-10 w-full max-w-3xl">
         {/* Main Profile Card */}
         <div className="bg-white rounded-2xl border border-gray-200/60 shadow-sm p-6 md:p-8 mb-6">
-          {/* Avatar Section */}
+          {/* Avatar Section - OPTIMIZED */}
           <div className="flex items-center gap-6 mb-6">
             <div className="relative group">
-              <div className="relative w-20 h-20 rounded-full bg-gradient-to-br from-blue-500 via-indigo-500 to-purple-600 p-0.5 shadow-md">
+              <div className="relative w-20 h-20 rounded-full bg-gradient-to-br from-blue-500 via-indigo-500 to-purple-600 p-0.5 shadow-md overflow-hidden">
                 {profile.avatar_url && !imageError ? (
-                  <img
+                  <Image
                     src={profile.avatar_url}
                     alt={profile.full_name || profile.username}
-                    className="w-full h-full rounded-full object-cover border-2 border-white"
+                    fill
+                    sizes="80px"
+                    quality={85}
+                    priority
+                    className="object-cover rounded-full border-2 border-white"
                     onError={() => setImageError(true)}
                   />
                 ) : (
@@ -417,7 +418,6 @@ export default function ProfilePanel({ user }: ProfilePanelProps) {
             </div>
 
             {isEditing ? (
-              // Edit Mode
               <div className="space-y-3 pt-2">
                 <div>
                   <label className="block text-xs font-semibold text-gray-500 mb-1">Full Name</label>
@@ -476,7 +476,6 @@ export default function ProfilePanel({ user }: ProfilePanelProps) {
                 </div>
               </div>
             ) : (
-              // View Mode
               <div className="space-y-2">
                 {profile.full_name && (
                   <div className="flex items-center gap-3 px-4 py-2.5 bg-gray-50 rounded-xl border border-gray-200/60">
@@ -579,7 +578,6 @@ export default function ProfilePanel({ user }: ProfilePanelProps) {
               <ChevronRight size={16} className="text-gray-400 group-hover:text-blue-600 group-hover:translate-x-0.5 transition-all" />
             </button>
 
-            {/* Sign Out Button */}
             <div className="pt-3 border-t border-gray-200/60">
               {!showSignOutConfirm ? (
                 <button
@@ -713,7 +711,6 @@ export default function ProfilePanel({ user }: ProfilePanelProps) {
             </div>
 
             <div className="space-y-4">
-              {/* Current Password */}
               <div>
                 <label className="block text-xs font-semibold text-gray-500 uppercase tracking-wide mb-2">
                   Current Password
@@ -736,7 +733,6 @@ export default function ProfilePanel({ user }: ProfilePanelProps) {
                 </div>
               </div>
 
-              {/* New Password */}
               <div>
                 <label className="block text-xs font-semibold text-gray-500 uppercase tracking-wide mb-2">
                   New Password
@@ -759,7 +755,6 @@ export default function ProfilePanel({ user }: ProfilePanelProps) {
                 </div>
               </div>
 
-              {/* Confirm New Password */}
               <div>
                 <label className="block text-xs font-semibold text-gray-500 uppercase tracking-wide mb-2">
                   Confirm New Password

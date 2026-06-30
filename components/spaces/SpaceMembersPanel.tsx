@@ -313,19 +313,18 @@ export default function SpaceMembersPanel({ space }: SpaceMembersPanelProps) {
         
         <div className="relative" ref={dropdownRef}>
           <button 
-            onClick={() => setShowInvite(!showInvite)}
-            className="flex items-center gap-1.5 md:gap-2 px-3 md:px-4 py-2.5 rounded-xl text-xs md:text-sm font-semibold transition-all shadow-md active:shadow-lg active:scale-95"
-            style={{
-              background: `linear-gradient(135deg, ${spaceColor}, ${spaceColor}DD)`,
-              color: 'white',
-              boxShadow: `0 4px 14px ${spaceColor}44`,
-            }}
-            aria-label="Invite members"
-          >
-            <UserPlus size={16} strokeWidth={2} />
-            <span className="hidden sm:inline">Invite</span>
-          </button>
-
+  onClick={() => setShowInvite(!showInvite)}
+  className="flex items-center gap-1.5 px-3 py-2 rounded-xl text-xs font-semibold transition-all shadow-md active:shadow-lg active:scale-95"
+  style={{
+    background: `linear-gradient(135deg, ${spaceColor}, ${spaceColor}DD)`,
+    color: 'white',
+    boxShadow: `0 4px 14px ${spaceColor}44`,
+  }}
+  aria-label="Invite members"
+>
+  <UserPlus size={14} strokeWidth={2} />
+  <span className="hidden sm:inline">Invite</span>
+</button>
           {showInvite && (
             <div className="fixed md:absolute inset-x-0 md:inset-auto md:right-0 md:top-full md:mt-2 bottom-0 md:bottom-auto w-full md:w-80 bg-white/95 backdrop-blur-xl md:rounded-2xl shadow-2xl border-t md:border border-gray-200/60 z-50 overflow-hidden animate-slideUp md:animate-fade-in-scale">
               

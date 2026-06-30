@@ -1,9 +1,17 @@
-import type { Metadata } from "next";
+import type { Metadata, Viewport } from "next";
+import { Inter } from "next/font/google";
 import { ToastProvider } from '@/contexts/ToastContext';
 import { ThemeProvider } from '@/contexts/ThemeContext';
 import { createClient } from '@/lib/supabase/server';
 import QueryProvider from '@/components/QueryProvider';
 import "./globals.css";
+
+// ✅ Self-host Inter font – no render-blocking external request
+const inter = Inter({
+  subsets: ['latin'],
+  display: 'swap',
+  variable: '--font-inter',
+});
 
 export const metadata: Metadata = {
   title: "memu — communicate differently",
@@ -18,6 +26,15 @@ export const metadata: Metadata = {
   manifest: '/site.webmanifest',
 };
 
+// ✅ Mobile viewport configuration – prevents zoom issues and handles notches
+export const viewport: Viewport = {
+  width: 'device-width',
+  initialScale: 1,
+  maximumScale: 1,
+  viewportFit: 'cover',
+  themeColor: '#2563eb',
+};
+
 export default async function RootLayout({
   children,
 }: Readonly<{
@@ -29,13 +46,7 @@ export default async function RootLayout({
 
   return (
     <html lang="en" suppressHydrationWarning>
-      <head>
-        <link 
-          href="https://fonts.googleapis.com/css2?family=Inter:ital,wght@0,400;0,500;0,600;0,700;1,400&display=swap" 
-          rel="stylesheet" 
-        />
-      </head>
-      <body className="antialiased">
+      <body className={`${inter.variable} antialiased`}>
         <ThemeProvider>
           <ToastProvider>
             <QueryProvider>

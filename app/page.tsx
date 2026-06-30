@@ -277,7 +277,12 @@ export default function MemuApp() {
           onMobileClose={() => setIsMobileSidebarOpen(false)}
         />
 
-        <main className="flex-1 min-w-0 min-h-0 overflow-auto pb-28 md:pb-24 pt-0">
+        {/* ============================================
+            MAIN CONTENT – MOBILE OPTIMIZED
+            - pb-bottom-nav uses CSS variable
+            - consistent with BottomNav height
+            ============================================ */}
+        <main className="flex-1 min-w-0 min-h-0 overflow-auto pt-0 pb-bottom-nav">
           {/* Desktop Header */}
           <div className="hidden lg:block sticky top-0 z-40 bg-white/80 backdrop-blur-xl border-b border-gray-200/40 shadow-sm -mt-1">
             <div className="absolute bottom-0 left-0 right-0 h-[1px] bg-gradient-to-r from-transparent via-blue-200/30 to-transparent" />
@@ -288,7 +293,7 @@ export default function MemuApp() {
                     if (window.history.length > 1) window.history.back();
                     else handleNavigate('home');
                   }}
-                  className="p-1.5 rounded-lg hover:bg-gray-100/80 transition text-gray-400 hover:text-blue-600 group"
+                  className="p-1.5 rounded-lg hover:bg-gray-100/80 transition text-gray-400 hover:text-blue-600 group active:scale-95"
                   aria-label="Go back"
                 >
                   <ChevronLeft size={18} strokeWidth={2} className="group-hover:-translate-x-0.5 transition-transform" />
@@ -296,7 +301,7 @@ export default function MemuApp() {
 
                 <button
                   onClick={() => handleNavigate('home')}
-                  className={`p-1.5 rounded-lg hover:bg-gray-100/80 transition group ${
+                  className={`p-1.5 rounded-lg hover:bg-gray-100/80 transition group active:scale-95 ${
                     activePanel === 'home' || activePanel === 'inmemus'
                       ? 'text-blue-600'
                       : 'text-gray-400 hover:text-blue-600'
@@ -310,7 +315,7 @@ export default function MemuApp() {
                 <div className="flex items-center gap-1.5 ml-2">
                   <button
                     onClick={() => handleNavigate('dashboard')}
-                    className="flex items-center gap-1.5 text-[13px] px-2 py-1 rounded-lg hover:bg-gray-100/80 transition-all cursor-pointer group"
+                    className="flex items-center gap-1.5 text-[13px] px-2 py-1 rounded-lg hover:bg-gray-100/80 transition-all cursor-pointer group active:scale-95"
                     title="Go to Dashboard"
                   >
                     <span className="text-gray-400 font-medium group-hover:text-gray-600 transition-colors tracking-tight">
@@ -337,16 +342,18 @@ export default function MemuApp() {
               <div className="flex items-center gap-2">
                 <button
                   onClick={() => setIsMobileSidebarOpen(true)}
-                  className="p-2 rounded-lg hover:bg-gray-100/80 transition text-gray-600"
+                  className="p-2 rounded-lg hover:bg-gray-100/80 transition text-gray-600 active:scale-95"
                   aria-label="Open menu"
+                  style={{ minHeight: '44px', minWidth: '44px' }}
                 >
                   <Menu size={20} strokeWidth={2} />
                 </button>
 
                 <button
                   onClick={() => handleNavigate('dashboard')}
-                  className="flex items-center gap-2 px-2 py-1 rounded-lg hover:bg-gray-100/80 active:bg-gray-200/60 transition-all cursor-pointer group"
+                  className="flex items-center gap-2 px-2 py-1 rounded-lg hover:bg-gray-100/80 active:bg-gray-200/60 transition-all cursor-pointer group active:scale-95"
                   title="Go to Dashboard"
+                  style={{ minHeight: '44px' }}
                 >
                   <div className="w-7 h-7 rounded-lg bg-gradient-to-br from-blue-600 to-indigo-600 flex items-center justify-center shadow-sm group-hover:scale-105 transition-transform">
                     <Sparkles size={14} strokeWidth={2} className="text-white" />
@@ -369,7 +376,7 @@ export default function MemuApp() {
             </div>
           </div>
 
-          {/* Guest Mode Banner */}
+          {/* Guest Mode Banner – stays as is */}
           {isGuest && (
             <div className="bg-gradient-to-r from-blue-600/90 via-indigo-600/90 to-purple-600/90 text-white px-4 py-3 text-center text-sm flex items-center justify-center gap-3 shadow-lg relative overflow-hidden border-b border-white/10">
               <div className="absolute inset-0 bg-gradient-to-r from-white/5 via-transparent to-white/5 pointer-events-none" />

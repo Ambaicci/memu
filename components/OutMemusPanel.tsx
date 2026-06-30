@@ -264,7 +264,7 @@ export default function OutMemusPanel({ isGuest, requireAuth }: OutMemusPanelPro
         </div>
       )}
 
-      {/* HEADER SECTION */}
+      {/* ================= HEADER SECTION ================= */}
       <div className="px-6 md:px-10 pt-8 pb-4 w-full">
         <div className="flex items-center justify-between flex-wrap gap-4 mb-6">
           <div className="space-y-1">
@@ -283,22 +283,24 @@ export default function OutMemusPanel({ isGuest, requireAuth }: OutMemusPanelPro
           </div>
 
           <div className="flex items-center gap-2">
+            {/* Search Toggle – Mobile Optimized */}
             <button
               onClick={() => {
                 setShowSearch(!showSearch);
                 if (showSearch) setSearchQuery('');
               }}
-              className={`w-10 h-10 rounded-xl flex items-center justify-center transition-all btn-press ${
+              className={`w-10 h-10 rounded-xl flex items-center justify-center transition-all btn-press active:scale-95 ${
                 showSearch ? 'bg-blue-600 text-white shadow-sm' : 'bg-gray-100 text-gray-500 hover:bg-gray-200'
               }`}
             >
               <Search size={18} strokeWidth={2} />
             </button>
 
+            {/* Filter Dropdown */}
             <div className="relative" ref={filterMenuRef}>
               <button
                 onClick={() => setShowFilterMenu(!showFilterMenu)}
-                className={`w-10 h-10 rounded-xl flex items-center justify-center transition-all btn-press ${
+                className={`w-10 h-10 rounded-xl flex items-center justify-center transition-all btn-press active:scale-95 ${
                   hasActiveFilters ? 'bg-blue-600 text-white shadow-sm' : 'bg-gray-100 text-gray-500 hover:bg-gray-200'
                 }`}
               >
@@ -306,12 +308,12 @@ export default function OutMemusPanel({ isGuest, requireAuth }: OutMemusPanelPro
               </button>
 
               {showFilterMenu && (
-                <div className="absolute right-0 top-full mt-2 w-64 bg-white rounded-2xl shadow-xl border border-gray-200 z-50 overflow-hidden animate-fade-in-scale">
+                <div className="absolute right-0 top-full mt-2 w-64 max-w-[calc(100vw-2rem)] bg-white rounded-2xl shadow-xl border border-gray-200 z-50 overflow-hidden animate-fade-in-scale">
                   <div className="p-2 max-h-96 overflow-y-auto no-scrollbar">
                     <div className="px-3 py-2 text-[11px] font-bold text-blue-600 tracking-widest uppercase">Nature</div>
                     <button
                       onClick={() => setActiveFilter('all')}
-                      className={`w-full px-4 py-2.5 text-left text-sm rounded-xl transition-all btn-press ${
+                      className={`w-full px-4 py-2.5 text-left text-sm rounded-xl transition-all btn-press active:scale-95 ${
                         activeFilter === 'all' ? 'bg-blue-600 text-white font-medium' : 'text-gray-700 hover:bg-gray-50'
                       }`}
                     >
@@ -324,7 +326,7 @@ export default function OutMemusPanel({ isGuest, requireAuth }: OutMemusPanelPro
                         <button
                           key={nature}
                           onClick={() => setActiveFilter(nature)}
-                          className={`w-full px-4 py-2.5 text-left text-sm rounded-xl transition-all btn-press flex items-center gap-2 ${
+                          className={`w-full px-4 py-2.5 text-left text-sm rounded-xl transition-all btn-press active:scale-95 flex items-center gap-2 ${
                             activeFilter === nature
                               ? 'bg-blue-600 text-white font-medium'
                               : 'text-gray-700 hover:bg-gray-50'
@@ -341,7 +343,7 @@ export default function OutMemusPanel({ isGuest, requireAuth }: OutMemusPanelPro
                       <button
                         key={range}
                         onClick={() => setFilterDate(range)}
-                        className={`w-full px-4 py-2.5 text-left text-sm rounded-xl transition-all btn-press flex items-center gap-2 ${
+                        className={`w-full px-4 py-2.5 text-left text-sm rounded-xl transition-all btn-press active:scale-95 flex items-center gap-2 ${
                           filterDate === range
                             ? 'bg-blue-600 text-white font-medium'
                             : 'text-gray-700 hover:bg-gray-50'
@@ -357,6 +359,7 @@ export default function OutMemusPanel({ isGuest, requireAuth }: OutMemusPanelPro
           </div>
         </div>
 
+        {/* Search Input – Mobile Optimized (text-base prevents iOS zoom) */}
         {showSearch && (
           <div className="mb-4 animate-fadeIn w-full">
             <div className="relative w-full">
@@ -366,13 +369,13 @@ export default function OutMemusPanel({ isGuest, requireAuth }: OutMemusPanelPro
                 value={searchQuery}
                 onChange={(e) => setSearchQuery(e.target.value)}
                 placeholder="Search sent messages..."
-                className="w-full pl-12 pr-12 py-3 text-sm bg-gray-50 border border-gray-200 rounded-xl outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-400 transition text-gray-900 placeholder:text-gray-400"
+                className="w-full pl-12 pr-12 py-3 text-base bg-gray-50 border border-gray-200 rounded-xl outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-400 transition text-gray-900 placeholder:text-gray-400"
                 autoFocus
               />
               {searchQuery && (
                 <button
                   onClick={() => setSearchQuery('')}
-                  className="absolute right-4 top-1/2 -translate-y-1/2 text-gray-400 hover:text-gray-600 btn-press"
+                  className="absolute right-4 top-1/2 -translate-y-1/2 text-gray-400 hover:text-gray-600 btn-press active:scale-95"
                 >
                   <X size={18} strokeWidth={2} />
                 </button>
@@ -381,6 +384,7 @@ export default function OutMemusPanel({ isGuest, requireAuth }: OutMemusPanelPro
           </div>
         )}
 
+        {/* Active Filters */}
         {hasActiveFilters && (
           <div className="flex items-center gap-2 flex-wrap mb-4 animate-fadeIn">
             {activeFilter !== 'all' && (
@@ -388,7 +392,7 @@ export default function OutMemusPanel({ isGuest, requireAuth }: OutMemusPanelPro
                 className={`inline-flex items-center gap-2 px-3 py-1.5 rounded-full text-xs font-medium border ${natureStyles[activeFilter].bg} ${natureStyles[activeFilter].text} ${natureStyles[activeFilter].border}`}
               >
                 {natureLabels[activeFilter]}
-                <button onClick={() => setActiveFilter('all')} className="opacity-60 hover:opacity-100 btn-press">
+                <button onClick={() => setActiveFilter('all')} className="opacity-60 hover:opacity-100 btn-press active:scale-95">
                   ✕
                 </button>
               </div>
@@ -396,7 +400,7 @@ export default function OutMemusPanel({ isGuest, requireAuth }: OutMemusPanelPro
             {filterDate !== 'all' && (
               <div className="inline-flex items-center gap-2 px-3 py-1.5 rounded-full text-xs font-medium bg-gray-900 text-white">
                 {dateLabels[filterDate]}
-                <button onClick={() => setFilterDate('all')} className="opacity-60 hover:opacity-100 btn-press">
+                <button onClick={() => setFilterDate('all')} className="opacity-60 hover:opacity-100 btn-press active:scale-95">
                   ✕
                 </button>
               </div>
@@ -404,14 +408,14 @@ export default function OutMemusPanel({ isGuest, requireAuth }: OutMemusPanelPro
             {searchQuery && (
               <div className="inline-flex items-center gap-2 px-3 py-1.5 rounded-full text-xs font-medium bg-gray-100 text-gray-700">
                 Search: "{searchQuery}"
-                <button onClick={() => setSearchQuery('')} className="opacity-60 hover:opacity-100 btn-press">
+                <button onClick={() => setSearchQuery('')} className="opacity-60 hover:opacity-100 btn-press active:scale-95">
                   ✕
                 </button>
               </div>
             )}
             <button
               onClick={clearFilters}
-              className="text-xs font-medium text-blue-600 hover:text-blue-700 btn-press"
+              className="text-xs font-medium text-blue-600 hover:text-blue-700 btn-press active:scale-95"
             >
               Clear all
             </button>
@@ -419,7 +423,7 @@ export default function OutMemusPanel({ isGuest, requireAuth }: OutMemusPanelPro
         )}
       </div>
 
-      {/* MEMU LIST */}
+      {/* ================= MEMU LIST ================= */}
       <div className="flex-1 overflow-y-auto px-6 md:px-10 pb-24 custom-scroll w-full">
         {filteredMemus.length === 0 ? (
           <EmptyState
@@ -544,7 +548,7 @@ export default function OutMemusPanel({ isGuest, requireAuth }: OutMemusPanelPro
         )}
       </div>
 
-      {/* VIEW MEMU MODAL */}
+      {/* ================= VIEW MEMU MODAL ================= */}
       {selectedMemu && (
         <div
           className="fixed inset-0 z-[9999] flex items-center justify-center p-4 sm:p-6 animate-fadeIn"
@@ -581,7 +585,7 @@ export default function OutMemusPanel({ isGuest, requireAuth }: OutMemusPanelPro
               </div>
               <button
                 onClick={() => setSelectedMemu(null)}
-                className="p-1.5 rounded-lg hover:bg-gray-200 text-gray-500 transition"
+                className="p-1.5 rounded-lg hover:bg-gray-200 text-gray-500 transition active:scale-95"
               >
                 <X size={18} strokeWidth={2} />
               </button>

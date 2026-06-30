@@ -1,4 +1,8 @@
+
 @import "tailwindcss";
+
+/* Enable class-based dark mode in Tailwind v4 */
+@custom-variant dark (&:where(.dark, .dark *));
 
 /* =========================================
     MEMU DESIGN SYSTEM v3.1 - BLUE-PRIMARY
@@ -676,4 +680,29 @@ h1, h2, h3, h4, h5, h6, .heading-serif {
   color: var(--ink3);
   max-width: 320px;
   line-height: 1.6;
+}
+/* ==========================================
+   MOBILE-SAFE UTILITIES
+   ========================================== */
+
+/* Safe area padding for fixed elements */
+.pb-safe-bottom {
+  padding-bottom: var(--safe-area-inset-bottom);
+}
+
+/* Bottom nav height utility */
+.h-bottom-nav {
+  height: var(--bottom-nav-height);
+}
+
+/* Total bottom spacing for scroll containers */
+.pb-bottom-nav {
+  padding-bottom: var(--bottom-nav-total);
+}
+
+/* Prevent iOS zoom on inputs (applied globally) */
+@media (max-width: 768px) {
+  input, textarea, select {
+    font-size: 16px !important;
+  }
 }

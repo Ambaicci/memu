@@ -184,47 +184,61 @@ export default function BottomNav({ activePanel, onNavigate, onOpenCompose, isGu
         </div>
       )}
 
-      {/* Bottom Navigation Bar - Updated to Blue-Primary */}
+      {/* ============================================
+          BOTTOM NAVIGATION BAR – MOBILE OPTIMIZED
+          Added: pb-safe-bottom, h-bottom-nav, 
+                 44px min touch targets
+          ============================================ */}
       <nav
         className={`fixed bottom-0 left-0 right-0 z-30 lg:hidden transition-transform duration-500 ease-out ${
           isVisible ? 'translate-y-0' : 'translate-y-full'
         }`}
-        style={{ paddingBottom: 'env(safe-area-inset-bottom, 0px)' }}
+        style={{ 
+          paddingBottom: 'env(safe-area-inset-bottom, 0px)',
+          height: 'calc(var(--bottom-nav-height, 64px) + env(safe-area-inset-bottom, 0px))',
+        }}
       >
-        <div className="bg-white/80 backdrop-blur-xl border-t border-gray-200/60 shadow-[0_-4px_20px_-4px_rgba(0,0,0,0.08)]">
-          <div className="flex items-center justify-around px-2 py-2">
+        <div className="bg-white/80 backdrop-blur-xl border-t border-gray-200/60 shadow-[0_-4px_20px_-4px_rgba(0,0,0,0.08)] h-full">
+          <div className="flex items-center justify-around px-2 h-full">
             {/* Home */}
             <button
               onClick={() => { triggerHaptic('selection'); onNavigate('home'); }}
-              className={`flex flex-col items-center gap-0.5 px-3 py-1.5 rounded-xl transition-all btn-press min-w-[60px] ${isHomeActive ? 'text-blue-600' : 'text-gray-500'}`}
+              className={`flex flex-col items-center justify-center gap-0.5 px-3 py-1 rounded-xl transition-all btn-press min-w-[56px] h-full ${
+                isHomeActive ? 'text-blue-600' : 'text-gray-500'
+              }`}
+              style={{ minHeight: '44px' }}
             >
-              <div className={`p-1.5 rounded-xl transition-all ${isHomeActive ? 'bg-blue-50' : ''}`}>
+              <div className={`p-1 rounded-xl transition-all ${isHomeActive ? 'bg-blue-50' : ''}`}>
                 <Home size={20} strokeWidth={isHomeActive ? 2.5 : 2} />
               </div>
-              <span className="text-[10px] font-semibold">Home</span>
+              <span className="text-[9px] font-semibold leading-none">Home</span>
             </button>
 
             {/* Inbox */}
             <button
               onClick={() => { triggerHaptic('selection'); onNavigate('inmemus'); }}
-              className={`flex flex-col items-center gap-0.5 px-3 py-1.5 rounded-xl transition-all btn-press min-w-[60px] ${isInboxActive ? 'text-blue-600' : 'text-gray-500'}`}
+              className={`flex flex-col items-center justify-center gap-0.5 px-3 py-1 rounded-xl transition-all btn-press min-w-[56px] h-full ${
+                isInboxActive ? 'text-blue-600' : 'text-gray-500'
+              }`}
+              style={{ minHeight: '44px' }}
             >
-              <div className={`p-1.5 rounded-xl transition-all ${isInboxActive ? 'bg-blue-50' : ''}`}>
+              <div className={`p-1 rounded-xl transition-all ${isInboxActive ? 'bg-blue-50' : ''}`}>
                 <Inbox size={20} strokeWidth={isInboxActive ? 2.5 : 2} />
               </div>
-              <span className="text-[10px] font-semibold">InMemus</span>
+              <span className="text-[9px] font-semibold leading-none">Inbox</span>
             </button>
 
-            {/* Compose - Solid Blue */}
+            {/* Compose - Solid Blue, floating */}
             <button
               onClick={() => { triggerHaptic('medium'); onOpenCompose(); }}
-              className="relative -mt-6 btn-press"
+              className="relative -mt-6 btn-press flex-shrink-0"
               aria-label="Compose"
+              style={{ minHeight: '44px', minWidth: '44px' }}
             >
               <div className="w-14 h-14 rounded-2xl bg-blue-600 flex items-center justify-center shadow-lg shadow-blue-500/30 hover:shadow-xl hover:-translate-y-0.5 transition-all">
                 <Plus size={24} strokeWidth={2.5} className="text-white" />
               </div>
-              <span className="absolute -bottom-5 left-1/2 -translate-x-1/2 text-[10px] font-semibold text-gray-700 whitespace-nowrap">
+              <span className="absolute -bottom-6 left-1/2 -translate-x-1/2 text-[9px] font-semibold text-gray-700 whitespace-nowrap">
                 Compose
               </span>
             </button>
@@ -232,23 +246,29 @@ export default function BottomNav({ activePanel, onNavigate, onOpenCompose, isGu
             {/* Spaces */}
             <button
               onClick={() => { triggerHaptic('selection'); onNavigate('spaces'); }}
-              className={`flex flex-col items-center gap-0.5 px-3 py-1.5 rounded-xl transition-all btn-press min-w-[60px] ${isSpacesActive ? 'text-blue-600' : 'text-gray-500'}`}
+              className={`flex flex-col items-center justify-center gap-0.5 px-3 py-1 rounded-xl transition-all btn-press min-w-[56px] h-full ${
+                isSpacesActive ? 'text-blue-600' : 'text-gray-500'
+              }`}
+              style={{ minHeight: '44px' }}
             >
-              <div className={`p-1.5 rounded-xl transition-all ${isSpacesActive ? 'bg-blue-50' : ''}`}>
+              <div className={`p-1 rounded-xl transition-all ${isSpacesActive ? 'bg-blue-50' : ''}`}>
                 <Layers size={20} strokeWidth={isSpacesActive ? 2.5 : 2} />
               </div>
-              <span className="text-[10px] font-semibold">Spaces</span>
+              <span className="text-[9px] font-semibold leading-none">Spaces</span>
             </button>
 
             {/* More */}
             <button
               onClick={() => { triggerHaptic('selection'); setShowMoreMenu(true); }}
-              className={`flex flex-col items-center gap-0.5 px-3 py-1.5 rounded-xl transition-all btn-press min-w-[60px] ${isMoreActive ? 'text-blue-600' : 'text-gray-500'}`}
+              className={`flex flex-col items-center justify-center gap-0.5 px-3 py-1 rounded-xl transition-all btn-press min-w-[56px] h-full ${
+                isMoreActive ? 'text-blue-600' : 'text-gray-500'
+              }`}
+              style={{ minHeight: '44px' }}
             >
-              <div className={`p-1.5 rounded-xl transition-all ${isMoreActive ? 'bg-blue-50' : ''}`}>
+              <div className={`p-1 rounded-xl transition-all ${isMoreActive ? 'bg-blue-50' : ''}`}>
                 <MoreHorizontal size={20} strokeWidth={isMoreActive ? 2.5 : 2} />
               </div>
-              <span className="text-[10px] font-semibold">More</span>
+              <span className="text-[9px] font-semibold leading-none">More</span>
             </button>
           </div>
         </div>
@@ -264,6 +284,7 @@ export default function BottomNav({ activePanel, onNavigate, onOpenCompose, isGu
         }
         .custom-scroll::-webkit-scrollbar { width: 4px; }
         .custom-scroll::-webkit-scrollbar-thumb { background: #d4d4d4; border-radius: 10px; }
+        .btn-press:active { transform: scale(0.95); }
       `}</style>
     </>
   );

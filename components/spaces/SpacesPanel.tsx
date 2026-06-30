@@ -277,7 +277,8 @@ export default function SpacesPanel({ isGuest, requireAuth }: SpacesPanelProps =
     setShowSettingsModal(true);
   };
 
-  const filteredSpaces = spaces.filter(space => {
+  // ✅ FIXED: Added explicit type annotation for 'space' parameter
+  const filteredSpaces = spaces.filter((space: Space) => {
     const matchesSearch = !searchQuery || 
       (space.name || '').toLowerCase().includes(searchQuery.toLowerCase()) || 
       (space.description || '').toLowerCase().includes(searchQuery.toLowerCase());
@@ -329,7 +330,7 @@ export default function SpacesPanel({ isGuest, requireAuth }: SpacesPanelProps =
           <div className="flex items-center gap-3">
             <button 
               onClick={() => { setShowSearch(!showSearch); if (showSearch) setSearchQuery(''); }}
-              className={`w-10 h-10 rounded-xl border flex items-center justify-center transition-all shadow-sm hover:shadow-md hover:-translate-y-0.5 ${
+              className={`w-10 h-10 rounded-xl border flex items-center justify-center transition-all shadow-sm hover:shadow-md hover:-translate-y-0.5 active:scale-95 ${
                 showSearch ? 'bg-blue-600 border-blue-600 text-white shadow-blue-500/25' : 'bg-white/80 backdrop-blur-sm border-gray-200/60 text-gray-500 hover:text-blue-600 hover:border-blue-300'
               }`}
             >
@@ -339,7 +340,7 @@ export default function SpacesPanel({ isGuest, requireAuth }: SpacesPanelProps =
             <div className="relative" ref={filterMenuRef}>
               <button 
                 onClick={() => setShowFilterMenu(!showFilterMenu)}
-                className={`w-10 h-10 rounded-xl border flex items-center justify-center transition-all shadow-sm hover:shadow-md hover:-translate-y-0.5 ${
+                className={`w-10 h-10 rounded-xl border flex items-center justify-center transition-all shadow-sm hover:shadow-md hover:-translate-y-0.5 active:scale-95 ${
                   hasActiveFilters ? 'bg-blue-600 border-blue-600 text-white shadow-blue-500/25' : 'bg-white/80 backdrop-blur-sm border-gray-200/60 text-gray-500 hover:text-blue-600 hover:border-blue-300'
                 }`}
               >
@@ -347,14 +348,14 @@ export default function SpacesPanel({ isGuest, requireAuth }: SpacesPanelProps =
               </button>
 
               {showFilterMenu && (
-                <div className="absolute right-0 top-full mt-2 w-48 bg-white/95 backdrop-blur-xl rounded-2xl shadow-xl border border-gray-200/60 z-50 overflow-hidden animate-fade-in-scale">
+                <div className="absolute right-0 top-full mt-2 w-48 max-w-[calc(100vw-2rem)] bg-white/95 backdrop-blur-xl rounded-2xl shadow-xl border border-gray-200/60 z-50 overflow-hidden animate-fade-in-scale">
                   <div className="p-2">
                     <div className="px-3 py-2 text-[10px] font-bold text-gray-400 tracking-widest uppercase">Filter by Role</div>
                     {['all', 'owner', 'admin', 'member', 'active', 'inactive'].map((f) => (
                       <button
                         key={f}
                         onClick={() => { setFilter(f); setShowFilterMenu(false); }}
-                        className={`w-full px-4 py-2.5 text-left text-sm rounded-xl transition-all ${
+                        className={`w-full px-4 py-2.5 text-left text-sm rounded-xl transition-all active:scale-95 ${
                           filter === f ? 'bg-gradient-to-r from-blue-50 to-indigo-50 text-blue-700 font-semibold' : 'text-gray-700 hover:bg-gray-50/80'
                         }`}
                       >
@@ -368,7 +369,7 @@ export default function SpacesPanel({ isGuest, requireAuth }: SpacesPanelProps =
 
             <button
               onClick={() => setShowCreateModal(true)}
-              className="flex items-center gap-2 px-4 py-2.5 bg-gradient-to-r from-blue-600 via-indigo-600 to-purple-600 text-white rounded-xl text-sm font-semibold shadow-lg shadow-blue-500/25 hover:shadow-xl hover:-translate-y-0.5 transition-all"
+              className="flex items-center gap-2 px-4 py-2.5 bg-gradient-to-r from-blue-600 via-indigo-600 to-purple-600 text-white rounded-xl text-sm font-semibold shadow-lg shadow-blue-500/25 hover:shadow-xl hover:-translate-y-0.5 active:scale-95 transition-all"
             >
               <Plus size={16} strokeWidth={2.5} />
               <span>New Space</span>
@@ -385,11 +386,11 @@ export default function SpacesPanel({ isGuest, requireAuth }: SpacesPanelProps =
                 value={searchQuery}
                 onChange={(e) => setSearchQuery(e.target.value)}
                 placeholder="Search your workspaces..."
-                className="w-full pl-12 pr-12 py-3.5 text-sm bg-white/80 backdrop-blur-sm border border-gray-200/60 rounded-2xl outline-none focus:ring-4 focus:ring-blue-500/10 focus:border-blue-400 transition shadow-sm"
+                className="w-full pl-12 pr-12 py-3.5 text-base bg-white/80 backdrop-blur-sm border border-gray-200/60 rounded-2xl outline-none focus:ring-4 focus:ring-blue-500/10 focus:border-blue-400 transition shadow-sm"
                 autoFocus
               />
               {searchQuery && (
-                <button onClick={() => setSearchQuery('')} className="absolute right-4 top-1/2 -translate-y-1/2 text-gray-400 hover:text-gray-600">
+                <button onClick={() => setSearchQuery('')} className="absolute right-4 top-1/2 -translate-y-1/2 text-gray-400 hover:text-gray-600 active:scale-95">
                   <X size={18} strokeWidth={2} />
                 </button>
               )}
@@ -402,16 +403,16 @@ export default function SpacesPanel({ isGuest, requireAuth }: SpacesPanelProps =
             {filter !== 'all' && (
               <div className="inline-flex items-center gap-2 px-3 py-1.5 rounded-full text-xs font-semibold bg-gradient-to-r from-blue-50 to-indigo-50 text-blue-700 border border-blue-100/60">
                 {filterLabels[filter]}
-                <button onClick={() => setFilter('all')} className="opacity-60 hover:opacity-100"><X size={12} /></button>
+                <button onClick={() => setFilter('all')} className="opacity-60 hover:opacity-100 active:scale-95"><X size={12} /></button>
               </div>
             )}
             {searchQuery && (
               <div className="inline-flex items-center gap-2 px-3 py-1.5 rounded-full text-xs font-semibold bg-gray-100/80 text-gray-700 border border-gray-200/60">
                 "{searchQuery}"
-                <button onClick={() => setSearchQuery('')} className="opacity-60 hover:opacity-100"><X size={12} /></button>
+                <button onClick={() => setSearchQuery('')} className="opacity-60 hover:opacity-100 active:scale-95"><X size={12} /></button>
               </div>
             )}
-            <button onClick={clearFilters} className="text-xs font-semibold text-blue-600 hover:text-blue-700 ml-2">Clear all</button>
+            <button onClick={clearFilters} className="text-xs font-semibold text-blue-600 hover:text-blue-700 ml-2 active:scale-95">Clear all</button>
           </div>
         )}
       </div>
@@ -443,7 +444,7 @@ export default function SpacesPanel({ isGuest, requireAuth }: SpacesPanelProps =
           />
         ) : (
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-            {filteredSpaces.map((space, idx) => {
+            {filteredSpaces.map((space: Space, idx: number) => {
               const cardGradient = getCardGradient(space.id);
               const iconGradient = getIconGradient(space.id);
               const isOwnerOrAdmin = space.role === 'owner' || space.role === 'admin';
@@ -453,7 +454,7 @@ export default function SpacesPanel({ isGuest, requireAuth }: SpacesPanelProps =
                 <div
                   key={space.id}
                   onClick={() => handleOpenSpace(space)}
-                  className="group relative rounded-3xl p-6 cursor-pointer animate-slide-up transition-all duration-300 hover:-translate-y-2"
+                  className="group relative rounded-3xl p-6 cursor-pointer animate-slide-up transition-all duration-300 hover:-translate-y-2 active:scale-[0.98]"
                   style={{ animationDelay: `${idx * 50}ms` }}
                 >
                   <div className={`absolute inset-0 rounded-3xl bg-gradient-to-br ${cardGradient} border border-gray-200/40 shadow-sm group-hover:shadow-xl group-hover:border-blue-200/60 transition-all duration-300`} />
@@ -484,7 +485,7 @@ export default function SpacesPanel({ isGuest, requireAuth }: SpacesPanelProps =
                       
                       <button
                         onClick={(e) => handleOpenSettings(space, e)}
-                        className="opacity-0 group-hover:opacity-100 p-2 rounded-xl hover:bg-white/60 text-gray-400 hover:text-blue-600 transition-all"
+                        className="opacity-0 group-hover:opacity-100 p-2 rounded-xl hover:bg-white/60 text-gray-400 hover:text-blue-600 transition-all active:scale-95"
                       >
                         <Settings size={16} strokeWidth={2} />
                       </button>
@@ -560,6 +561,7 @@ export default function SpacesPanel({ isGuest, requireAuth }: SpacesPanelProps =
         .line-clamp-2 { display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden; }
         .custom-scroll::-webkit-scrollbar { width: 6px; }
         .custom-scroll::-webkit-scrollbar-thumb { background: #e2e8f0; border-radius: 10px; }
+        .custom-scroll::-webkit-scrollbar-track { background: transparent; }
       `}</style>
     </div>
   );

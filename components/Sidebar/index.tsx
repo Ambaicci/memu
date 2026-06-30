@@ -20,6 +20,10 @@ import {
   Sparkles,
   LogIn,
   ChevronRight as ChevronRightIcon,
+  Home,
+  Folder,
+  Star,
+  Clock,
 } from 'lucide-react';
 import SpacesList from './SpacesList';
 import DeleteConfirmModal from './DeleteConfirmModal';
@@ -56,11 +60,8 @@ export default function Sidebar({
   const [collapsed, setCollapsed] = useState(false);
   const [showDeleteModal, setShowDeleteModal] = useState(false);
   const [itemToDelete, setItemToDelete] = useState<any>(null);
-  
-  //  New: State to force avatar refresh when profile updates
   const [avatarRefreshKey, setAvatarRefreshKey] = useState(0);
 
-  // 🚀 New: Listen for profile updates to refresh the avatar instantly
   useEffect(() => {
     const handleProfileUpdate = () => {
       setAvatarRefreshKey(prev => prev + 1);
@@ -81,6 +82,11 @@ export default function Sidebar({
     if (onMobileClose) onMobileClose();
   };
 
+  // ============================================
+  // NAVIGATION ITEMS – CLEAN, NO DUPLICATES
+  // ============================================
+  
+  // Main communication items
   const primaryItems = [
     { icon: Inbox, label: 'InMemus', panel: 'inmemus' as PanelType },
     { icon: Send, label: 'OutMemus', panel: 'outmemus' as PanelType },
@@ -88,12 +94,18 @@ export default function Sidebar({
     { icon: MessageSquare, label: 'Direct Memos', action: 'direct-memos' },
   ];
 
+  // Collaboration tools (Spaces, Connections, Confer)
   const collaborationItems = [
-    { icon: Users, label: 'Connections', panel: 'connections' as PanelType },
     { icon: Layers, label: 'Spaces', panel: 'spaces' as PanelType },
+    { icon: Users, label: 'Connections', panel: 'connections' as PanelType },
     { icon: Video, label: 'Confer', panel: 'confer' as PanelType },
+  ];
+
+  // Utilities (Calendar, Analytics, Handles)
+  const utilityItems = [
     { icon: Calendar, label: 'Calendar', panel: 'calendar' as PanelType },
     { icon: BarChart3, label: 'Analytics', panel: 'analytics' as PanelType },
+    { icon: AtSign, label: 'Handles', panel: 'handles' as PanelType },
   ];
 
   const renderNavItem = (item: any) => {
@@ -115,12 +127,13 @@ export default function Sidebar({
         }}
         className={`
           group relative flex items-center gap-3 w-full px-3 py-2.5 rounded-xl
-          transition-all duration-200 text-left
+          transition-all duration-200 text-left active:scale-[0.98]
           ${isActive
-            ? 'bg-blue-50/70 text-blue-700 shadow-sm'
-            : 'text-gray-600 hover:bg-gray-50/70 hover:text-gray-900'
+            ? 'bg-blue-50/80 text-blue-700 shadow-sm'
+            : 'text-gray-600 hover:bg-gray-50/80 hover:text-gray-900'
           }
         `}
+        style={{ minHeight: '44px' }}
       >
         {isActive && (
           <div className="absolute left-0 top-1/2 -translate-y-1/2 w-1 h-6 bg-blue-500 rounded-r-full shadow-sm shadow-blue-500/30" />
@@ -128,7 +141,7 @@ export default function Sidebar({
         <item.icon
           size={18}
           strokeWidth={isActive ? 2.2 : 1.8}
-          className={`transition-all duration-200 ${
+          className={`transition-all duration-200 flex-shrink-0 ${
             isActive 
               ? 'text-blue-600' 
               : 'text-gray-400 group-hover:text-gray-600'
@@ -137,7 +150,7 @@ export default function Sidebar({
         <span className={`
           text-sm font-medium tracking-tight truncate transition-all duration-300
           ${isActive ? 'text-gray-900' : 'text-gray-600 group-hover:text-gray-900'}
-          ${collapsed ? 'lg:opacity-0 lg:w-0' : 'opacity-100'}
+          ${collapsed ? 'lg:opacity-0 lg:w-0 lg:overflow-hidden' : 'opacity-100'}
         `}>
           {item.label}
         </span>
@@ -153,23 +166,27 @@ export default function Sidebar({
 
   return (
     <>
+      {/* Mobile Overlay */}
       {isMobileOpen && (
         <div
-          className="fixed inset-0 bg-black/40 backdrop-blur-sm z-40 lg:hidden transition-opacity"
+          className="fixed inset-0 bg-black/40 backdrop-blur-sm z-40 lg:hidden transition-opacity animate-fadeIn"
           onClick={onMobileClose}
         />
       )}
 
+      {/* ============================================
+          SIDEBAR – PREMIUM GLASS DESIGN
+          ============================================ */}
       <aside
         className={`
           fixed lg:static top-0 left-0 h-screen
-          bg-white/90 backdrop-blur-xl border-r border-gray-200/40 shadow-sm
+          bg-white/90 backdrop-blur-xl border-r border-gray-200/40 shadow-lg
           z-50 flex flex-col transition-all duration-300 ease-out
           ${isMobileOpen ? 'translate-x-0 pointer-events-auto' : '-translate-x-full lg:translate-x-0 pointer-events-none lg:pointer-events-auto'}
           ${collapsed ? 'lg:w-20' : 'lg:w-64'}
         `}
       >
-        {/* Collapse Toggle */}
+        {/* ===== COLLAPSE TOGGLE ===== */}
         <button
           onClick={() => setCollapsed(!collapsed)}
           className="
@@ -177,7 +194,7 @@ export default function Sidebar({
             w-6 h-6 bg-white/90 backdrop-blur-sm border border-gray-200 rounded-full
             items-center justify-center shadow-sm
             hover:scale-105 hover:border-blue-300 hover:text-blue-600
-            transition-all duration-300 text-gray-400
+            transition-all duration-300 text-gray-400 active:scale-95
           "
           title={collapsed ? 'Expand Sidebar' : 'Collapse Sidebar'}
         >
@@ -188,18 +205,19 @@ export default function Sidebar({
         <div className="flex-shrink-0 flex items-center justify-center lg:justify-start px-4 py-3.5 border-b border-gray-100/60">
           <button
             onClick={() => handleNavigate('dashboard')}
-            className="flex items-center gap-3 group"
+            className="flex items-center gap-3 group active:scale-95"
             title="Go to Dashboard"
+            style={{ minHeight: '44px', minWidth: '44px' }}
           >
             <img
               src="/svg.logo.png"
               alt="MEMU Logo"
-              className="w-9 h-9 rounded-xl object-contain group-hover:scale-105 transition-transform duration-300"
+              className="w-9 h-9 rounded-xl object-contain group-hover:scale-105 transition-transform duration-300 flex-shrink-0"
             />
             <span className={`
               text-xl font-semibold tracking-tight text-gray-900
               transition-all duration-300
-              ${collapsed ? 'lg:opacity-0 lg:w-0' : 'opacity-100'}
+              ${collapsed ? 'lg:opacity-0 lg:w-0 lg:overflow-hidden' : 'opacity-100'}
             `}>
               memu
             </span>
@@ -208,13 +226,14 @@ export default function Sidebar({
           {/* Mobile Close */}
           <button
             onClick={onMobileClose}
-            className="lg:hidden absolute right-4 p-2 rounded-lg hover:bg-gray-100 text-gray-500"
+            className="lg:hidden absolute right-4 p-2 rounded-lg hover:bg-gray-100 text-gray-500 active:scale-95"
+            style={{ minHeight: '44px', minWidth: '44px' }}
           >
             <X size={20} strokeWidth={2} />
           </button>
         </div>
 
-        {/* ===== COMPOSE BUTTON ===== */}
+        {/* ===== COMPOSE BUTTON – PREMIUM ===== */}
         <div className="flex-shrink-0 px-3 py-3">
           <button
             onClick={() => {
@@ -224,9 +243,10 @@ export default function Sidebar({
             className={`
               relative flex items-center justify-center gap-2 w-full py-2.5 rounded-xl
               bg-gradient-to-r from-blue-600 to-indigo-600 text-white font-medium
-              shadow-sm hover:shadow-md hover:-translate-y-0.5 transition-all duration-300
-              overflow-hidden group
+              shadow-md hover:shadow-lg hover:-translate-y-0.5 transition-all duration-300
+              overflow-hidden group active:scale-[0.98]
             `}
+            style={{ minHeight: '44px' }}
           >
             <div className="absolute inset-0 bg-gradient-to-t from-white/0 via-white/10 to-white/20 opacity-0 group-hover:opacity-100 transition-opacity duration-300" />
             <Plus size={18} strokeWidth={2.5} className="flex-shrink-0 relative z-10" />
@@ -245,11 +265,11 @@ export default function Sidebar({
           ${collapsed ? 'lg:px-1' : ''}
           scrollbar-hidden
         `}>
-          {/* Main Section */}
+          {/* ===== COMMUNICATION SECTION ===== */}
           <div className="mb-4">
             {!collapsed && (
               <p className="px-3 mb-2 text-[11px] font-bold text-blue-600 tracking-widest uppercase">
-                Main
+                Communication
               </p>
             )}
             <div className="space-y-0.5">
@@ -257,7 +277,7 @@ export default function Sidebar({
             </div>
           </div>
 
-          {/* Collaboration Section */}
+          {/* ===== COLLABORATION SECTION ===== */}
           <div className="mb-4">
             {!collapsed && (
               <p className="px-3 mb-2 text-[11px] font-bold text-purple-600 tracking-widest uppercase">
@@ -269,95 +289,42 @@ export default function Sidebar({
             </div>
           </div>
 
-          {/* Handles & Spaces */}
+          {/* ===== UTILITIES SECTION ===== */}
           <div className="pt-4 border-t border-gray-100/60">
-            <button
-              onClick={() => handleNavigate('handles')}
-              className={`
-                group relative flex items-center gap-3 w-full px-3 py-2.5 rounded-xl
-                transition-all duration-200 text-left
-                ${activePanel === 'handles'
-                  ? 'bg-blue-50/70 text-blue-700 shadow-sm'
-                  : 'text-gray-600 hover:bg-gray-50/70 hover:text-gray-900'
-                }
-              `}
-            >
-              {activePanel === 'handles' && (
-                <div className="absolute left-0 top-1/2 -translate-y-1/2 w-1 h-6 bg-blue-500 rounded-r-full shadow-sm shadow-blue-500/30" />
-              )}
-              <AtSign
-                size={18}
-                strokeWidth={activePanel === 'handles' ? 2.2 : 1.8}
-                className={`transition-all duration-200 ${
-                  activePanel === 'handles' 
-                    ? 'text-blue-600' 
-                    : 'text-gray-400 group-hover:text-gray-600'
-                }`}
-              />
-              <span className={`
-                text-sm font-medium tracking-tight truncate transition-all duration-300
-                ${activePanel === 'handles' ? 'text-gray-900' : 'text-gray-600 group-hover:text-gray-900'}
-                ${collapsed ? 'lg:opacity-0 lg:w-0' : 'opacity-100'}
-              `}>
-                Handles
-              </span>
-            </button>
+            {!collapsed && (
+              <p className="px-3 mb-2 text-[11px] font-bold text-gray-400 tracking-widest uppercase">
+                Utilities
+              </p>
+            )}
+            <div className="space-y-0.5">
+              {utilityItems.map(renderNavItem)}
+            </div>
 
+            {/* ===== YOUR SPACES LIST ===== */}
             {!collapsed && (
               <div className="px-3 mt-4 mb-2">
                 <p className="text-[11px] font-bold text-emerald-600 tracking-widest uppercase">
-                  Spaces
+                  Your Spaces
                 </p>
               </div>
             )}
-
-            <button
-              onClick={() => handleNavigate('spaces')}
-              className={`
-                group relative flex items-center gap-3 w-full px-3 py-2.5 rounded-xl
-                transition-all duration-200 text-left
-                ${activePanel === 'spaces' || activePanel === 'space-dashboard'
-                  ? 'bg-blue-50/70 text-blue-700 shadow-sm'
-                  : 'text-gray-600 hover:bg-gray-50/70 hover:text-gray-900'
-                }
-              `}
-            >
-              {(activePanel === 'spaces' || activePanel === 'space-dashboard') && (
-                <div className="absolute left-0 top-1/2 -translate-y-1/2 w-1 h-6 bg-blue-500 rounded-r-full shadow-sm shadow-blue-500/30" />
-              )}
-              <LayoutGrid
-                size={18}
-                strokeWidth={(activePanel === 'spaces' || activePanel === 'space-dashboard') ? 2.2 : 1.8}
-                className={`transition-all duration-200 ${
-                  (activePanel === 'spaces' || activePanel === 'space-dashboard')
-                    ? 'text-blue-600' 
-                    : 'text-gray-400 group-hover:text-gray-600'
-                }`}
-              />
-              <span className={`
-                text-sm font-medium tracking-tight truncate transition-all duration-300
-                ${(activePanel === 'spaces' || activePanel === 'space-dashboard') ? 'text-gray-900' : 'text-gray-600 group-hover:text-gray-900'}
-                ${collapsed ? 'lg:opacity-0 lg:w-0' : 'opacity-100'}
-              `}>
-                All Spaces
-              </span>
-            </button>
 
             <SpacesList
               onOpenSpace={(spaceId) => handleNavigate('space-dashboard', spaceId)}
               activePanel={activePanel}
               onDeleteRequest={handleDeleteRequest}
-              maxItems={collapsed ? 1 : 2}
+              maxItems={collapsed ? 1 : 3}
             />
           </div>
         </div>
 
-        {/* ===== FOOTER ===== */}
+        {/* ===== FOOTER – PROFILE / GUEST ===== */}
         <div className="flex-shrink-0 border-t border-gray-100/60 p-3 bg-white/50 backdrop-blur-sm space-y-2">
           {isGuest ? (
             <button
               onClick={onSignIn}
-              className="w-full flex items-center gap-3 px-3 py-2.5 rounded-xl bg-blue-50/80 hover:bg-blue-100/80 transition-all btn-press text-blue-700 group"
+              className="w-full flex items-center gap-3 px-3 py-2.5 rounded-xl bg-blue-50/80 hover:bg-blue-100/80 transition-all btn-press text-blue-700 group active:scale-[0.98]"
+              style={{ minHeight: '44px' }}
             >
               <div className="w-8 h-8 rounded-full bg-blue-100 flex items-center justify-center flex-shrink-0 group-hover:scale-105 transition-transform">
                 <LogIn size={16} strokeWidth={2} className="text-blue-600" />
@@ -371,9 +338,9 @@ export default function Sidebar({
           ) : (
             <button
               onClick={onOpenProfile}
-              className="w-full flex items-center gap-3 px-3 py-2 rounded-xl hover:bg-gray-50/80 transition-all group btn-press"
+              className="w-full flex items-center gap-3 px-3 py-2 rounded-xl hover:bg-gray-50/80 transition-all group btn-press active:scale-[0.98]"
+              style={{ minHeight: '44px' }}
             >
-              {/*  Updated Avatar Section with Refresh Key */}
               <div key={avatarRefreshKey} className="flex-shrink-0">
                 {user?.user_metadata?.avatar_url ? (
                   <img
@@ -408,17 +375,12 @@ export default function Sidebar({
         item={itemToDelete}
       />
 
-      {/* ===== GLOBAL STYLES: HIDE SCROLLBAR ===== */}
       <style>{`
-        /* Hide scrollbar for Chrome, Safari and Opera */
-        .scrollbar-hidden::-webkit-scrollbar {
-          display: none;
-        }
-        /* Hide scrollbar for IE, Edge and Firefox */
-        .scrollbar-hidden {
-          -ms-overflow-style: none;  /* IE and Edge */
-          scrollbar-width: none;  /* Firefox */
-        }
+        .scrollbar-hidden::-webkit-scrollbar { display: none; }
+        .scrollbar-hidden { -ms-overflow-style: none; scrollbar-width: none; }
+        @keyframes fadeIn { from { opacity: 0; } to { opacity: 1; } }
+        .animate-fadeIn { animation: fadeIn 0.2s ease-out; }
+        .btn-press:active { transform: scale(0.95); }
       `}</style>
     </>
   );

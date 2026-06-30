@@ -166,7 +166,8 @@ export default function SpaceView({ spaceId }: SpaceViewProps) {
         <p className="text-sm text-gray-500 font-light mb-6 max-w-xs">This space may have been deleted or you no longer have access.</p>
         <button 
           onClick={() => router.push('/?panel=spaces')}
-          className="px-6 py-3 bg-blue-600 text-white rounded-xl text-sm font-medium hover:bg-blue-700 hover:shadow-md transition-all btn-press"
+          className="px-6 py-3 bg-blue-600 text-white rounded-xl text-sm font-medium hover:bg-blue-700 hover:shadow-md transition-all btn-press active:scale-95"
+          style={{ minHeight: '44px' }}
         >
           Back to Spaces
         </button>
@@ -183,12 +184,13 @@ export default function SpaceView({ spaceId }: SpaceViewProps) {
   return (
     <div className="flex flex-col h-full w-full bg-memu-canvas overflow-hidden">
       
-      {/* ================= PREMIUM HEADER ================= */}
+      {/* ================= PREMIUM HEADER – MOBILE OPTIMIZED ================= */}
       <div className="sticky top-0 z-20 bg-white/90 backdrop-blur-xl border-b border-gray-200/40 shadow-sm">
         <div className="px-4 md:px-10 pt-4 md:pt-5 pb-2 md:pb-3">
           {/* Top Row: Space Identity */}
-          <div className="flex items-center justify-between mb-3 md:mb-4">
+          <div className="flex items-center justify-between mb-3 md:mb-4 gap-2">
             <div className="flex items-center gap-3 md:gap-4 min-w-0 flex-1">
+              {/* Space Avatar – Touch-friendly */}
               <div 
                 className="w-11 h-11 md:w-12 md:h-12 rounded-2xl flex items-center justify-center text-xl md:text-2xl shadow-lg flex-shrink-0 transition-all duration-300 active:scale-95"
                 style={{ 
@@ -221,17 +223,19 @@ export default function SpaceView({ spaceId }: SpaceViewProps) {
               </div>
             </div>
 
-            <div className="flex items-center gap-1.5 md:gap-2 flex-shrink-0 ml-2">
-              {/* Files Button - Quick Access */}
+            {/* Action Buttons – Touch-friendly */}
+            <div className="flex items-center gap-1.5 md:gap-2 flex-shrink-0">
+              {/* Files Button */}
               <button 
                 onClick={() => setActiveTab('files')}
-                className={`group p-2.5 md:p-3 rounded-xl transition-all duration-300 btn-press ${
+                className={`group p-2.5 md:p-3 rounded-xl transition-all duration-300 btn-press active:scale-95 ${
                   activeTab === 'files' 
                     ? 'bg-blue-50 text-blue-600 shadow-sm' 
-                    : 'active:bg-gray-100 text-gray-500 active:text-gray-700'
+                    : 'hover:bg-gray-100/80 text-gray-500 hover:text-gray-700'
                 }`}
                 title="Space Files"
                 aria-label="Space Files"
+                style={{ minHeight: '44px', minWidth: '44px' }}
               >
                 <Folder 
                   size={18} 
@@ -240,23 +244,24 @@ export default function SpaceView({ spaceId }: SpaceViewProps) {
                 />
               </button>
 
-              {/* Settings Button - Opens Modal */}
+              {/* Settings Button */}
               <button 
                 onClick={() => setIsSettingsOpen(true)}
-                className="group p-2.5 md:p-3 rounded-xl transition-all duration-300 btn-press active:bg-gray-100"
+                className="group p-2.5 md:p-3 rounded-xl transition-all duration-300 btn-press active:scale-95 hover:bg-gray-100/80"
                 title="Space Settings"
                 aria-label="Space Settings"
+                style={{ minHeight: '44px', minWidth: '44px' }}
               >
                 <Settings 
                   size={18} 
                   strokeWidth={2} 
-                  className="text-gray-500 transition-all duration-300 group-active:rotate-45 group-active:scale-95 group-active:text-gray-700" 
+                  className="text-gray-500 transition-all duration-300 group-hover:rotate-45 group-hover:text-gray-700" 
                 />
               </button>
             </div>
           </div>
 
-          {/* ================= PREMIUM TABS ================= */}
+          {/* ================= TABS – MOBILE OPTIMIZED ================= */}
           <div className="flex items-center gap-1 md:gap-1.5 overflow-x-auto custom-scroll-hide pb-1 -mx-4 md:-mx-0 px-4 md:px-0">
             {tabs.map((tab) => {
               const isActive = activeTab === tab.id;
@@ -265,11 +270,11 @@ export default function SpaceView({ spaceId }: SpaceViewProps) {
                   key={tab.id}
                   onClick={() => setActiveTab(tab.id)}
                   className={`
-                    relative flex items-center gap-2 md:gap-2.5 px-4 md:px-5 py-2.5 rounded-2xl
+                    relative flex items-center gap-2 md:gap-2.5 px-3.5 md:px-5 py-2.5 rounded-2xl
                     transition-all duration-300 whitespace-nowrap btn-press flex-shrink-0
                     ${isActive 
                       ? 'text-white shadow-lg' 
-                      : 'text-gray-500 active:text-gray-700 active:bg-gray-100/70'
+                      : 'text-gray-500 hover:text-gray-700 hover:bg-gray-100/70'
                     }
                   `}
                   style={{
@@ -279,6 +284,7 @@ export default function SpaceView({ spaceId }: SpaceViewProps) {
                     boxShadow: isActive 
                       ? `0 8px 24px ${bgColor}44, inset 0 1px 0 ${bgColor}44` 
                       : 'none',
+                    minHeight: '44px',
                   }}
                 >
                   <span className="transition-colors duration-300 flex-shrink-0">

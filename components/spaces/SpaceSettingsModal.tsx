@@ -271,12 +271,12 @@ export default function SpaceSettingsModal({ isOpen, space, onClose, onUpdate, o
 
   return createPortal(
     <div
-      className="fixed inset-0 w-screen h-screen z-[99999] flex items-center justify-center bg-black/50 backdrop-blur-sm animate-fadeIn"
+      className="fixed inset-0 w-screen h-screen z-[99999] flex items-center justify-center bg-black/50 backdrop-blur-sm animate-fadeIn p-4"
       onClick={handleOverlayClick}
     >
       <div
         ref={modalRef}
-        className="relative w-[95%] md:w-[90%] max-w-[560px] max-h-[95vh] md:max-h-[90vh] bg-white/95 backdrop-blur-xl rounded-2xl md:rounded-3xl shadow-2xl border border-gray-200/60 overflow-hidden animate-slideUp"
+        className="relative w-full max-w-[560px] max-h-[95vh] md:max-h-[90vh] bg-white/95 backdrop-blur-xl rounded-2xl md:rounded-3xl shadow-2xl border border-gray-200/60 overflow-hidden animate-slideUp"
         onClick={(e) => e.stopPropagation()}
       >
         <div className="hide-scrollbar p-5 md:p-8 max-h-[95vh] md:max-h-[90vh] overflow-y-auto">
@@ -295,8 +295,9 @@ export default function SpaceSettingsModal({ isOpen, space, onClose, onUpdate, o
             </div>
             <button 
               onClick={onClose} 
-              className="p-2.5 rounded-xl hover:bg-gray-100 text-gray-500 hover:text-gray-700 transition-all flex-shrink-0"
+              className="p-2.5 rounded-xl hover:bg-gray-100 text-gray-500 hover:text-gray-700 transition-all flex-shrink-0 active:scale-95"
               aria-label="Close"
+              style={{ minHeight: '44px', minWidth: '44px' }}
             >
               <X size={20} strokeWidth={2} />
             </button>
@@ -306,7 +307,7 @@ export default function SpaceSettingsModal({ isOpen, space, onClose, onUpdate, o
             {/* Space Preview */}
             <div className="flex items-center gap-4 p-4 bg-gradient-to-br from-gray-50/80 to-gray-100/40 rounded-2xl border border-gray-200/40">
               <div 
-                className="w-14 h-14 rounded-2xl flex items-center justify-center text-3xl shadow-lg flex-shrink-0 transition-all duration-300"
+                className="w-14 h-14 rounded-2xl flex items-center justify-center text-3xl shadow-lg flex-shrink-0 transition-all duration-300 active:scale-95"
                 style={{ 
                   background: `linear-gradient(135deg, ${displayColor}CC, ${displayColor}55)`,
                   color: '#fff',
@@ -325,14 +326,16 @@ export default function SpaceSettingsModal({ isOpen, space, onClose, onUpdate, o
               {!isEditing && (
                 <button 
                   onClick={handleStartEdit} 
-                  className="px-4 py-2 rounded-xl bg-gray-100/80 hover:bg-gray-200/80 text-gray-700 text-xs font-medium transition-all flex items-center gap-1.5 flex-shrink-0"
+                  className="px-4 py-2 rounded-xl bg-gray-100/80 hover:bg-gray-200/80 text-gray-700 text-xs font-medium transition-all flex items-center gap-1.5 flex-shrink-0 active:scale-95"
+                  style={{ minHeight: '44px' }}
                 >
-                  <Edit2 size={14} /> Edit
+                  <Edit2 size={14} strokeWidth={2} /> Edit
                 </button>
               )}
             </div>
 
             {!isEditing ? (
+              // ===== VIEW MODE =====
               <>
                 <div>
                   <label className="block text-[11px] font-bold text-gray-500 uppercase tracking-wider mb-1">Name</label>
@@ -355,7 +358,8 @@ export default function SpaceSettingsModal({ isOpen, space, onClose, onUpdate, o
                         value={memberSearchQuery} 
                         onChange={(e) => setMemberSearchQuery(e.target.value)} 
                         placeholder="Add member by handle or name..." 
-                        className="w-full pl-10 pr-3 py-2.5 bg-white border border-gray-200 rounded-xl text-sm outline-none focus:ring-4 focus:ring-blue-500/10 focus:border-blue-400 transition"
+                        className="w-full pl-10 pr-3 py-2.5 bg-white border border-gray-200 rounded-xl text-base outline-none focus:ring-4 focus:ring-blue-500/10 focus:border-blue-400 transition"
+                        style={{ minHeight: '44px' }}
                       />
                       {memberSearching && (
                         <div className="mt-2 p-2 bg-gray-50/80 rounded-lg text-xs text-gray-600 text-center">
@@ -368,7 +372,8 @@ export default function SpaceSettingsModal({ isOpen, space, onClose, onUpdate, o
                             <button 
                               key={user.id} 
                               onClick={() => handleAddMember(user)} 
-                              className="w-full flex items-center gap-2.5 p-3 hover:bg-blue-50/80 border-b border-gray-100 last:border-b-0 transition-all text-left"
+                              className="w-full flex items-center gap-2.5 p-3 hover:bg-blue-50/80 border-b border-gray-100 last:border-b-0 transition-all text-left active:scale-[0.98]"
+                              style={{ minHeight: '44px' }}
                             >
                               <div className="w-8 h-8 rounded-full bg-gradient-to-br from-blue-500 to-indigo-600 flex items-center justify-center text-white text-[9px] font-bold flex-shrink-0">
                                 {getInitials(user.full_name || user.username)}
@@ -406,8 +411,9 @@ export default function SpaceSettingsModal({ isOpen, space, onClose, onUpdate, o
                         {isOwner && member.id !== currentUserId && (
                           <button 
                             onClick={() => handleRemoveMember(member.id)} 
-                            className="p-2 rounded-lg hover:bg-red-50 text-gray-400 hover:text-red-500 transition-all flex-shrink-0"
+                            className="p-2 rounded-lg hover:bg-red-50 text-gray-400 hover:text-red-500 transition-all flex-shrink-0 active:scale-95"
                             aria-label="Remove member"
+                            style={{ minHeight: '44px', minWidth: '44px' }}
                           >
                             <X size={16} strokeWidth={2} />
                           </button>
@@ -422,9 +428,10 @@ export default function SpaceSettingsModal({ isOpen, space, onClose, onUpdate, o
                   {!showDeleteConfirm ? (
                     <button 
                       onClick={() => setShowDeleteConfirm(true)} 
-                      className="flex items-center gap-2 px-3 py-2.5 hover:bg-red-50/80 text-red-500 text-sm font-medium rounded-xl transition-all"
+                      className="flex items-center gap-2 px-3 py-2.5 hover:bg-red-50/80 text-red-500 text-sm font-medium rounded-xl transition-all active:scale-95"
+                      style={{ minHeight: '44px' }}
                     >
-                      <Trash2 size={16} /> Delete Space
+                      <Trash2 size={16} strokeWidth={2} /> Delete Space
                     </button>
                   ) : (
                     <div className="flex flex-col gap-3">
@@ -434,13 +441,15 @@ export default function SpaceSettingsModal({ isOpen, space, onClose, onUpdate, o
                       <div className="flex gap-2.5">
                         <button 
                           onClick={() => setShowDeleteConfirm(false)} 
-                          className="flex-1 px-4 py-2.5 rounded-xl bg-gray-100/80 hover:bg-gray-200/80 text-gray-700 text-sm font-medium transition-all"
+                          className="flex-1 px-4 py-2.5 rounded-xl bg-gray-100/80 hover:bg-gray-200/80 text-gray-700 text-sm font-medium transition-all active:scale-95"
+                          style={{ minHeight: '44px' }}
                         >
                           Cancel
                         </button>
                         <button 
                           onClick={handleDelete} 
-                          className="flex-1 px-4 py-2.5 rounded-xl bg-red-500 hover:bg-red-600 text-white text-sm font-semibold transition-all"
+                          className="flex-1 px-4 py-2.5 rounded-xl bg-red-500 hover:bg-red-600 text-white text-sm font-semibold transition-all active:scale-95"
+                          style={{ minHeight: '44px' }}
                         >
                           Delete Permanently
                         </button>
@@ -450,6 +459,7 @@ export default function SpaceSettingsModal({ isOpen, space, onClose, onUpdate, o
                 </div>
               </>
             ) : (
+              // ===== EDIT MODE =====
               <>
                 <div>
                   <label className="block text-[11px] font-bold text-gray-500 uppercase tracking-wider mb-2">Space Name</label>
@@ -458,7 +468,8 @@ export default function SpaceSettingsModal({ isOpen, space, onClose, onUpdate, o
                     value={editName} 
                     onChange={(e) => setEditName(e.target.value)} 
                     placeholder="Space name..." 
-                    className="w-full px-4 py-3 bg-white border border-gray-200 rounded-2xl text-sm outline-none focus:ring-4 focus:ring-blue-500/10 focus:border-blue-400 transition"
+                    className="w-full px-4 py-3 bg-white border border-gray-200 rounded-2xl text-base outline-none focus:ring-4 focus:ring-blue-500/10 focus:border-blue-400 transition"
+                    style={{ minHeight: '44px' }}
                   />
                 </div>
                 <div>
@@ -468,7 +479,7 @@ export default function SpaceSettingsModal({ isOpen, space, onClose, onUpdate, o
                     onChange={(e) => setEditDescription(e.target.value)} 
                     placeholder="What is this space for?" 
                     rows={2}
-                    className="w-full px-4 py-3 bg-white border border-gray-200 rounded-2xl text-sm outline-none focus:ring-4 focus:ring-blue-500/10 focus:border-blue-400 transition resize-none"
+                    className="w-full px-4 py-3 bg-white border border-gray-200 rounded-2xl text-base outline-none focus:ring-4 focus:ring-blue-500/10 focus:border-blue-400 transition resize-none"
                   />
                 </div>
                 <div>
@@ -478,12 +489,13 @@ export default function SpaceSettingsModal({ isOpen, space, onClose, onUpdate, o
                       <button 
                         key={index} 
                         onClick={() => setEditIcon(item.emoji)} 
-                        className={`relative p-2 rounded-xl text-xl transition-all ${
+                        className={`relative p-2 rounded-xl text-xl transition-all active:scale-95 ${
                           editIcon === item.emoji 
                             ? 'border-2 border-blue-500 bg-blue-50/80 scale-110 shadow-md' 
                             : 'border-2 border-transparent bg-gray-50/80 hover:bg-gray-100/80 hover:scale-105'
                         }`}
                         title={item.label}
+                        style={{ minHeight: '44px' }}
                       >
                         <span className="relative z-10">{item.emoji}</span>
                         {editIcon === item.emoji && (
@@ -502,7 +514,7 @@ export default function SpaceSettingsModal({ isOpen, space, onClose, onUpdate, o
                       <button 
                         key={c.hex} 
                         onClick={() => setEditColor(c.hex)} 
-                        className={`w-9 h-9 rounded-full transition-all flex items-center justify-center ${
+                        className={`w-9 h-9 rounded-full transition-all flex items-center justify-center active:scale-95 ${
                           editColor === c.hex 
                             ? 'border-4 border-blue-200/60 scale-110' 
                             : 'hover:scale-105'
@@ -519,18 +531,20 @@ export default function SpaceSettingsModal({ isOpen, space, onClose, onUpdate, o
                   <button 
                     onClick={handleSaveEdit} 
                     disabled={isUpdating || !editName.trim()}
-                    className={`flex-1 flex items-center justify-center gap-2 px-4 py-3 rounded-2xl text-sm font-semibold transition-all ${
+                    className={`flex-1 flex items-center justify-center gap-2 px-4 py-3 rounded-2xl text-sm font-semibold transition-all active:scale-95 ${
                       isUpdating || !editName.trim()
                         ? 'bg-gray-300/50 text-gray-500 cursor-not-allowed'
                         : 'bg-gradient-to-r from-blue-600 via-indigo-600 to-purple-600 text-white shadow-lg hover:shadow-xl hover:-translate-y-0.5'
                     }`}
+                    style={{ minHeight: '44px' }}
                   >
                     {isUpdating ? <Loader2 size={16} className="animate-spin" /> : <Check size={16} strokeWidth={2.5} />}
                     {isUpdating ? 'Saving...' : 'Save Changes'}
                   </button>
                   <button 
                     onClick={handleCancelEdit} 
-                    className="px-4 py-3 rounded-2xl bg-gray-100/80 hover:bg-gray-200/80 text-gray-700 text-sm font-medium transition-all"
+                    className="px-4 py-3 rounded-2xl bg-gray-100/80 hover:bg-gray-200/80 text-gray-700 text-sm font-medium transition-all active:scale-95"
+                    style={{ minHeight: '44px' }}
                   >
                     Cancel
                   </button>

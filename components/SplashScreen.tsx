@@ -1,52 +1,99 @@
 'use client';
 
-import { useState, useEffect } from 'react';
+import { useEffect, useState } from 'react';
+import { motion } from 'framer-motion';
 
 interface SplashScreenProps {
   onComplete: () => void;
+  minDisplayTime?: number; // Minimum time to show splash screen (ms)
 }
 
-export default function SplashScreen({ onComplete }: SplashScreenProps) {
-  const [fadeOut, setFadeOut] = useState(false);
+export default function SplashScreen({ 
+  onComplete, 
+  minDisplayTime = 2000 
+}: SplashScreenProps) {
+  const [isVisible, setIsVisible] = useState(true);
 
   useEffect(() => {
     const timer = setTimeout(() => {
-      setFadeOut(true);
-      setTimeout(onComplete, 500); // Wait for fade animation
-    }, 2000); // Show for 2 seconds
+      setIsVisible(false);
+      onComplete();
+    }, minDisplayTime);
 
     return () => clearTimeout(timer);
-  }, [onComplete]);
+  }, [onComplete, minDisplayTime]);
+
+  if (!isVisible) return null;
 
   return (
-    <div className={`fixed inset-0 z-[100] flex items-center justify-center transition-opacity duration-500 ${
-      fadeOut ? 'opacity-0 pointer-events-none' : 'opacity-100'
-    }`}>
-      {/* Background */}
-      <div className="absolute inset-0 bg-gradient-to-br from-[#0a0a0a] to-[#1a1a1a]" />
+    <div className="fixed inset-0 z-[9999] flex items-center justify-center bg-[#0B0F19]">
+      {/* Subtle background glow */}
+      <div className="absolute inset-0 bg-gradient-to-br from-blue-600/5 via-transparent to-purple-600/5 pointer-events-none" />
       
-      {/* Content */}
-      <div className="relative z-10 text-center animate-pulse-slow">
+      <motion.div
+        initial={{ opacity: 0, scale: 0.9 }}
+        animate={{ opacity: 1, scale: 1 }}
+        transition={{
+          duration: 0.6,
+          ease: [0.16, 1, 0.3, 1],
+        }}
+        className="flex flex-col items-center justify-center"
+      >
         {/* Logo */}
-        <div className="w-24 h-24 mx-auto mb-6 rounded-2xl shadow-2xl overflow-hidden bg-white/10 backdrop-blur-sm">
-  <img 
-    src="/svg.logo.png" 
-    alt="memu" 
-    className="w-full h-full object-contain p-2"
-  />
-</div>
-        
+        <motion.img
+          src="/svg.logo.png"
+          alt="MEMU Logo"
+          className="w-32 h-32 md:w-48 md:h-48 object-contain"
+          animate={{
+            y: [0, -8, 0],
+          }}
+          transition={{
+            duration: 2.5,
+            repeat: Infinity,
+            ease: 'easeInOut',
+          }}
+        />
+
         {/* App Name */}
-        <h1 className="font-['Playfair_Display'] text-5xl font-medium tracking-tight text-white mb-2">
+        <motion.h1
+          initial={{ opacity: 0, y: 10 }}
+          animate={{ opacity: 1, y: 0 }}
+          transition={{
+            delay: 0.3,
+            duration: 0.5,
+            ease: [0.16, 1, 0.3, 1],
+          }}
+          className="mt-4 text-3xl md:text-4xl font-bold text-white tracking-tight"
+        >
           memu
-        </h1>
-        
+        </motion.h1>
+
         {/* Tagline */}
-        <p className="text-white/60 text-sm tracking-wide">
+        <motion.p
+          initial={{ opacity: 0 }}
+          animate={{ opacity: 1 }}
+          transition={{
+            delay: 0.5,
+            duration: 0.4,
+          }}
+          className="mt-2 text-sm text-gray-400 font-light tracking-wide"
+        >
           communicate differently
-        </p>
-      </div>
+        </motion.p>
+
+        {/* Loading Spinner */}
+        <motion.div
+          initial={{ opacity: 0 }}
+          animate={{ opacity: 1 }}
+          transition={{
+            delay: 0.6,
+            duration: 0.3,
+          }}
+          className="mt-8"
+        >
+          <div className="w-6 h-6 border-2 border-blue-500/30 border-t-blue-500 rounded-full animate-spin" />
+        </motion.div>
+      </motion.div>
     </div>
   );
 }
-

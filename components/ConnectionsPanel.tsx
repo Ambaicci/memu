@@ -23,19 +23,21 @@ interface Connection {
 interface ConnectionsPanelProps {
   isGuest?: boolean;
   requireAuth?: (action: string, callback: () => void) => void;
+  onOpenCompose?: (prefilledHandle?: string) => void;
+  onOpenDirectMemos?: (userId?: string) => void;
 }
 
 const filterOptions = [
-  { id: 'all', label: 'All connections', icon: <Users size={14} /> },
-  { id: 'favorites', label: 'Favorites', icon: <Star size={14} /> },
+  { id: 'all', label: 'All connections', icon: <Users size={14} strokeWidth={2} /> },
+  { id: 'favorites', label: 'Favorites', icon: <Star size={14} strokeWidth={2} /> },
 ];
 
 const getBorderClass = (color: string) => {
   const match = color.match(/hsl\((\d+)/);
   if (!match) return 'border-gray-200/60';
-  
+
   const hue = parseInt(match[1]);
-  
+
   if (hue >= 0 && hue < 30) return 'border-rose-200/60';
   if (hue >= 30 && hue < 60) return 'border-amber-200/60';
   if (hue >= 60 && hue < 90) return 'border-yellow-200/60';
@@ -47,7 +49,7 @@ const getBorderClass = (color: string) => {
 };
 
 const getInitials = (name: string) => {
-  return name.split(' ').map(part => part[0]).join('').toUpperCase().slice(0, 2);
+  return name.split(' ').map((part) => part[0]).join('').toUpperCase().slice(0, 2);
 };
 
 const stringToColor = (str: string) => {
@@ -59,7 +61,12 @@ const stringToColor = (str: string) => {
   return `hsl(${hue}, 65%, 65%)`;
 };
 
-export default function ConnectionsPanel({ isGuest, requireAuth }: ConnectionsPanelProps = {}) {
+export default function ConnectionsPanel({
+  isGuest,
+  requireAuth,
+  onOpenCompose,
+  onOpenDirectMemos,
+}: ConnectionsPanelProps = {}) {
   const [currentUserId, setCurrentUserId] = useState<string | null>(null);
   const [filter, setFilter] = useState<'all' | 'favorites'>('all');
   const [favorites, setFavorites] = useState<Set<string>>(new Set());
@@ -125,7 +132,7 @@ export default function ConnectionsPanel({ isGuest, requireAuth }: ConnectionsPa
     queryFn: async () => {
       if (!currentUserId) return [];
       const supabase = createClient();
-      
+
       const { data: profilesData, error } = await supabase
         .from('profiles')
         .select('id, full_name, username, bio')
@@ -134,7 +141,7 @@ export default function ConnectionsPanel({ isGuest, requireAuth }: ConnectionsPa
 
       if (error) throw error;
 
-      const fallbackConnections: Connection[] = (profilesData || []).map(p => ({
+      const fallbackConnections: Connection[] = (profilesData || []).map((p) => ({
         id: p.id,
         user_id: currentUserId,
         connected_user_id: p.id,
@@ -149,43 +156,83 @@ export default function ConnectionsPanel({ isGuest, requireAuth }: ConnectionsPa
     staleTime: 60 * 1000,
   });
 
-  const filteredConnections = connections.filter(c => {
+  const filteredConnections = connections.filter((c) => {
     const matchesFilter = filter === 'all' ? true : favorites.has(c.connected_user_id);
     const profile = c.profile;
     const name = profile?.full_name || profile?.username || '';
-    const matchesSearch = searchQuery === '' || 
-                          name.toLowerCase().includes(searchQuery.toLowerCase()) ||
-                          (profile?.bio || '').toLowerCase().includes(searchQuery.toLowerCase());
+    const matchesSearch =
+      searchQuery === '' ||
+      name.toLowerCase().includes(searchQuery.toLowerCase()) ||
+      (profile?.bio || '').toLowerCase().includes(searchQuery.toLowerCase());
     return matchesFilter && matchesSearch;
   });
 
   const currentFilterLabel = filter === 'all' ? 'All connections' : 'Favorites';
+  // ✅ FIX: define hasActiveFilters
+  const hasActiveFilters = filter !== 'all' || searchQuery;
+
+  const handleWrite = (connection: Connection) => {
+    if (isGuest && requireAuth) {
+      requireAuth('compose', () => {
+        const handle = connection.profile?.username ? `@${connection.profile.username}.memu` : undefined;
+        if (onOpenCompose) {
+          onOpenCompose(handle);
+        } else {
+          showToast('Compose coming soon', 'info');
+        }
+      });
+    } else {
+      const handle = connection.profile?.username ? `@${connection.profile.username}.memu` : undefined;
+      if (onOpenCompose) {
+        onOpenCompose(handle);
+      } else {
+        showToast('Compose coming soon', 'info');
+      }
+    }
+  };
+
+  const handleMemo = (connection: Connection) => {
+    if (isGuest && requireAuth) {
+      requireAuth('direct-memos', () => {
+        if (onOpenDirectMemos) {
+          onOpenDirectMemos(connection.connected_user_id);
+        } else {
+          showToast('Direct memo coming soon', 'info');
+        }
+      });
+    } else {
+      if (onOpenDirectMemos) {
+        onOpenDirectMemos(connection.connected_user_id);
+      } else {
+        showToast('Direct memo coming soon', 'info');
+      }
+    }
+  };
 
   if (isLoading) {
     return (
-      <div className="flex items-center justify-center h-full">
-        <div className="w-6 h-6 border-2 border-indigo-600 border-t-transparent rounded-full animate-spin" />
+      <div className="flex items-center justify-center h-full w-full">
+        <div className="w-8 h-8 border-2 border-blue-600 border-t-transparent rounded-full animate-spin" />
       </div>
     );
   }
 
   return (
-    <div className="flex flex-col h-full bg-memu-canvas animate-page-enter">
-      {/* Header Section */}
-      <div className="px-6 md:px-10 pt-8 pb-6">
+    <div className="flex flex-col h-full w-full bg-memu-canvas animate-page-enter">
+      {/* HEADER SECTION */}
+      <div className="px-6 md:px-10 pt-8 pb-4 w-full">
         <div className="flex items-center justify-between flex-wrap gap-4 mb-6">
-          <div className="space-y-2">
-            <div className="flex items-center gap-3 text-indigo-600">
-              <div className="w-11 h-11 rounded-2xl bg-gradient-to-br from-indigo-600 to-purple-600 flex items-center justify-center shadow-lg">
-                <Users size={22} className="text-white" strokeWidth={2.5} />
+          <div className="space-y-1">
+            <div className="flex items-center gap-3">
+              <div className="w-10 h-10 rounded-xl bg-gradient-to-br from-blue-500 to-indigo-600 flex items-center justify-center shadow-sm">
+                <Users size={20} strokeWidth={2} className="text-white" />
               </div>
-              <span className="text-sm font-bold uppercase tracking-wider">Network</span>
+              <h1 className="text-2xl font-semibold text-gray-900 tracking-tight">Connections</h1>
             </div>
-            <h1 className="font-serif text-3xl md:text-4xl font-semibold text-gray-900 leading-tight">Connections</h1>
-            <div className="flex flex-wrap gap-3 mt-3">
+            <div className="flex flex-wrap gap-3 mt-1">
               <span className="text-sm text-gray-500 font-medium">{connections.length} connections</span>
               <span className="text-gray-300">·</span>
-              <span className="text-sm text-amber-600 font-bold">{favorites.size} favorites</span>
+              <span className="text-sm text-amber-600 font-medium">{favorites.size} favorites</span>
             </div>
           </div>
         </div>
@@ -193,33 +240,40 @@ export default function ConnectionsPanel({ isGuest, requireAuth }: ConnectionsPa
         {/* Search & Filter */}
         <div className="flex flex-col sm:flex-row gap-3">
           <div className="flex-1 relative">
-            <Search size={19} className="absolute left-4 top-1/2 -translate-y-1/2 text-gray-400" />
+            <Search size={18} strokeWidth={2} className="absolute left-4 top-1/2 -translate-y-1/2 text-gray-400" />
             <input
               type="text"
               value={searchQuery}
               onChange={(e) => setSearchQuery(e.target.value)}
               placeholder="Search connections..."
-              className="w-full pl-12 pr-4 py-4 bg-white/80 backdrop-blur-xl border border-gray-200 rounded-2xl text-sm text-gray-900 outline-none focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500 transition-all placeholder:text-gray-400"
+              className="w-full pl-12 pr-4 py-3 text-sm bg-gray-50 border border-gray-200 rounded-xl outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-400 transition text-gray-900 placeholder:text-gray-400"
             />
           </div>
           <div className="relative" ref={filterRef}>
             <button
               onClick={() => setIsFilterOpen(!isFilterOpen)}
-              className="flex items-center gap-3 px-5 py-4 bg-white/80 backdrop-blur-xl border border-gray-200 rounded-2xl text-sm font-medium text-gray-700 hover:bg-white hover:border-gray-300 transition-all shadow-sm btn-press"
+              className={`flex items-center gap-3 px-5 py-3 rounded-xl text-sm font-medium transition-all btn-press ${
+                hasActiveFilters || filter !== 'all'
+                  ? 'bg-blue-600 text-white shadow-sm'
+                  : 'bg-gray-100 text-gray-500 hover:bg-gray-200'
+              }`}
             >
-              <Filter size={15} />
+              <Filter size={15} strokeWidth={2} />
               <span>{currentFilterLabel}</span>
-              <ChevronDown size={13} />
+              <ChevronDown size={13} strokeWidth={2} />
             </button>
             {isFilterOpen && (
-              <div className="absolute right-0 mt-3 w-48 bg-white rounded-2xl shadow-2xl border border-gray-200 overflow-hidden z-20 animate-fadeIn">
+              <div className="absolute right-0 mt-3 w-48 bg-white rounded-2xl shadow-2xl border border-gray-200 overflow-hidden z-20 animate-fade-in-scale">
                 <div className="py-2">
                   {filterOptions.map((opt) => (
                     <button
                       key={opt.id}
-                      onClick={() => { setFilter(opt.id as any); setIsFilterOpen(false); }}
+                      onClick={() => {
+                        setFilter(opt.id as any);
+                        setIsFilterOpen(false);
+                      }}
                       className={`w-full flex items-center gap-3 px-5 py-3 text-sm text-left transition ${
-                        filter === opt.id ? 'bg-indigo-50 text-indigo-700 font-semibold' : 'text-gray-600 hover:bg-gray-50'
+                        filter === opt.id ? 'bg-blue-50 text-blue-700 font-semibold' : 'text-gray-600 hover:bg-gray-50'
                       }`}
                     >
                       {opt.icon}
@@ -233,22 +287,23 @@ export default function ConnectionsPanel({ isGuest, requireAuth }: ConnectionsPa
         </div>
       </div>
 
-      {/* Connections Grid */}
-      <div className="flex-1 overflow-y-auto px-6 md:px-10 pb-10">
+      {/* CONNECTIONS GRID */}
+      <div className="flex-1 overflow-y-auto px-6 md:px-10 pb-10 custom-scroll w-full">
         {filteredConnections.length === 0 ? (
-          <div className="flex flex-col items-center justify-center py-24 text-center animate-fade-in-scale">
-            <div className="relative w-32 h-32 mb-8">
-              <div className="absolute inset-0 bg-gradient-to-br from-indigo-100 to-purple-100 rounded-3xl blur-2xl animate-pulse"></div>
-              <div className="relative bg-white rounded-3xl w-32 h-32 flex items-center justify-center shadow-xl border border-gray-200">
-                <Users size={48} className="text-indigo-500" strokeWidth={2} />
-              </div>
+          <div className="flex flex-col items-center justify-center py-16 text-center w-full px-4">
+            <div className="w-20 h-20 rounded-2xl bg-gradient-to-br from-blue-50 to-indigo-50 flex items-center justify-center mb-4 shadow-sm border border-gray-100">
+              <Users size={32} strokeWidth={1.5} className="text-blue-400" />
             </div>
-            <h3 className="font-serif text-xl font-semibold text-gray-900 mb-3">
+            <h3 className="text-xl font-semibold text-gray-900 mb-2 tracking-tight">
               {filter === 'favorites' ? 'No favorite connections' : 'No connections found'}
             </h3>
-            <p className="text-gray-500 text-sm max-w-md">
-              {filter === 'favorites' ? 'Star some connections to see them here' : 'Try a different search'}
-            </p>
+            <div style={{ width: '280px', margin: '0 auto 24px auto' }}>
+              <p className="text-sm text-gray-500 leading-relaxed text-center">
+                {filter === 'favorites'
+                  ? 'Star some connections to see them here'
+                  : 'Try a different search or connect with more people.'}
+              </p>
+            </div>
           </div>
         ) : (
           <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
@@ -263,7 +318,7 @@ export default function ConnectionsPanel({ isGuest, requireAuth }: ConnectionsPa
               return (
                 <div
                   key={connection.id}
-                  className={`group relative bg-white rounded-2xl border-[1px] shadow-[0_2px_8px_-2px_rgba(0,0,0,0.04)] hover:shadow-lg hover:-translate-y-0.5 transition-all duration-300 ${borderClass} p-4 animate-slide-up btn-press`}
+                  className={`group relative bg-white rounded-xl border ${borderClass} shadow-sm hover:shadow-xl hover:-translate-y-1 transition-all duration-300 p-4 animate-slide-up btn-press`}
                   style={{ animationDelay: `${idx * 60}ms`, opacity: 0 }}
                 >
                   <div className="flex items-start gap-3 mb-3">
@@ -276,33 +331,43 @@ export default function ConnectionsPanel({ isGuest, requireAuth }: ConnectionsPa
                     <div className="flex-1 min-w-0">
                       <div className="flex items-start justify-between gap-2">
                         <div className="flex-1 min-w-0">
-                          <h3 className="text-sm font-bold text-gray-900 truncate">{name}</h3>
+                          <h3 className="text-sm font-semibold text-gray-900 truncate">{name}</h3>
                           {profile?.username && (
-                            <p className="text-[11px] text-indigo-600 font-semibold">@{profile.username}</p>
+                            <p className="text-[11px] text-blue-600 font-medium">@{profile.username}</p>
                           )}
                         </div>
                         <button
                           onClick={() => toggleFavorite(connection.connected_user_id)}
                           className="p-1.5 rounded-lg hover:bg-gray-100 transition-all flex-shrink-0 hover:scale-110 btn-press"
                         >
-                          <Star size={14} strokeWidth={2.5} className={isFavorite ? 'fill-amber-500 text-amber-500' : 'text-gray-300'} />
+                          <Star
+                            size={14}
+                            strokeWidth={2.5}
+                            className={isFavorite ? 'fill-amber-500 text-amber-500' : 'text-gray-300'}
+                          />
                         </button>
                       </div>
                     </div>
                   </div>
 
                   {profile?.bio && (
-                    <p className="text-[13px] text-gray-500 mb-3 line-clamp-2 leading-relaxed">{profile.bio}</p>
+                    <p className="text-sm text-gray-500 font-light leading-relaxed mb-3 line-clamp-2">
+                      {profile.bio}
+                    </p>
                   )}
 
                   <div className="flex gap-2 pt-3 border-t border-gray-100/50">
-                    <button className="flex-1 flex items-center justify-center gap-1.5 bg-gradient-to-r from-indigo-600 to-purple-600 text-white rounded-full py-2 text-xs font-semibold hover:shadow-lg hover:-translate-y-0.5 transition-all shadow-md btn-press">
-                      <Mail size={11} strokeWidth={2.5} />
-                      Write
+                    <button
+                      onClick={() => handleWrite(connection)}
+                      className="flex-1 flex items-center justify-center gap-1.5 bg-gradient-to-r from-blue-600 to-bridge text-white rounded-full py-2 text-xs font-medium hover:shadow-lg hover:-translate-y-0.5 transition-all shadow-md btn-press"
+                    >
+                      <Mail size={11} strokeWidth={2.5} /> Write
                     </button>
-                    <button className="flex-1 flex items-center justify-center gap-1.5 bg-gradient-to-r from-cyan-600 to-blue-600 text-white rounded-full py-2 text-xs font-semibold hover:shadow-lg hover:-translate-y-0.5 transition-all shadow-md btn-press">
-                      <MessageSquare size={11} strokeWidth={2.5} />
-                      Memo
+                    <button
+                      onClick={() => handleMemo(connection)}
+                      className="flex-1 flex items-center justify-center gap-1.5 bg-gradient-to-r from-indigo-500 to-purple-600 text-white rounded-full py-2 text-xs font-medium hover:shadow-lg hover:-translate-y-0.5 transition-all shadow-md btn-press"
+                    >
+                      <MessageSquare size={11} strokeWidth={2.5} /> Memo
                     </button>
                   </div>
                 </div>
@@ -313,9 +378,16 @@ export default function ConnectionsPanel({ isGuest, requireAuth }: ConnectionsPa
       </div>
 
       <style>{`
-        @keyframes fadeIn { from { opacity: 0; transform: scale(0.96); } to { opacity: 1; transform: scale(1); } }
-        .animate-fadeIn { animation: fadeIn 0.2s ease-out; }
-        .line-clamp-2 { display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden; }
+        .no-scrollbar::-webkit-scrollbar { display: none; }
+        .no-scrollbar { -ms-overflow-style: none; scrollbar-width: none; }
+        .custom-scroll::-webkit-scrollbar { width: 4px; }
+        .custom-scroll::-webkit-scrollbar-thumb { background: #d4d4d4; border-radius: 10px; }
+        .line-clamp-2 {
+          display: -webkit-box;
+          -webkit-line-clamp: 2;
+          -webkit-box-orient: vertical;
+          overflow: hidden;
+        }
       `}</style>
     </div>
   );

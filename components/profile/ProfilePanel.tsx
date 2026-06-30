@@ -1,864 +1,817 @@
 'use client';
 
-import { useState, useRef, useEffect, useCallback } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import { createClient } from '@/lib/supabase/client';
 import { useToast } from '@/contexts/ToastContext';
-import { useTheme } from '@/contexts/ThemeContext';
-import { triggerHaptic } from '@/lib/haptics';
-import { 
-  Camera, Loader2, Save, User, Building2, Briefcase, AtSign, LogOut, 
-  Bell, Shield, Eye, Palette, AlertTriangle, Trash2, Lock, Mail, 
-  CheckCircle, ChevronLeft
+import {
+  User,
+  Mail,
+  Building,
+  AtSign,
+  Camera,
+  Loader2,
+  Save,
+  LogOut,
+  Shield,
+  Bell,
+  Lock,
+  Globe,
+  MapPin,
+  Sparkles,
+  Edit3,
+  ArrowRight,
+  Verified,
+  ChevronRight,
+  AlertTriangle,
+  Trash2,
+  X,
+  Eye,
+  EyeOff,
+  Palette
 } from 'lucide-react';
 
 interface ProfilePanelProps {
   user: any;
 }
 
-interface NotificationPreferences {
-  emailNotifications: boolean;
-  pushNotifications: boolean;
-  memuNotifications: boolean;
-  broadcastNotifications: boolean;
+interface ProfileData {
+  id: string;
+  username: string;
+  full_name: string | null;
+  avatar_url: string | null;
+  email: string;
+  bio: string | null;
+  organization: string | null;
+  website: string | null;
+  location: string | null;
+  created_at?: string;
 }
-
-interface PrivacySettings {
-  whoCanSend: 'everyone' | 'connections' | 'nobody';
-  showReadReceipts: boolean;
-  showOnlineStatus: boolean;
-  profileVisibility: 'public' | 'private';
-}
-
-interface AppearanceSettings {
-  theme: 'light' | 'dark' | 'system';
-}
-
-type TabType = 'profile' | 'account' | 'notifications' | 'privacy' | 'appearance' | 'danger';
 
 export default function ProfilePanel({ user }: ProfilePanelProps) {
-  const [activeTab, setActiveTab] = useState<TabType>('profile');
-  const [loading, setLoading] = useState(false);
-  const [uploading, setUploading] = useState(false);
+  const [profile, setProfile] = useState<ProfileData | null>(null);
+  const [loading, setLoading] = useState(true);
+  const [saving, setSaving] = useState(false);
+  const [isEditing, setIsEditing] = useState(false);
+  const [editData, setEditData] = useState<Partial<ProfileData>>({});
+  const [uploadingAvatar, setUploadingAvatar] = useState(false);
+  const [imageError, setImageError] = useState(false);
+  const fileInputRef = useRef<HTMLInputElement>(null);
+  const [showSignOutConfirm, setShowSignOutConfirm] = useState(false);
+  const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
+  const [deleteConfirmationText, setDeleteConfirmationText] = useState('');
+  const [deleting, setDeleting] = useState(false);
   
-  // Theme Context
-  const { theme, setTheme } = useTheme();
-  
-  // Profile State
-  const [fullName, setFullName] = useState(user?.user_metadata?.full_name || '');
-  const [username, setUsername] = useState(user?.user_metadata?.username || '');
-  const [bio, setBio] = useState('');
-  const [organization, setOrganization] = useState('');
-  const [occupation, setOccupation] = useState('');
-  const [avatarUrl, setAvatarUrl] = useState(user?.user_metadata?.avatar_url || '');
-  
-  // Account State
+  // 🔐 Change Password State
+  const [showPasswordModal, setShowPasswordModal] = useState(false);
   const [currentPassword, setCurrentPassword] = useState('');
   const [newPassword, setNewPassword] = useState('');
   const [confirmPassword, setConfirmPassword] = useState('');
-  const [email, setEmail] = useState(user?.email || '');
+  const [changingPassword, setChangingPassword] = useState(false);
   
-  // Notification State
-  const [notificationPrefs, setNotificationPrefs] = useState<NotificationPreferences>({
-    emailNotifications: true,
-    pushNotifications: true,
-    memuNotifications: true,
-    broadcastNotifications: true,
-  });
+  // 👁️ Password Visibility State
+  const [showCurrentPassword, setShowCurrentPassword] = useState(false);
+  const [showNewPassword, setShowNewPassword] = useState(false);
+  const [showConfirmPassword, setShowConfirmPassword] = useState(false);
   
-  // Privacy State
-  const [privacySettings, setPrivacySettings] = useState<PrivacySettings>({
-    whoCanSend: 'everyone',
-    showReadReceipts: true,
-    showOnlineStatus: true,
-    profileVisibility: 'public',
-  });
-  
-  // Appearance State - Initialize from theme context
-  const [appearanceSettings, setAppearanceSettings] = useState<AppearanceSettings>({
-    theme: theme,
-  });
-  
-  // Danger Zone State
-  const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
-  const [deleteConfirmText, setDeleteConfirmText] = useState('');
-  
-  const fileInputRef = useRef<HTMLInputElement>(null);
+    // 🎨 Appearance State
+  const [showAppearanceModal, setShowAppearanceModal] = useState(false);
   const { showToast } = useToast();
 
-  // Sync appearanceSettings with theme context
   useEffect(() => {
-    setAppearanceSettings({ theme });
-  }, [theme]);
-
-  // ============================================
-  // BROWSER BACK BUTTON SUPPORT
-  // ============================================
-  
-  const navigateToTab = useCallback((tab: TabType, pushToHistory: boolean = true) => {
-    setActiveTab(tab);
-    
-    if (pushToHistory) {
-      const url = new URL(window.location.href);
-      url.searchParams.set('settingsTab', tab);
-      window.history.pushState({ settingsTab: tab }, '', url.toString());
-    }
-  }, []);
-
-  useEffect(() => {
-    const handlePopState = (event: PopStateEvent) => {
-      if (event.state?.settingsTab) {
-        setActiveTab(event.state.settingsTab as TabType);
-      } else {
-        const url = new URL(window.location.href);
-        const tab = url.searchParams.get('settingsTab') as TabType | null;
-        if (tab && ['profile', 'account', 'notifications', 'privacy', 'appearance', 'danger'].includes(tab)) {
-          setActiveTab(tab);
-        } else {
-          setActiveTab('profile');
-        }
-      }
-    };
-
-    window.addEventListener('popstate', handlePopState);
-
-    const url = new URL(window.location.href);
-    const initialTab = url.searchParams.get('settingsTab') as TabType | null;
-    if (initialTab && ['profile', 'account', 'notifications', 'privacy', 'appearance', 'danger'].includes(initialTab)) {
-      setActiveTab(initialTab);
-    }
-
-    window.history.replaceState({ settingsTab: initialTab || 'profile' }, '', window.location.href);
-
-    return () => {
-      window.removeEventListener('popstate', handlePopState);
-    };
-  }, []);
-
-  // ============================================
-  // DATA FETCHING
-  // ============================================
-
-  useEffect(() => {
-    if (user?.id) {
+    if (user) {
       fetchProfile();
     }
-  }, [user?.id]);
+  }, [user]);
 
   const fetchProfile = async () => {
     const supabase = createClient();
-    const { data } = await supabase
+    const { data, error } = await supabase
       .from('profiles')
-      .select('full_name, username, bio, organization, occupation, avatar_url, notification_preferences, privacy_settings, appearance_settings')
+      .select('*')
       .eq('id', user.id)
       .single();
 
-    if (data) {
-      setFullName(data.full_name || '');
-      setUsername(data.username || '');
-      setBio(data.bio || '');
-      setOrganization(data.organization || '');
-      setOccupation(data.occupation || '');
-      setAvatarUrl(data.avatar_url || '');
-      
-      if (data.notification_preferences) setNotificationPrefs(data.notification_preferences);
-      if (data.privacy_settings) setPrivacySettings(data.privacy_settings);
-      if (data.appearance_settings) {
-        setAppearanceSettings(data.appearance_settings);
-        // Also sync with theme context
-        setTheme(data.appearance_settings.theme);
-      }
+    if (error) {
+      console.error('Error fetching profile:', error);
+      showToast('Failed to load profile', 'error');
+    } else {
+      setProfile(data);
+      setEditData(data || {});
     }
+    setLoading(false);
   };
 
-  // ============================================
-  // HANDLERS
-  // ============================================
-
-  const handleImageUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
+  const handleAvatarUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
     if (!file) return;
 
-    setUploading(true);
+    setUploadingAvatar(true);
     const supabase = createClient();
-    const fileExt = file.name.split('.').pop();
-    const filePath = `avatars/${user.id}_${Date.now()}.${fileExt}`;
 
     try {
+      const fileExt = file.name.split('.').pop();
+      const fileName = `${user.id}-${Date.now()}.${fileExt}`;
+      const filePath = `avatars/${fileName}`;
+
       const { error: uploadError } = await supabase.storage
-        .from('airshare') 
-        .upload(filePath, file, { upsert: true });
+        .from('avatars')
+        .upload(filePath, file);
 
       if (uploadError) throw uploadError;
 
-      const { data: urlData } = supabase.storage.from('airshare').getPublicUrl(filePath);
-      setAvatarUrl(urlData.publicUrl);
+      const { data: urlData } = supabase.storage
+        .from('avatars')
+        .getPublicUrl(filePath);
 
-      await supabase.auth.updateUser({ data: { avatar_url: urlData.publicUrl } });
-      
-      triggerHaptic('success');
-      showToast('Profile picture updated!', 'success');
-    } catch (err: any) {
-      console.warn('Upload error:', err);
-      triggerHaptic('error');
-      showToast('Failed to upload image', 'error');
+      // 1. Update profiles table
+      const { error: updateError } = await supabase
+        .from('profiles')
+        .update({ avatar_url: urlData.publicUrl })
+        .eq('id', user.id);
+
+      if (updateError) throw updateError;
+
+      // 2. Update Auth metadata
+      const { error: authError } = await supabase.auth.updateUser({
+        data: { avatar_url: urlData.publicUrl },
+      });
+
+      if (authError) {
+        console.warn('Auth metadata update failed:', authError);
+      }
+
+      // 3. Show success message
+      showToast('Avatar updated successfully!', 'success');
+
+      // 4. Force full page reload to refresh Auth session
+      setTimeout(() => {
+        window.location.reload();
+      }, 500);
+    } catch (err) {
+      console.error('Avatar upload error:', err);
+      showToast('Failed to upload avatar', 'error');
     } finally {
-      setUploading(false);
+      setUploadingAvatar(false);
+      if (fileInputRef.current) fileInputRef.current.value = '';
     }
   };
 
   const handleSaveProfile = async () => {
-    triggerHaptic('medium');
-    setLoading(true);
+    setSaving(true);
     const supabase = createClient();
 
-    try {
-      const { error: profileError } = await supabase
-        .from('profiles')
-        .update({ full_name: fullName, username, bio, organization, occupation, avatar_url: avatarUrl })
-        .eq('id', user.id);
+    const { data, error } = await supabase
+      .from('profiles')
+      .update({
+        full_name: editData.full_name || null,
+        bio: editData.bio || null,
+        organization: editData.organization || null,
+        website: editData.website || null,
+        location: editData.location || null,
+      })
+      .eq('id', user.id)
+      .select();
 
-      if (profileError) throw profileError;
-
-      const { error: authError } = await supabase.auth.updateUser({
-        data: { full_name: fullName, username, avatar_url: avatarUrl },
-      });
-
-      if (authError) throw authError;
-
-      triggerHaptic('success');
-      showToast('Profile saved successfully!', 'success');
-      window.location.reload(); 
-    } catch (err: any) {
-      console.warn('Save error:', err);
-      triggerHaptic('error');
-      showToast(err.message || 'Failed to save profile', 'error');
-    } finally {
-      setLoading(false);
+    if (error) {
+      console.error('Profile update failed:', error);
+      showToast(`Failed to update: ${error.message}`, 'error');
+    } else {
+      setProfile((prev) => prev ? { ...prev, ...editData } : null);
+      setIsEditing(false);
+      showToast('Profile updated successfully!', 'success');
     }
+    setSaving(false);
   };
 
   const handleChangePassword = async () => {
-    if (newPassword !== confirmPassword) {
-      triggerHaptic('error');
-      showToast('Passwords do not match', 'error');
+    if (!currentPassword || !newPassword || !confirmPassword) {
+      showToast('Please fill in all fields', 'error');
       return;
     }
+
     if (newPassword.length < 8) {
-      triggerHaptic('error');
       showToast('Password must be at least 8 characters', 'error');
       return;
     }
 
-    triggerHaptic('medium');
-    setLoading(true);
+    if (newPassword !== confirmPassword) {
+      showToast('Passwords do not match', 'error');
+      return;
+    }
+
+    setChangingPassword(true);
     const supabase = createClient();
 
     try {
       const { error } = await supabase.auth.updateUser({ password: newPassword });
+
       if (error) throw error;
 
-      triggerHaptic('success');
-      showToast('Password updated successfully!', 'success');
+      showToast('Password changed successfully!', 'success');
+      setShowPasswordModal(false);
       setCurrentPassword('');
       setNewPassword('');
       setConfirmPassword('');
     } catch (err: any) {
-      console.warn('Password change error:', err);
-      triggerHaptic('error');
+      console.error('Password change error:', err);
       showToast(err.message || 'Failed to change password', 'error');
     } finally {
-      setLoading(false);
-    }
-  };
-
-  const handleSaveNotifications = async () => {
-    triggerHaptic('medium');
-    setLoading(true);
-    const supabase = createClient();
-
-    try {
-      const { error } = await supabase
-        .from('profiles')
-        .update({ notification_preferences: notificationPrefs })
-        .eq('id', user.id);
-
-      if (error) throw error;
-
-      triggerHaptic('success');
-      showToast('Notification preferences saved!', 'success');
-    } catch (err: any) {
-      console.warn('Save error:', err);
-      triggerHaptic('error');
-      showToast(err.message || 'Failed to save notification preferences', 'error');
-    } finally {
-      setLoading(false);
-    }
-  };
-
-  const handleSavePrivacy = async () => {
-    triggerHaptic('medium');
-    setLoading(true);
-    const supabase = createClient();
-
-    try {
-      const { error } = await supabase
-        .from('profiles')
-        .update({ privacy_settings: privacySettings })
-        .eq('id', user.id);
-
-      if (error) throw error;
-
-      triggerHaptic('success');
-      showToast('Privacy settings saved!', 'success');
-    } catch (err: any) {
-      console.warn('Save error:', err);
-      triggerHaptic('error');
-      showToast(err.message || 'Failed to save privacy settings', 'error');
-    } finally {
-      setLoading(false);
-    }
-  };
-
-  const handleSaveAppearance = async () => {
-    triggerHaptic('medium');
-    setLoading(true);
-    const supabase = createClient();
-
-    try {
-      const { error } = await supabase
-        .from('profiles')
-        .update({ appearance_settings: appearanceSettings })
-        .eq('id', user.id);
-
-      if (error) throw error;
-
-      // Theme is already applied via setTheme, just save to database
-      triggerHaptic('success');
-      showToast('Appearance settings saved!', 'success');
-    } catch (err: any) {
-      console.warn('Save error:', err);
-      triggerHaptic('error');
-      showToast(err.message || 'Failed to save appearance settings', 'error');
-    } finally {
-      setLoading(false);
-    }
-  };
-
-  const handleDeleteAccount = async () => {
-    if (deleteConfirmText !== 'DELETE') {
-      triggerHaptic('error');
-      showToast('Please type DELETE to confirm', 'error');
-      return;
-    }
-    triggerHaptic('error');
-    setLoading(true);
-    try {
-      showToast('Account deletion is not yet implemented. Please contact support.', 'error');
-      setShowDeleteConfirm(false);
-      setDeleteConfirmText('');
-    } finally {
-      setLoading(false);
+      setChangingPassword(false);
     }
   };
 
   const handleSignOut = async () => {
-    triggerHaptic('medium');
     const supabase = createClient();
     await supabase.auth.signOut();
-    window.location.reload();
+    window.location.href = '/';
   };
 
-  // ============================================
-  // HELPERS
-  // ============================================
+  const handleDeleteAccount = async () => {
+    if (deleteConfirmationText !== 'DELETE') {
+      showToast('Please type "DELETE" to confirm', 'error');
+      return;
+    }
 
-  const initials = fullName.split(' ').map((n: string) => n[0]).join('').toUpperCase().slice(0, 2);
+    setDeleting(true);
+    const supabase = createClient();
 
-  const tabs = [
-    { id: 'profile' as TabType, label: 'Profile', icon: User },
-    { id: 'account' as TabType, label: 'Account', icon: Shield },
-    { id: 'notifications' as TabType, label: 'Notifications', icon: Bell },
-    { id: 'privacy' as TabType, label: 'Privacy', icon: Eye },
-    { id: 'appearance' as TabType, label: 'Appearance', icon: Palette },
-    { id: 'danger' as TabType, label: 'Danger Zone', icon: AlertTriangle },
-  ];
+    try {
+      // 1. Delete user's handles
+      await supabase.from('handles').delete().eq('user_id', user.id);
 
-  const currentTabIndex = tabs.findIndex(t => t.id === activeTab);
-  const canGoBack = currentTabIndex > 0;
+      // 2. Delete user's profile
+      await supabase.from('profiles').delete().eq('id', user.id);
 
-  const handleBack = () => {
-    triggerHaptic('light');
-    if (canGoBack) {
-      window.history.back();
-    } else {
-      navigateToTab('profile');
+      // 3. Delete user's memus
+      await supabase.from('memus').delete().or(`sender_id.eq.${user.id},recipient_id.eq.${user.id}`);
+
+      // 4. Delete user's auth account (Note: requires service role key in production, will fail on client)
+      const { error } = await supabase.auth.admin.deleteUser(user.id);
+
+      if (error) {
+        console.error('Error deleting user:', error);
+        showToast('Failed to delete account. Please contact support.', 'error');
+        setDeleting(false);
+        return;
+      }
+
+      showToast('Account deleted successfully', 'success');
+      await supabase.auth.signOut();
+      window.location.href = '/';
+    } catch (err) {
+      console.error('Delete account error:', err);
+      showToast('Failed to delete account. Please try again.', 'error');
+      setDeleting(false);
     }
   };
 
-  // ============================================
-  // TAB CONTENT
-  // ============================================
-
-  const renderContent = () => {
-    switch (activeTab) {
-      case 'profile':
-        return (
-          <div>
-            <h2 className="text-2xl font-bold text-gray-900 mb-6 flex items-center gap-2">
-              <User className="text-indigo-500" /> Profile Information
-            </h2>
-
-            <div className="flex flex-col items-center mb-8 pb-8 border-b border-gray-100">
-              <div className="relative group">
-                {avatarUrl ? (
-                  <img src={avatarUrl} alt="Profile" className="w-24 h-24 rounded-full object-cover border-4 border-white shadow-lg" />
-                ) : (
-                  <div className="w-24 h-24 rounded-full bg-gradient-to-br from-indigo-500 to-cyan-500 flex items-center justify-center text-white text-2xl font-bold shadow-lg">
-                    {initials}
-                  </div>
-                )}
-                <button
-                  onClick={() => { triggerHaptic('light'); fileInputRef.current?.click(); }}
-                  disabled={uploading}
-                  className="absolute bottom-0 right-0 w-8 h-8 bg-white border border-gray-200 rounded-full flex items-center justify-center text-gray-600 shadow-md hover:bg-gray-50 hover:text-indigo-600 transition-all disabled:opacity-50"
-                >
-                  {uploading ? <Loader2 size={14} className="animate-spin" /> : <Camera size={14} />}
-                </button>
-                <input ref={fileInputRef} type="file" accept="image/*" onChange={handleImageUpload} className="hidden" />
-              </div>
-              <p className="text-sm text-gray-500 mt-3">Click the camera icon to upload a new profile picture</p>
-            </div>
-
-            <div className="space-y-5">
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-5">
-                <div>
-                  <label className="text-xs font-semibold text-gray-600 mb-1.5 block uppercase tracking-wider">Full Name</label>
-                  <div className="relative">
-                    <User size={16} className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400" />
-                    <input type="text" value={fullName} onChange={(e) => setFullName(e.target.value)} className="w-full pl-10 pr-4 py-2.5 bg-gray-50 border border-gray-200 rounded-xl focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-400 outline-none transition" />
-                  </div>
-                </div>
-                <div>
-                  <label className="text-xs font-semibold text-gray-600 mb-1.5 block uppercase tracking-wider">Handle</label>
-                  <div className="relative">
-                    <AtSign size={16} className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400" />
-                    <input type="text" value={username} onChange={(e) => setUsername(e.target.value.toLowerCase().replace(/[^a-z0-9_]/g, ''))} className="w-full pl-10 pr-4 py-2.5 bg-gray-50 border border-gray-200 rounded-xl focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-400 outline-none transition" />
-                  </div>
-                </div>
-              </div>
-
-              <div>
-                <label className="text-xs font-semibold text-gray-600 mb-1.5 block uppercase tracking-wider">Bio</label>
-                <textarea value={bio} onChange={(e) => setBio(e.target.value)} rows={3} className="w-full p-3 bg-gray-50 border border-gray-200 rounded-xl focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-400 outline-none transition resize-none" placeholder="Tell the world about yourself..." />
-              </div>
-
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-5">
-                <div>
-                  <label className="text-xs font-semibold text-gray-600 mb-1.5 block uppercase tracking-wider">Organization</label>
-                  <div className="relative">
-                    <Building2 size={16} className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400" />
-                    <input type="text" value={organization} onChange={(e) => setOrganization(e.target.value)} className="w-full pl-10 pr-4 py-2.5 bg-gray-50 border border-gray-200 rounded-xl focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-400 outline-none transition" placeholder="e.g., Memu Inc." />
-                  </div>
-                </div>
-                <div>
-                  <label className="text-xs font-semibold text-gray-600 mb-1.5 block uppercase tracking-wider">Occupation</label>
-                  <div className="relative">
-                    <Briefcase size={16} className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400" />
-                    <input type="text" value={occupation} onChange={(e) => setOccupation(e.target.value)} className="w-full pl-10 pr-4 py-2.5 bg-gray-50 border border-gray-200 rounded-xl focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-400 outline-none transition" placeholder="e.g., Founder" />
-                  </div>
-                </div>
-              </div>
-
-              <div className="pt-4 flex justify-end">
-                <button onClick={handleSaveProfile} disabled={loading} className="flex items-center gap-2 px-6 py-3 bg-gradient-to-r from-indigo-600 to-cyan-600 text-white rounded-xl font-semibold hover:shadow-lg hover:shadow-indigo-500/25 hover:-translate-y-0.5 transition-all disabled:opacity-50 disabled:cursor-not-allowed btn-press">
-                  {loading ? <Loader2 size={18} className="animate-spin" /> : <><Save size={18} /> Save Changes</>}
-                </button>
-              </div>
-            </div>
-          </div>
-        );
-
-      case 'account':
-        return (
-          <div>
-            <h2 className="text-2xl font-bold text-gray-900 mb-6 flex items-center gap-2">
-              <Shield className="text-indigo-500" /> Account Security
-            </h2>
-            <div className="space-y-8">
-              <div>
-                <h3 className="text-lg font-semibold text-gray-900 mb-4 flex items-center gap-2">
-                  <Mail size={20} className="text-gray-600" /> Email Address
-                </h3>
-                <div className="bg-gray-50 rounded-xl p-4 flex items-center justify-between">
-                  <div>
-                    <p className="text-sm font-medium text-gray-900">{email}</p>
-                    <p className="text-xs text-gray-500 mt-1">Your primary email address</p>
-                  </div>
-                  <button className="px-4 py-2 text-sm font-semibold text-indigo-600 hover:bg-indigo-50 rounded-lg transition-all btn-press">Change</button>
-                </div>
-              </div>
-
-              <div>
-                <h3 className="text-lg font-semibold text-gray-900 mb-4 flex items-center gap-2">
-                  <Lock size={20} className="text-gray-600" /> Change Password
-                </h3>
-                <div className="space-y-4">
-                  <div>
-                    <label className="text-xs font-semibold text-gray-600 mb-1.5 block uppercase tracking-wider">Current Password</label>
-                    <input type="password" value={currentPassword} onChange={(e) => setCurrentPassword(e.target.value)} className="w-full px-4 py-2.5 bg-gray-50 border border-gray-200 rounded-xl focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-400 outline-none transition" placeholder="Enter current password" />
-                  </div>
-                  <div>
-                    <label className="text-xs font-semibold text-gray-600 mb-1.5 block uppercase tracking-wider">New Password</label>
-                    <input type="password" value={newPassword} onChange={(e) => setNewPassword(e.target.value)} className="w-full px-4 py-2.5 bg-gray-50 border border-gray-200 rounded-xl focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-400 outline-none transition" placeholder="Enter new password (min 8 characters)" />
-                  </div>
-                  <div>
-                    <label className="text-xs font-semibold text-gray-600 mb-1.5 block uppercase tracking-wider">Confirm New Password</label>
-                    <input type="password" value={confirmPassword} onChange={(e) => setConfirmPassword(e.target.value)} className="w-full px-4 py-2.5 bg-gray-50 border border-gray-200 rounded-xl focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-400 outline-none transition" placeholder="Confirm new password" />
-                  </div>
-                  <div className="pt-2">
-                    <button onClick={handleChangePassword} disabled={loading || !currentPassword || !newPassword || !confirmPassword} className="px-6 py-2.5 bg-gradient-to-r from-indigo-600 to-cyan-600 text-white rounded-xl font-semibold hover:shadow-lg hover:shadow-indigo-500/25 hover:-translate-y-0.5 transition-all disabled:opacity-50 disabled:cursor-not-allowed btn-press">
-                      {loading ? <Loader2 size={16} className="animate-spin" /> : 'Update Password'}
-                    </button>
-                  </div>
-                </div>
-              </div>
-
-              <div className="pt-6 border-t border-gray-100">
-                <button onClick={handleSignOut} className="w-full flex items-center justify-center gap-2 py-3 text-sm font-medium text-red-600 hover:bg-red-50 rounded-xl transition-colors btn-press">
-                  <LogOut size={16} /> Sign Out of Memu
-                </button>
-              </div>
-            </div>
-          </div>
-        );
-
-      case 'notifications':
-        return (
-          <div>
-            <h2 className="text-2xl font-bold text-gray-900 mb-6 flex items-center gap-2">
-              <Bell className="text-indigo-500" /> Notification Preferences
-            </h2>
-            <div className="space-y-6">
-              <div>
-                <h3 className="text-lg font-semibold text-gray-900 mb-4">Communication Channels</h3>
-                <div className="space-y-3">
-                  {[
-                    { key: 'emailNotifications' as const, icon: Mail, label: 'Email Notifications', desc: 'Receive notifications via email' },
-                    { key: 'pushNotifications' as const, icon: Bell, label: 'Push Notifications', desc: 'Receive push notifications on your device' },
-                  ].map((item) => (
-                    <div key={item.key} className="flex items-center justify-between p-4 bg-gray-50 rounded-xl">
-                      <div className="flex items-center gap-3">
-                        <item.icon size={20} className="text-gray-600" />
-                        <div>
-                          <p className="text-sm font-medium text-gray-900">{item.label}</p>
-                          <p className="text-xs text-gray-500">{item.desc}</p>
-                        </div>
-                      </div>
-                      <button
-                        onClick={() => { triggerHaptic('light'); setNotificationPrefs({ ...notificationPrefs, [item.key]: !notificationPrefs[item.key] }); }}
-                        className={`relative w-12 h-6 rounded-full transition-colors ${notificationPrefs[item.key] ? 'bg-indigo-600' : 'bg-gray-300'}`}
-                      >
-                        <div className={`absolute top-0.5 left-0.5 w-5 h-5 bg-white rounded-full transition-transform ${notificationPrefs[item.key] ? 'translate-x-6' : 'translate-x-0'}`} />
-                      </button>
-                    </div>
-                  ))}
-                </div>
-              </div>
-
-              <div>
-                <h3 className="text-lg font-semibold text-gray-900 mb-4">Notification Types</h3>
-                <div className="space-y-3">
-                  {[
-                    { key: 'memuNotifications' as const, label: 'New Memus', desc: 'When someone sends you a memu' },
-                    { key: 'broadcastNotifications' as const, label: 'Broadcasts', desc: 'When you receive a broadcast message' },
-                  ].map((item) => (
-                    <div key={item.key} className="flex items-center justify-between p-4 bg-gray-50 rounded-xl">
-                      <div>
-                        <p className="text-sm font-medium text-gray-900">{item.label}</p>
-                        <p className="text-xs text-gray-500">{item.desc}</p>
-                      </div>
-                      <button
-                        onClick={() => { triggerHaptic('light'); setNotificationPrefs({ ...notificationPrefs, [item.key]: !notificationPrefs[item.key] }); }}
-                        className={`relative w-12 h-6 rounded-full transition-colors ${notificationPrefs[item.key] ? 'bg-indigo-600' : 'bg-gray-300'}`}
-                      >
-                        <div className={`absolute top-0.5 left-0.5 w-5 h-5 bg-white rounded-full transition-transform ${notificationPrefs[item.key] ? 'translate-x-6' : 'translate-x-0'}`} />
-                      </button>
-                    </div>
-                  ))}
-                </div>
-              </div>
-
-              <div className="pt-4 flex justify-end">
-                <button onClick={handleSaveNotifications} disabled={loading} className="flex items-center gap-2 px-6 py-2.5 bg-gradient-to-r from-indigo-600 to-cyan-600 text-white rounded-xl font-semibold hover:shadow-lg hover:shadow-indigo-500/25 hover:-translate-y-0.5 transition-all disabled:opacity-50 btn-press">
-                  {loading ? <Loader2 size={16} className="animate-spin" /> : <><Save size={16} /> Save Preferences</>}
-                </button>
-              </div>
-            </div>
-          </div>
-        );
-
-      case 'privacy':
-        return (
-          <div>
-            <h2 className="text-2xl font-bold text-gray-900 mb-6 flex items-center gap-2">
-              <Eye className="text-indigo-500" /> Privacy Settings
-            </h2>
-            <div className="space-y-6">
-              <div>
-                <h3 className="text-lg font-semibold text-gray-900 mb-4">Who Can Contact You</h3>
-                <div className="space-y-2">
-                  {[
-                    { value: 'everyone', label: 'Everyone', desc: 'Anyone can send you memus' },
-                    { value: 'connections', label: 'Connections Only', desc: 'Only people you\'ve connected with' },
-                    { value: 'nobody', label: 'Nobody', desc: 'Block all incoming memus' },
-                  ].map((option) => (
-                    <button
-                      key={option.value}
-                      onClick={() => { triggerHaptic('light'); setPrivacySettings({ ...privacySettings, whoCanSend: option.value as any }); }}
-                      className={`w-full flex items-center justify-between p-4 rounded-xl transition-all btn-press ${
-                        privacySettings.whoCanSend === option.value ? 'bg-indigo-50 border-2 border-indigo-500' : 'bg-gray-50 border-2 border-transparent hover:bg-gray-100'
-                      }`}
-                    >
-                      <div className="text-left">
-                        <p className="text-sm font-medium text-gray-900">{option.label}</p>
-                        <p className="text-xs text-gray-500">{option.desc}</p>
-                      </div>
-                      {privacySettings.whoCanSend === option.value && <CheckCircle size={20} className="text-indigo-600" />}
-                    </button>
-                  ))}
-                </div>
-              </div>
-
-              <div>
-                <h3 className="text-lg font-semibold text-gray-900 mb-4">Visibility</h3>
-                <div className="space-y-3">
-                  {[
-                    { key: 'showReadReceipts' as const, label: 'Read Receipts', desc: 'Show when you\'ve read a memu' },
-                    { key: 'showOnlineStatus' as const, label: 'Online Status', desc: 'Show when you\'re online' },
-                  ].map((item) => (
-                    <div key={item.key} className="flex items-center justify-between p-4 bg-gray-50 rounded-xl">
-                      <div>
-                        <p className="text-sm font-medium text-gray-900">{item.label}</p>
-                        <p className="text-xs text-gray-500">{item.desc}</p>
-                      </div>
-                      <button
-                        onClick={() => { triggerHaptic('light'); setPrivacySettings({ ...privacySettings, [item.key]: !privacySettings[item.key] }); }}
-                        className={`relative w-12 h-6 rounded-full transition-colors ${privacySettings[item.key] ? 'bg-indigo-600' : 'bg-gray-300'}`}
-                      >
-                        <div className={`absolute top-0.5 left-0.5 w-5 h-5 bg-white rounded-full transition-transform ${privacySettings[item.key] ? 'translate-x-6' : 'translate-x-0'}`} />
-                      </button>
-                    </div>
-                  ))}
-
-                  <div className="flex items-center justify-between p-4 bg-gray-50 rounded-xl">
-                    <div>
-                      <p className="text-sm font-medium text-gray-900">Profile Visibility</p>
-                      <p className="text-xs text-gray-500">Who can see your profile</p>
-                    </div>
-                    <select
-                      value={privacySettings.profileVisibility}
-                      onChange={(e) => { triggerHaptic('light'); setPrivacySettings({ ...privacySettings, profileVisibility: e.target.value as any }); }}
-                      className="px-3 py-1.5 bg-white border border-gray-200 rounded-lg text-sm font-medium text-gray-700 focus:outline-none focus:ring-2 focus:ring-indigo-500/20"
-                    >
-                      <option value="public">Public</option>
-                      <option value="private">Private</option>
-                    </select>
-                  </div>
-                </div>
-              </div>
-
-              <div className="pt-4 flex justify-end">
-                <button onClick={handleSavePrivacy} disabled={loading} className="flex items-center gap-2 px-6 py-2.5 bg-gradient-to-r from-indigo-600 to-cyan-600 text-white rounded-xl font-semibold hover:shadow-lg hover:shadow-indigo-500/25 hover:-translate-y-0.5 transition-all disabled:opacity-50 btn-press">
-                  {loading ? <Loader2 size={16} className="animate-spin" /> : <><Save size={16} /> Save Settings</>}
-                </button>
-              </div>
-            </div>
-          </div>
-        );
-
-      case 'appearance':
-        return (
-          <div>
-            <h2 className="text-2xl font-bold text-gray-900 mb-6 flex items-center gap-2">
-              <Palette className="text-indigo-500" /> Appearance
-            </h2>
-            <div className="space-y-6">
-              <div>
-                <h3 className="text-lg font-semibold text-gray-900 mb-4">Theme</h3>
-                <div className="grid grid-cols-3 gap-3">
-                  {[
-                    { value: 'light', label: 'Light', icon: '☀️' },
-                    { value: 'dark', label: 'Dark', icon: '🌙' },
-                    { value: 'system', label: 'System', icon: '💻' },
-                  ].map((option) => (
-                    <button
-                      key={option.value}
-                      onClick={() => { 
-                        triggerHaptic('light'); 
-                        const newTheme = option.value as 'light' | 'dark' | 'system';
-                        setAppearanceSettings({ theme: newTheme });
-                        // Apply theme immediately via context
-                        setTheme(newTheme);
-                      }}
-                      className={`flex flex-col items-center gap-2 p-4 rounded-xl transition-all btn-press ${
-                        appearanceSettings.theme === option.value ? 'bg-indigo-50 border-2 border-indigo-500' : 'bg-gray-50 border-2 border-transparent hover:bg-gray-100'
-                      }`}
-                    >
-                      <span className="text-2xl">{option.icon}</span>
-                      <span className="text-sm font-medium text-gray-900">{option.label}</span>
-                    </button>
-                  ))}
-                </div>
-                <p className="text-xs text-gray-500 mt-3 text-center">
-                  {appearanceSettings.theme === 'dark' ? 'Dark mode enabled' : appearanceSettings.theme === 'system' ? 'Will match your device settings' : 'Light mode enabled'}
-                </p>
-              </div>
-
-              <div className="pt-4 flex justify-end">
-                <button onClick={handleSaveAppearance} disabled={loading} className="flex items-center gap-2 px-6 py-2.5 bg-gradient-to-r from-indigo-600 to-cyan-600 text-white rounded-xl font-semibold hover:shadow-lg hover:shadow-indigo-500/25 hover:-translate-y-0.5 transition-all disabled:opacity-50 btn-press">
-                  {loading ? <Loader2 size={16} className="animate-spin" /> : <><Save size={16} /> Save Appearance</>}
-                </button>
-              </div>
-            </div>
-          </div>
-        );
-
-      case 'danger':
-        return (
-          <div>
-            <h2 className="text-2xl font-bold text-rose-600 mb-6 flex items-center gap-2">
-              <AlertTriangle className="text-rose-600" /> Danger Zone
-            </h2>
-            <div className="space-y-6">
-              <div className="bg-rose-50 border-2 border-rose-200 rounded-xl p-6">
-                <h3 className="text-lg font-semibold text-rose-900 mb-2">Delete Account</h3>
-                <p className="text-sm text-rose-700 mb-4">Permanently delete your account and all associated data. This action cannot be undone.</p>
-                
-                {!showDeleteConfirm ? (
-                  <button onClick={() => { triggerHaptic('error'); setShowDeleteConfirm(true); }} className="flex items-center gap-2 px-4 py-2 bg-rose-600 text-white rounded-lg font-semibold hover:bg-rose-700 transition-all btn-press">
-                    <Trash2 size={16} /> Delete My Account
-                  </button>
-                ) : (
-                  <div className="space-y-4">
-                    <p className="text-sm font-medium text-rose-900">Type <strong>DELETE</strong> to confirm:</p>
-                    <input type="text" value={deleteConfirmText} onChange={(e) => setDeleteConfirmText(e.target.value)} className="w-full px-4 py-2.5 bg-white border-2 border-rose-300 rounded-xl focus:ring-2 focus:ring-rose-500/20 focus:border-rose-400 outline-none transition" placeholder="Type DELETE" />
-                    <div className="flex gap-3">
-                      <button onClick={() => { setShowDeleteConfirm(false); setDeleteConfirmText(''); }} className="px-4 py-2 text-sm font-semibold text-gray-600 hover:bg-gray-100 rounded-lg transition-all btn-press">Cancel</button>
-                      <button onClick={handleDeleteAccount} disabled={deleteConfirmText !== 'DELETE' || loading} className="flex items-center gap-2 px-4 py-2 bg-rose-600 text-white rounded-lg font-semibold hover:bg-rose-700 transition-all disabled:opacity-50 disabled:cursor-not-allowed btn-press">
-                        {loading ? <Loader2 size={16} className="animate-spin" /> : <><Trash2 size={16} /> Permanently Delete</>}
-                      </button>
-                    </div>
-                  </div>
-                )}
-              </div>
-            </div>
-          </div>
-        );
-
-      default:
-        return null;
-    }
+  const getInitials = (name: string) => {
+    if (!name) return '?';
+    return name.split(' ').map((n) => n[0]).join('').toUpperCase().slice(0, 2);
   };
+
+  const formatDate = (dateStr?: string) => {
+    if (!dateStr) return '';
+    const date = new Date(dateStr);
+    return new Intl.DateTimeFormat('en-US', { month: 'long', year: 'numeric' }).format(date);
+  };
+
+  if (loading) {
+    return (
+      <div className="flex items-center justify-center h-full w-full bg-memu-canvas">
+        <div className="relative">
+          <div className="absolute inset-0 rounded-full bg-blue-500/20 blur-xl animate-pulse" />
+          <Loader2 className="w-8 h-8 animate-spin text-blue-600 relative z-10" />
+        </div>
+      </div>
+    );
+  }
+
+  if (!profile) {
+    return (
+      <div className="flex items-center justify-center h-full w-full bg-memu-canvas">
+        <div className="text-center">
+          <p className="text-gray-500">No profile data found</p>
+        </div>
+      </div>
+    );
+  }
 
   return (
-    <div className="h-full overflow-hidden bg-memu-canvas flex">
-      
-      {/* ============================================ */}
-      {/* DESKTOP: Sidebar + Content                   */}
-      {/* ============================================ */}
-      <div className="hidden md:flex w-full">
-        {/* Sidebar */}
-        <div className="flex flex-col w-64 bg-white border-r border-gray-200 p-6">
-          <h1 className="font-serif text-2xl font-bold text-gray-900 mb-8">Settings</h1>
-          <nav className="flex-1 space-y-1">
-            {tabs.map((tab) => {
-              const Icon = tab.icon;
-              return (
-                <button
-                  key={tab.id}
-                  onClick={() => navigateToTab(tab.id)}
-                  className={`w-full flex items-center gap-3 px-4 py-3 rounded-xl text-sm font-semibold transition-all btn-press ${
-                    activeTab === tab.id
-                      ? 'bg-gradient-to-r from-indigo-50 to-purple-50 text-indigo-700 border-l-4 border-indigo-600'
-                      : 'text-gray-600 hover:bg-gray-50'
-                  }`}
-                >
-                  <Icon size={18} strokeWidth={2.5} className={activeTab === tab.id ? 'text-indigo-600' : 'text-gray-400'} />
-                  {tab.label}
-                </button>
-              );
-            })}
-          </nav>
-        </div>
+    <div className="flex flex-col h-full w-full bg-memu-canvas overflow-y-auto pb-24 custom-scroll">
+      {/* Header */}
+      <div className="px-6 md:px-10 pt-6 pb-2 w-full">
+        <div className="flex items-center justify-between flex-wrap gap-4">
+          <div className="flex items-center gap-3">
+            <div className="w-10 h-10 rounded-xl bg-gradient-to-br from-blue-600 to-indigo-600 flex items-center justify-center shadow-sm">
+              <User size={20} strokeWidth={2} className="text-white" />
+            </div>
+            <div>
+              <h1 className="text-2xl font-semibold text-gray-900 tracking-tight">Profile</h1>
+              <p className="text-sm text-gray-500 font-medium">Manage your personal information</p>
+            </div>
+          </div>
 
-        {/* Content */}
-        <div className="flex-1 overflow-y-auto p-10">
-          <div className="max-w-3xl">
-            {canGoBack && (
-              <button onClick={handleBack} className="flex items-center gap-2 text-sm font-semibold text-gray-500 hover:text-indigo-600 mb-6 transition-all btn-press">
-                <ChevronLeft size={18} strokeWidth={2.5} /> Back to {tabs[currentTabIndex - 1].label}
+          <div className="flex items-center gap-2">
+            {!isEditing ? (
+              <button
+                onClick={() => setIsEditing(true)}
+                className="flex items-center gap-2 px-4 py-2 bg-blue-600 text-white rounded-xl text-sm font-medium hover:bg-blue-700 transition shadow-sm hover:shadow-md"
+              >
+                <Edit3 size={16} strokeWidth={2} />
+                Edit Profile
               </button>
-            )}
-            <div className="bg-white/80 backdrop-blur-sm border border-gray-200 rounded-3xl shadow-xl p-8">
-              {renderContent()}
-            </div>
-          </div>
-        </div>
-      </div>
-
-      {/* ============================================ */}
-      {/* MOBILE: Header + Tabs + Content              */}
-      {/* ============================================ */}
-      <div className="md:hidden flex flex-col h-full w-full">
-        {/* Mobile Header with Back Button */}
-        <div className="bg-white border-b border-gray-200 px-4 py-3 flex-shrink-0">
-          <div className="flex items-center justify-between mb-3">
-            <div className="flex items-center gap-2">
-              {canGoBack && (
-                <button onClick={handleBack} className="w-10 h-10 rounded-xl flex items-center justify-center hover:bg-gray-100 transition-all btn-press">
-                  <ChevronLeft size={20} strokeWidth={2.5} className="text-gray-700" />
-                </button>
-              )}
-              <h1 className="font-serif text-xl font-bold text-gray-900">Settings</h1>
-            </div>
-            <span className="text-xs font-semibold text-gray-400 uppercase tracking-wider">
-              {tabs.find(t => t.id === activeTab)?.label}
-            </span>
-          </div>
-          
-          {/* Mobile Tab Bar */}
-          <div className="flex gap-2 overflow-x-auto pb-1 -mx-4 px-4 custom-scroll">
-            {tabs.map((tab) => {
-              const Icon = tab.icon;
-              return (
+            ) : (
+              <>
                 <button
-                  key={tab.id}
-                  onClick={() => navigateToTab(tab.id)}
-                  className={`flex items-center gap-1.5 px-3 py-2 rounded-xl text-xs font-semibold whitespace-nowrap transition-all btn-press flex-shrink-0 ${
-                    activeTab === tab.id
-                      ? 'bg-gradient-to-r from-indigo-600 to-purple-600 text-white shadow-lg'
-                      : 'bg-gray-100 text-gray-600'
-                  }`}
+                  onClick={handleSaveProfile}
+                  disabled={saving}
+                  className="flex items-center gap-2 px-4 py-2 bg-emerald-600 text-white rounded-xl text-sm font-medium hover:bg-emerald-700 transition shadow-sm disabled:opacity-50"
                 >
-                  <Icon size={14} strokeWidth={2.5} />
-                  {tab.label}
+                  {saving ? <Loader2 size={16} className="animate-spin" /> : <Save size={16} strokeWidth={2} />}
+                  {saving ? 'Saving...' : 'Save'}
                 </button>
-              );
-            })}
-          </div>
-        </div>
-
-        {/* Mobile Content */}
-        <div className="flex-1 overflow-y-auto p-4">
-          <div className="bg-white/80 backdrop-blur-sm border border-gray-200 rounded-3xl shadow-xl p-6">
-            {renderContent()}
+                <button
+                  onClick={() => {
+                    setIsEditing(false);
+                    setEditData(profile);
+                  }}
+                  className="px-4 py-2 bg-gray-100 text-gray-700 rounded-xl text-sm font-medium hover:bg-gray-200 transition"
+                >
+                  Cancel
+                </button>
+              </>
+            )}
           </div>
         </div>
       </div>
+
+      {/* Profile Content */}
+      <div className="flex-1 px-6 md:px-10 pb-10 w-full max-w-3xl">
+        {/* Main Profile Card */}
+        <div className="bg-white rounded-2xl border border-gray-200/60 shadow-sm p-6 md:p-8 mb-6">
+          {/* Avatar Section */}
+          <div className="flex items-center gap-6 mb-6">
+            <div className="relative group">
+              <div className="relative w-20 h-20 rounded-full bg-gradient-to-br from-blue-500 via-indigo-500 to-purple-600 p-0.5 shadow-md">
+                {profile.avatar_url && !imageError ? (
+                  <img
+                    src={profile.avatar_url}
+                    alt={profile.full_name || profile.username}
+                    className="w-full h-full rounded-full object-cover border-2 border-white"
+                    onError={() => setImageError(true)}
+                  />
+                ) : (
+                  <div className="w-full h-full rounded-full bg-gradient-to-br from-blue-500 to-indigo-600 flex items-center justify-center text-white text-xl font-bold">
+                    {getInitials(profile.full_name || profile.username)}
+                  </div>
+                )}
+              </div>
+              <button
+                onClick={() => fileInputRef.current?.click()}
+                disabled={uploadingAvatar}
+                className="absolute bottom-0 right-0 p-1.5 bg-blue-600 rounded-full text-white shadow-md hover:bg-blue-700 transition-all hover:scale-105 disabled:opacity-50 border-2 border-white"
+                title="Change avatar"
+              >
+                {uploadingAvatar ? (
+                  <Loader2 size={12} className="animate-spin" />
+                ) : (
+                  <Camera size={12} strokeWidth={2.5} />
+                )}
+              </button>
+              <input
+                ref={fileInputRef}
+                type="file"
+                accept="image/*"
+                onChange={handleAvatarUpload}
+                className="hidden"
+              />
+            </div>
+
+            <div className="flex-1 min-w-0">
+              <h2 className="text-xl font-bold text-gray-900 truncate">
+                {profile.full_name || profile.username}
+              </h2>
+              <div className="flex items-center gap-2">
+                <AtSign size={14} className="text-blue-600" />
+                <span className="text-sm font-medium text-blue-700">{profile.username}</span>
+                {profile.created_at && (
+                  <span className="text-xs text-gray-400 ml-2">
+                    · Joined {formatDate(profile.created_at)}
+                  </span>
+                )}
+              </div>
+            </div>
+          </div>
+
+          {/* Profile Info */}
+          <div className="space-y-3">
+            {/* Email */}
+            <div className="flex items-center gap-3 px-4 py-2.5 bg-gray-50 rounded-xl border border-gray-200/60">
+              <Mail size={16} className="text-gray-400 flex-shrink-0" />
+              <span className="text-sm text-gray-700 flex-1">{profile.email}</span>
+              <span className="flex items-center gap-1 text-[10px] font-semibold text-emerald-600 px-2 py-0.5 bg-emerald-50 rounded-full border border-emerald-200/60">
+                <Verified size={10} />
+                Verified
+              </span>
+            </div>
+
+            {isEditing ? (
+              // Edit Mode
+              <div className="space-y-3 pt-2">
+                <div>
+                  <label className="block text-xs font-semibold text-gray-500 mb-1">Full Name</label>
+                  <input
+                    type="text"
+                    value={editData.full_name || ''}
+                    onChange={(e) => setEditData({ ...editData, full_name: e.target.value })}
+                    placeholder="Your full name"
+                    className="w-full px-4 py-2.5 bg-gray-50 border border-gray-200 rounded-xl text-sm outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-400 transition"
+                  />
+                </div>
+
+                <div>
+                  <label className="block text-xs font-semibold text-gray-500 mb-1">Bio</label>
+                  <textarea
+                    value={editData.bio || ''}
+                    onChange={(e) => setEditData({ ...editData, bio: e.target.value })}
+                    placeholder="Tell people about yourself..."
+                    rows={3}
+                    className="w-full px-4 py-2.5 bg-gray-50 border border-gray-200 rounded-xl text-sm outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-400 transition resize-none"
+                  />
+                </div>
+
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+                  <div>
+                    <label className="block text-xs font-semibold text-gray-500 mb-1">Organization</label>
+                    <input
+                      type="text"
+                      value={editData.organization || ''}
+                      onChange={(e) => setEditData({ ...editData, organization: e.target.value })}
+                      placeholder="Your company"
+                      className="w-full px-4 py-2.5 bg-gray-50 border border-gray-200 rounded-xl text-sm outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-400 transition"
+                    />
+                  </div>
+                  <div>
+                    <label className="block text-xs font-semibold text-gray-500 mb-1">Location</label>
+                    <input
+                      type="text"
+                      value={editData.location || ''}
+                      onChange={(e) => setEditData({ ...editData, location: e.target.value })}
+                      placeholder="City, Country"
+                      className="w-full px-4 py-2.5 bg-gray-50 border border-gray-200 rounded-xl text-sm outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-400 transition"
+                    />
+                  </div>
+                </div>
+
+                <div>
+                  <label className="block text-xs font-semibold text-gray-500 mb-1">Website</label>
+                  <input
+                    type="url"
+                    value={editData.website || ''}
+                    onChange={(e) => setEditData({ ...editData, website: e.target.value })}
+                    placeholder="https://yourwebsite.com"
+                    className="w-full px-4 py-2.5 bg-gray-50 border border-gray-200 rounded-xl text-sm outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-400 transition"
+                  />
+                </div>
+              </div>
+            ) : (
+              // View Mode
+              <div className="space-y-2">
+                {profile.full_name && (
+                  <div className="flex items-center gap-3 px-4 py-2.5 bg-gray-50 rounded-xl border border-gray-200/60">
+                    <User size={16} className="text-gray-400 flex-shrink-0" />
+                    <span className="text-sm text-gray-700">{profile.full_name}</span>
+                  </div>
+                )}
+
+                {profile.bio && (
+                  <div className="px-4 py-2.5 bg-gray-50 rounded-xl border border-gray-200/60">
+                    <p className="text-sm text-gray-600">{profile.bio}</p>
+                  </div>
+                )}
+
+                {profile.organization && (
+                  <div className="flex items-center gap-3 px-4 py-2.5 bg-gray-50 rounded-xl border border-gray-200/60">
+                    <Building size={16} className="text-gray-400 flex-shrink-0" />
+                    <span className="text-sm text-gray-700">{profile.organization}</span>
+                  </div>
+                )}
+
+                {profile.website && (
+                  <div className="flex items-center gap-3 px-4 py-2.5 bg-gray-50 rounded-xl border border-gray-200/60">
+                    <Globe size={16} className="text-gray-400 flex-shrink-0" />
+                    <a
+                      href={profile.website}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      className="text-sm text-blue-600 hover:underline flex items-center gap-1"
+                    >
+                      {profile.website.replace(/^https?:\/\//, '')}
+                      <ArrowRight size={12} />
+                    </a>
+                  </div>
+                )}
+
+                {profile.location && (
+                  <div className="flex items-center gap-3 px-4 py-2.5 bg-gray-50 rounded-xl border border-gray-200/60">
+                    <MapPin size={16} className="text-gray-400 flex-shrink-0" />
+                    <span className="text-sm text-gray-700">{profile.location}</span>
+                  </div>
+                )}
+              </div>
+            )}
+          </div>
+        </div>
+
+        {/* Account Settings */}
+        <div className="bg-white rounded-2xl border border-gray-200/60 shadow-sm p-6 md:p-8 mb-6">
+          <div className="flex items-center gap-3 mb-4">
+            <div className="w-10 h-10 rounded-xl bg-gradient-to-br from-blue-600 to-indigo-600 flex items-center justify-center shadow-sm">
+              <Shield size={18} strokeWidth={2} className="text-white" />
+            </div>
+            <div>
+              <h3 className="text-base font-semibold text-gray-900 tracking-tight">Account Settings</h3>
+              <p className="text-xs text-gray-500">Manage your account preferences</p>
+            </div>
+          </div>
+
+          <div className="space-y-2">
+            <button className="group w-full flex items-center justify-between p-3 bg-gray-50 hover:bg-blue-50 rounded-xl border border-gray-200/60 hover:border-blue-300/60 transition-all">
+              <div className="flex items-center gap-3">
+                <div className="w-9 h-9 rounded-xl bg-gradient-to-br from-purple-100 to-pink-100 flex items-center justify-center flex-shrink-0">
+                  <Shield size={16} className="text-purple-600" />
+                </div>
+                <div className="text-left">
+                  <p className="text-sm font-medium text-gray-900">Privacy</p>
+                  <p className="text-xs text-gray-500">Manage your privacy settings</p>
+                </div>
+              </div>
+              <ChevronRight size={16} className="text-gray-400 group-hover:text-blue-600 group-hover:translate-x-0.5 transition-all" />
+            </button>
+
+            <button className="group w-full flex items-center justify-between p-3 bg-gray-50 hover:bg-blue-50 rounded-xl border border-gray-200/60 hover:border-blue-300/60 transition-all">
+              <div className="flex items-center gap-3">
+                <div className="w-9 h-9 rounded-xl bg-gradient-to-br from-blue-100 to-cyan-100 flex items-center justify-center flex-shrink-0">
+                  <Bell size={16} className="text-blue-600" />
+                </div>
+                <div className="text-left">
+                  <p className="text-sm font-medium text-gray-900">Notifications</p>
+                  <p className="text-xs text-gray-500">Configure notification preferences</p>
+                </div>
+              </div>
+              <ChevronRight size={16} className="text-gray-400 group-hover:text-blue-600 group-hover:translate-x-0.5 transition-all" />
+            </button>
+
+            <button 
+              onClick={() => setShowPasswordModal(true)}
+              className="group w-full flex items-center justify-between p-3 bg-gray-50 hover:bg-blue-50 rounded-xl border border-gray-200/60 hover:border-blue-300/60 transition-all"
+            >
+              <div className="flex items-center gap-3">
+                <div className="w-9 h-9 rounded-xl bg-gradient-to-br from-emerald-100 to-teal-100 flex items-center justify-center flex-shrink-0">
+                  <Lock size={16} className="text-emerald-600" />
+                </div>
+                <div className="text-left">
+                  <p className="text-sm font-medium text-gray-900">Security</p>
+                  <p className="text-xs text-gray-500">Password and authentication</p>
+                </div>
+              </div>
+              <ChevronRight size={16} className="text-gray-400 group-hover:text-blue-600 group-hover:translate-x-0.5 transition-all" />
+            </button>
+
+            {/* Sign Out Button */}
+            <div className="pt-3 border-t border-gray-200/60">
+              {!showSignOutConfirm ? (
+                <button
+                  onClick={() => setShowSignOutConfirm(true)}
+                  className="w-full flex items-center justify-center gap-2 px-4 py-2.5 bg-rose-50 hover:bg-rose-100 text-rose-600 rounded-xl border border-rose-200/60 transition-all text-sm font-medium"
+                >
+                  <LogOut size={16} strokeWidth={2} />
+                  Sign Out
+                </button>
+              ) : (
+                <div className="flex items-center gap-3 p-3 bg-rose-50 rounded-xl border border-rose-200/60">
+                  <p className="text-sm text-rose-700 flex-1">Are you sure you want to sign out?</p>
+                  <button
+                    onClick={handleSignOut}
+                    className="px-3 py-1.5 bg-rose-600 text-white rounded-lg text-xs font-medium hover:bg-rose-700 transition"
+                  >
+                    Yes
+                  </button>
+                  <button
+                    onClick={() => setShowSignOutConfirm(false)}
+                    className="px-3 py-1.5 bg-gray-200 text-gray-700 rounded-lg text-xs font-medium hover:bg-gray-300 transition"
+                  >
+                    No
+                  </button>
+                </div>
+              )}
+            </div>
+          </div>
+        </div>
+
+        {/* Danger Zone */}
+        <div className="bg-white rounded-2xl border-2 border-rose-200/60 shadow-sm p-6 md:p-8">
+          <div className="flex items-center gap-3 mb-4">
+            <div className="w-10 h-10 rounded-xl bg-gradient-to-br from-rose-100 to-red-100 flex items-center justify-center shadow-sm">
+              <AlertTriangle size={18} className="text-rose-600" />
+            </div>
+            <div>
+              <h3 className="text-base font-semibold text-rose-700 tracking-tight">Danger Zone</h3>
+              <p className="text-xs text-gray-500">Irreversible actions — proceed with caution</p>
+            </div>
+          </div>
+
+          {!showDeleteConfirm ? (
+            <button
+              onClick={() => setShowDeleteConfirm(true)}
+              className="w-full flex items-center justify-center gap-2 px-4 py-3 bg-rose-50 hover:bg-rose-100 text-rose-700 rounded-xl border border-rose-200/60 transition-all text-sm font-medium"
+            >
+              <Trash2 size={16} strokeWidth={2} />
+              Delete Account
+            </button>
+          ) : (
+            <div className="space-y-4">
+              <div className="p-4 bg-rose-50 rounded-xl border border-rose-200/60">
+                <p className="text-sm text-rose-800 font-medium mb-2">
+                  ⚠️ This action is permanent and cannot be undone.
+                </p>
+                <ul className="text-xs text-rose-700 space-y-1 list-disc pl-4">
+                  <li>All your memus will be permanently deleted</li>
+                  <li>All your handles will be released</li>
+                  <li>Your profile and all associated data will be removed</li>
+                  <li>You will lose access to all spaces you're a member of</li>
+                </ul>
+              </div>
+
+              <div>
+                <label className="block text-xs font-semibold text-gray-600 mb-1.5">
+                  Type <span className="font-bold text-rose-600">DELETE</span> to confirm
+                </label>
+                <input
+                  type="text"
+                  value={deleteConfirmationText}
+                  onChange={(e) => setDeleteConfirmationText(e.target.value)}
+                  placeholder="Type DELETE here"
+                  className="w-full px-4 py-2.5 bg-gray-50 border border-gray-200 rounded-xl text-sm outline-none focus:ring-2 focus:ring-rose-500/20 focus:border-rose-400 transition"
+                  autoFocus
+                />
+              </div>
+
+              <div className="flex gap-3">
+                <button
+                  onClick={handleDeleteAccount}
+                  disabled={deleting || deleteConfirmationText !== 'DELETE'}
+                  className="flex-1 flex items-center justify-center gap-2 px-4 py-2.5 bg-rose-600 text-white rounded-xl text-sm font-medium hover:bg-rose-700 transition disabled:opacity-50 disabled:cursor-not-allowed"
+                >
+                  {deleting ? <Loader2 size={16} className="animate-spin" /> : <Trash2 size={16} strokeWidth={2} />}
+                  {deleting ? 'Deleting...' : 'Permanently Delete Account'}
+                </button>
+                <button
+                  onClick={() => {
+                    setShowDeleteConfirm(false);
+                    setDeleteConfirmationText('');
+                  }}
+                  className="px-4 py-2.5 bg-gray-100 text-gray-700 rounded-xl text-sm font-medium hover:bg-gray-200 transition"
+                >
+                  Cancel
+                </button>
+              </div>
+            </div>
+          )}
+        </div>
+      </div>
+
+      {/* Change Password Modal */}
+      {showPasswordModal && (
+        <div 
+          className="fixed inset-0 bg-black/40 backdrop-blur-sm flex items-center justify-center z-[100] p-4"
+          onClick={() => setShowPasswordModal(false)}
+          style={{ minWidth: '100vw', minHeight: '100vh' }}
+        >
+          <div 
+            className="bg-white rounded-2xl p-6 shadow-2xl border border-gray-200 animate-fade-in-scale"
+            onClick={(e) => e.stopPropagation()}
+            style={{ minWidth: '400px', width: '100%', maxWidth: '400px', maxHeight: '90vh', overflowY: 'auto' }}
+          >
+            <div className="flex items-center justify-between mb-6">
+              <div className="flex items-center gap-3">
+                <div className="w-10 h-10 rounded-xl bg-gradient-to-br from-emerald-500 to-teal-600 flex items-center justify-center shadow-sm flex-shrink-0">
+                  <Lock size={20} className="text-white" />
+                </div>
+                <div>
+                  <h3 className="text-lg font-semibold text-gray-900">Change Password</h3>
+                  <p className="text-xs text-gray-500">Update your account password</p>
+                </div>
+              </div>
+              <button
+                onClick={() => setShowPasswordModal(false)}
+                className="p-2 rounded-lg hover:bg-gray-100 text-gray-500 transition flex-shrink-0"
+              >
+                <X size={18} strokeWidth={2} />
+              </button>
+            </div>
+
+            <div className="space-y-4">
+              {/* Current Password */}
+              <div>
+                <label className="block text-xs font-semibold text-gray-500 uppercase tracking-wide mb-2">
+                  Current Password
+                </label>
+                <div className="relative">
+                  <input
+                    type={showCurrentPassword ? "text" : "password"}
+                    value={currentPassword}
+                    onChange={(e) => setCurrentPassword(e.target.value)}
+                    placeholder="Enter current password"
+                    className="w-full px-4 py-3 pr-10 bg-gray-50 border border-gray-200 rounded-xl text-sm outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-400 transition"
+                  />
+                  <button
+                    type="button"
+                    onClick={() => setShowCurrentPassword(!showCurrentPassword)}
+                    className="absolute right-3 top-1/2 -translate-y-1/2 text-gray-400 hover:text-gray-600 transition"
+                  >
+                    {showCurrentPassword ? <EyeOff size={16} /> : <Eye size={16} />}
+                  </button>
+                </div>
+              </div>
+
+              {/* New Password */}
+              <div>
+                <label className="block text-xs font-semibold text-gray-500 uppercase tracking-wide mb-2">
+                  New Password
+                </label>
+                <div className="relative">
+                  <input
+                    type={showNewPassword ? "text" : "password"}
+                    value={newPassword}
+                    onChange={(e) => setNewPassword(e.target.value)}
+                    placeholder="At least 8 characters"
+                    className="w-full px-4 py-3 pr-10 bg-gray-50 border border-gray-200 rounded-xl text-sm outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-400 transition"
+                  />
+                  <button
+                    type="button"
+                    onClick={() => setShowNewPassword(!showNewPassword)}
+                    className="absolute right-3 top-1/2 -translate-y-1/2 text-gray-400 hover:text-gray-600 transition"
+                  >
+                    {showNewPassword ? <EyeOff size={16} /> : <Eye size={16} />}
+                  </button>
+                </div>
+              </div>
+
+              {/* Confirm New Password */}
+              <div>
+                <label className="block text-xs font-semibold text-gray-500 uppercase tracking-wide mb-2">
+                  Confirm New Password
+                </label>
+                <div className="relative">
+                  <input
+                    type={showConfirmPassword ? "text" : "password"}
+                    value={confirmPassword}
+                    onChange={(e) => setConfirmPassword(e.target.value)}
+                    placeholder="Re-enter new password"
+                    className="w-full px-4 py-3 pr-10 bg-gray-50 border border-gray-200 rounded-xl text-sm outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-400 transition"
+                  />
+                  <button
+                    type="button"
+                    onClick={() => setShowConfirmPassword(!showConfirmPassword)}
+                    className="absolute right-3 top-1/2 -translate-y-1/2 text-gray-400 hover:text-gray-600 transition"
+                  >
+                    {showConfirmPassword ? <EyeOff size={16} /> : <Eye size={16} />}
+                  </button>
+                </div>
+              </div>
+
+              <div className="flex gap-3 pt-2">
+                <button
+                  onClick={handleChangePassword}
+                  disabled={changingPassword}
+                  className="flex-1 flex items-center justify-center gap-2 px-4 py-3 bg-gradient-to-r from-emerald-600 to-teal-600 text-white rounded-xl text-sm font-medium hover:from-emerald-700 hover:to-teal-700 transition disabled:opacity-50 shadow-sm whitespace-nowrap"
+                >
+                  {changingPassword ? <Loader2 size={16} className="animate-spin" /> : <Lock size={16} strokeWidth={2} />}
+                  {changingPassword ? 'Changing...' : 'Change Password'}
+                </button>
+                <button
+                  onClick={() => setShowPasswordModal(false)}
+                  className="px-4 py-3 bg-gray-100 text-gray-700 rounded-xl text-sm font-medium hover:bg-gray-200 transition whitespace-nowrap"
+                >
+                  Cancel
+                </button>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
 
       <style>{`
-        .custom-scroll::-webkit-scrollbar { width: 6px; height: 6px; }
-        .custom-scroll::-webkit-scrollbar-thumb { background: #e2e8f0; border-radius: 10px; }
+        .custom-scroll::-webkit-scrollbar { width: 4px; }
+        .custom-scroll::-webkit-scrollbar-thumb { background: #d4d4d4; border-radius: 10px; }
+        .custom-scroll::-webkit-scrollbar-track { background: transparent; }
+        @keyframes fadeInScale {
+          from { opacity: 0; transform: scale(0.95); }
+          to { opacity: 1; transform: scale(1); }
+        }
+        .animate-fade-in-scale { animation: fadeInScale 0.2s ease-out; }
       `}</style>
     </div>
   );

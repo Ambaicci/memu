@@ -3,10 +3,25 @@
 import { useState, useEffect, useRef, useCallback } from 'react';
 import { createClient } from '@/lib/supabase/client';
 import { useToast } from '@/contexts/ToastContext';
-import { 
-  Video, Mic, MicOff, VideoOff, PhoneOff, Phone, Users, 
-  Calendar, Clock, ChevronRight, Share2, MessageSquare, 
-  Camera, Volume2, Copy, CheckCircle, X, Sparkles
+import {
+  Video,
+  Mic,
+  MicOff,
+  VideoOff,
+  PhoneOff,
+  Phone,
+  Users,
+  Calendar,
+  Clock,
+  ChevronRight,
+  Share2,
+  MessageSquare,
+  Camera,
+  Volume2,
+  Copy,
+  CheckCircle,
+  X,
+  Sparkles
 } from 'lucide-react';
 
 interface Participant {
@@ -32,7 +47,7 @@ export default function ConferPanel() {
   const [copied, setCopied] = useState(false);
   const [callError, setCallError] = useState<string | null>(null);
   const [isConnecting, setIsConnecting] = useState(false);
-  
+
   const localVideoRef = useRef<HTMLVideoElement>(null);
   const peerConnectionsRef = useRef<Map<string, RTCPeerConnection>>(new Map());
   const channelRef = useRef<any>(null);
@@ -260,41 +275,44 @@ export default function ConferPanel() {
   if (!isInCall) {
     return (
       <div className="flex flex-col h-full overflow-y-auto bg-memu-canvas animate-page-enter">
-        <div className="flex flex-col items-center justify-center py-24 px-4 text-center max-w-2xl mx-auto">
-          {/* Premium Header */}
+        <div className="flex flex-col items-center justify-center py-24 px-4 text-center w-full max-w-2xl mx-auto">
+          {/* Premium Header with rounded rectangle icon */}
           <div className="relative w-32 h-32 mb-8 animate-fade-in-scale">
-            <div className="absolute inset-0 bg-gradient-to-br from-indigo-100 to-purple-100 rounded-3xl blur-2xl animate-pulse"></div>
-            <div className="relative bg-gradient-to-br from-indigo-600 to-purple-600 rounded-3xl w-32 h-32 flex items-center justify-center shadow-xl border border-indigo-200/60">
-              <Video size={48} className="text-white" strokeWidth={2} />
+            <div className="absolute inset-0 bg-gradient-to-br from-blue-100 to-indigo-100 rounded-3xl blur-2xl animate-pulse" />
+            <div className="relative bg-gradient-to-br from-blue-500 to-indigo-600 rounded-3xl w-32 h-32 flex items-center justify-center shadow-xl border border-blue-200/60">
+              <Video size={48} strokeWidth={2} className="text-white" />
             </div>
-          </div>
-          
-          <div className="space-y-2 mb-8">
-            <div className="flex items-center gap-3 text-indigo-600 justify-center">
-              <span className="text-sm font-bold uppercase tracking-wider">Video Conferencing</span>
-            </div>
-            <h1 className="font-serif text-4xl md:text-5xl font-semibold text-gray-900 leading-tight">
-              memu<span className="text-indigo-600">-confer</span>
-            </h1>
-            <p className="text-gray-500 text-base max-w-md mx-auto">
-              Crystal-clear conversations — video, voice, or text.
-            </p>
           </div>
 
-          <div className="flex flex-col sm:flex-row gap-3 mb-6">
-            <button 
-              onClick={startNewCall} 
+          <div className="space-y-2 mb-8">
+            <div className="flex items-center gap-3 text-blue-600 justify-center">
+              <span className="text-sm font-semibold uppercase tracking-wider">Video Conferencing</span>
+            </div>
+            <h1 className="text-4xl md:text-5xl font-semibold text-gray-900 leading-tight tracking-tight whitespace-nowrap">
+              memu<span className="text-blue-600">-confer</span>
+            </h1>
+            <div style={{ width: '320px', margin: '0 auto' }}>
+              <p className="text-gray-500 text-base font-light">
+                Crystal-clear conversations — video, voice, or text.
+              </p>
+            </div>
+          </div>
+
+          {/* ✨ REFINED BUTTONS — Solid blue primary, consistent with MEMU design */}
+          <div className="flex flex-col sm:flex-row gap-3 w-full justify-center">
+            <button
+              onClick={startNewCall}
               disabled={isConnecting}
-              className="flex items-center gap-3 px-6 py-3 bg-gradient-to-r from-indigo-600 to-purple-600 text-white rounded-full text-sm font-semibold hover:shadow-xl hover:-translate-y-0.5 transition-all shadow-lg disabled:opacity-50 btn-press"
+              className="flex items-center justify-center gap-2 px-5 py-2.5 bg-blue-600 text-white rounded-xl text-sm font-medium hover:bg-blue-700 hover:shadow-lg hover:-translate-y-0.5 transition-all shadow-md disabled:opacity-50 btn-press"
             >
-              {isConnecting ? <div className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin" /> : <Phone size={16} strokeWidth={2.5} />}
+              {isConnecting ? <div className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin" /> : <Phone size={16} strokeWidth={2} />}
               {isConnecting ? 'Connecting...' : 'Start a Call'}
             </button>
-            <button 
-              onClick={() => setShowJoinInput(!showJoinInput)} 
-              className="flex items-center gap-3 px-6 py-3 bg-white border border-gray-200 rounded-full text-sm font-semibold text-gray-700 hover:border-indigo-300 hover:text-indigo-600 transition-all shadow-sm btn-press"
+            <button
+              onClick={() => setShowJoinInput(!showJoinInput)}
+              className="flex items-center justify-center gap-2 px-5 py-2.5 bg-white border border-gray-300 text-gray-700 rounded-xl text-sm font-medium hover:border-blue-400 hover:text-blue-600 hover:shadow-md transition-all shadow-sm btn-press"
             >
-              <Video size={16} strokeWidth={2.5} /> Join with Code
+              <Video size={16} strokeWidth={2} /> Join with Code
             </button>
           </div>
 
@@ -305,12 +323,12 @@ export default function ConferPanel() {
                 value={joinRoomId}
                 onChange={(e) => setJoinRoomId(e.target.value)}
                 placeholder="Enter room ID"
-                className="flex-1 border border-gray-200 rounded-xl px-4 py-3 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500 transition-all bg-white"
+                className="flex-1 border border-gray-200 rounded-xl px-4 py-3 text-sm outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-400 transition bg-white"
               />
-              <button 
-                onClick={() => joinCall(joinRoomId)} 
+              <button
+                onClick={() => joinCall(joinRoomId)}
                 disabled={isConnecting}
-                className="bg-gradient-to-r from-indigo-600 to-purple-600 text-white px-6 py-3 rounded-xl text-sm font-semibold hover:shadow-xl hover:-translate-y-0.5 transition-all shadow-lg disabled:opacity-50 btn-press"
+                className="bg-blue-600 text-white px-5 py-2.5 rounded-xl text-sm font-medium hover:bg-blue-700 hover:shadow-lg hover:-translate-y-0.5 transition-all shadow-md disabled:opacity-50 btn-press"
               >
                 Join
               </button>
@@ -319,7 +337,7 @@ export default function ConferPanel() {
 
           {callError && (
             <div className="mt-6 flex items-center gap-2 text-sm p-3 rounded-xl font-medium bg-rose-50 text-rose-700 border border-rose-200 animate-fade-in-scale">
-              <X size={16} strokeWidth={2.5} />
+              <X size={16} strokeWidth={2} />
               {callError}
             </div>
           )}
@@ -328,7 +346,7 @@ export default function ConferPanel() {
     );
   }
 
-  // ----- In call UI (polished, lighter, with purple accents) -----
+  // ----- In call UI (unchanged) -----
   return (
     <div className="flex flex-col h-full bg-gradient-to-br from-gray-900 to-gray-950 animate-page-enter">
       {/* Header */}
@@ -340,11 +358,11 @@ export default function ConferPanel() {
         </div>
         <div className="flex items-center gap-3">
           <button onClick={copyRoomId} className="flex items-center gap-2 text-white/60 hover:text-white transition text-xs font-semibold btn-press">
-            {copied ? <CheckCircle size={14} strokeWidth={2.5} className="text-emerald-500" /> : <Copy size={14} strokeWidth={2.5} />}
+            {copied ? <CheckCircle size={14} strokeWidth={2} className="text-emerald-500" /> : <Copy size={14} strokeWidth={2} />}
             {copied ? 'Copied' : 'Copy ID'}
           </button>
           <button onClick={endCall} className="flex items-center gap-2 bg-rose-500/80 hover:bg-rose-600 text-white rounded-full px-4 py-2 text-xs font-semibold transition-all btn-press">
-            <PhoneOff size={12} strokeWidth={2.5} /> Leave
+            <PhoneOff size={12} strokeWidth={2} /> Leave
           </button>
         </div>
       </div>
@@ -357,7 +375,7 @@ export default function ConferPanel() {
             <video ref={localVideoRef} autoPlay muted playsInline className="w-full h-full object-cover" />
             {!localStream && <div className="absolute inset-0 flex items-center justify-center text-white/60 font-medium">Connecting...</div>}
             <div className="absolute bottom-3 left-3 bg-black/60 backdrop-blur-sm rounded-full px-3 py-1.5 text-white text-xs font-semibold flex items-center gap-2">
-              <Sparkles size={10} strokeWidth={2.5} className="text-indigo-400" />
+              <Sparkles size={10} strokeWidth={2} className="text-blue-400" />
               You {isVideoOff && '(cam off)'}
             </div>
           </div>
@@ -369,7 +387,7 @@ export default function ConferPanel() {
               ) : (
                 <div className="absolute inset-0 flex items-center justify-center">
                   <div className="text-center">
-                    <div className="w-16 h-16 rounded-2xl bg-gradient-to-br from-indigo-600 to-purple-600 flex items-center justify-center mx-auto mb-3 shadow-lg">
+                    <div className="w-16 h-16 rounded-2xl bg-gradient-to-br from-blue-500 to-indigo-600 flex items-center justify-center mx-auto mb-3 shadow-lg">
                       <span className="text-white text-xl font-bold">{p.name.charAt(0).toUpperCase()}</span>
                     </div>
                     <p className="text-white/80 text-sm font-semibold">{p.name}</p>
@@ -385,33 +403,33 @@ export default function ConferPanel() {
       {/* Controls - Premium pill */}
       <div className="pb-8 pt-4 px-6">
         <div className="flex items-center justify-center gap-3 bg-black/60 backdrop-blur-xl rounded-full w-fit mx-auto px-5 py-3 border border-white/10 shadow-2xl animate-fade-in-scale">
-          <button 
-            onClick={toggleMute} 
+          <button
+            onClick={toggleMute}
             className={`w-12 h-12 rounded-full flex items-center justify-center transition-all hover:scale-105 btn-press ${
               isMuted ? 'bg-rose-500 hover:bg-rose-600' : 'bg-white/10 hover:bg-white/20'
             }`}
           >
-            {isMuted ? <MicOff size={20} strokeWidth={2.5} className="text-white" /> : <Mic size={20} strokeWidth={2.5} className="text-white" />}
+            {isMuted ? <MicOff size={20} strokeWidth={2} className="text-white" /> : <Mic size={20} strokeWidth={2} className="text-white" />}
           </button>
-          <button 
-            onClick={toggleVideo} 
+          <button
+            onClick={toggleVideo}
             className={`w-12 h-12 rounded-full flex items-center justify-center transition-all hover:scale-105 btn-press ${
               isVideoOff ? 'bg-rose-500 hover:bg-rose-600' : 'bg-white/10 hover:bg-white/20'
             }`}
           >
-            {isVideoOff ? <VideoOff size={20} strokeWidth={2.5} className="text-white" /> : <Video size={20} strokeWidth={2.5} className="text-white" />}
+            {isVideoOff ? <VideoOff size={20} strokeWidth={2} className="text-white" /> : <Video size={20} strokeWidth={2} className="text-white" />}
           </button>
-          <button 
-            onClick={copyRoomId} 
+          <button
+            onClick={copyRoomId}
             className="w-12 h-12 rounded-full bg-white/10 hover:bg-white/20 flex items-center justify-center transition-all hover:scale-105 btn-press"
           >
-            <Share2 size={20} strokeWidth={2.5} className="text-white" />
+            <Share2 size={20} strokeWidth={2} className="text-white" />
           </button>
-          <button 
-            onClick={endCall} 
+          <button
+            onClick={endCall}
             className="w-12 h-12 rounded-full bg-rose-500 hover:bg-rose-600 flex items-center justify-center transition-all hover:scale-105 btn-press"
           >
-            <PhoneOff size={20} strokeWidth={2.5} className="text-white" />
+            <PhoneOff size={20} strokeWidth={2} className="text-white" />
           </button>
         </div>
       </div>

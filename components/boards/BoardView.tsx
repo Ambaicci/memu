@@ -4,7 +4,8 @@ import { useState, useRef, useEffect } from 'react';
 import { 
   Send, Lock, Users, Plus, X, ChevronLeft, Trash2, UserMinus, Search, 
   Pin, PinOff, MessageSquare, AtSign, Paperclip, Image, File, Download, 
-  Check, AlertCircle, Upload, Eye, MoreHorizontal, Reply, Star
+  Check, AlertCircle, Upload, Eye, MoreHorizontal, Reply, Star, LayoutGrid,
+  Sparkles, Clock
 } from 'lucide-react';
 import { createClient } from '@/lib/supabase/client';
 import BoardKanbanPanel from './BoardKanbanPanel';
@@ -64,6 +65,9 @@ const stringToColor = (str: string) => {
   return `hsl(${hash % 360}, 60%, 65%)`;
 };
 
+// Premium emoji options for boards
+const BOARD_EMOJIS = ['📋', '🎯', '🚀', '💡', '🎨', '📊', '🏗️', '🌟', '⚡', '🔥', '💎', '🌈'];
+
 export default function BoardView({ board, onBack, currentUser }: BoardViewProps) {
   const [messages, setMessages] = useState<Message[]>([]);
   const [newMessage, setNewMessage] = useState('');
@@ -81,12 +85,14 @@ export default function BoardView({ board, onBack, currentUser }: BoardViewProps
   const [boardMembers, setBoardMembers] = useState<Member[]>(board.members);
   const [isOwner, setIsOwner] = useState(false);
   
-  // NEW: Tab state for switching between Discussion and Kanban
   const [activeView, setActiveView] = useState<'discussion' | 'kanban'>('discussion');
 
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const textareaRef = useRef<HTMLTextAreaElement>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
+
+  const boardEmoji = BOARD_EMOJIS[board.id.charCodeAt(0) % BOARD_EMOJIS.length];
+  const bgColor = board.color || '#3B82F6';
 
   // Get current user ID and check ownership
   useEffect(() => {
@@ -121,7 +127,6 @@ export default function BoardView({ board, onBack, currentUser }: BoardViewProps
     };
     fetchMessages();
 
-    // Realtime subscription
     const supabase = createClient();
     const channel = supabase
       .channel(`board:${board.id}`)
@@ -272,39 +277,39 @@ export default function BoardView({ board, onBack, currentUser }: BoardViewProps
     const isMine = msg.user_id === currentUserId;
 
     return (
-      <div key={msg.id} className={`group ${isReply ? 'ml-6 border-l-2 border-[#e8e7e3] pl-3 mt-2' : ''}`}>
+      <div key={msg.id} className={`group ${isReply ? 'ml-6 border-l-2 border-gray-200/60 pl-3 mt-2' : ''}`}>
         <div className={`flex gap-2.5 ${isMine ? 'flex-row-reverse' : ''}`}>
           <div className="w-8 h-8 rounded-full flex items-center justify-center text-[11px] font-medium shadow-sm flex-shrink-0" style={{ background: avatarColor, color: '#fff' }}>
             {initials}
           </div>
           <div className={`max-w-[75%] ${isMine ? 'items-end' : ''}`}>
-            {!isMine && <div className="text-[11px] text-[#777] mb-1">{senderName}</div>}
-            <div className={`px-3.5 py-2.5 rounded-2xl text-[13.5px] leading-relaxed shadow-sm ${isMine ? 'bg-[#0f0f0f] text-white rounded-br-[4px]' : 'bg-white text-[#0f0f0f] rounded-bl-[4px] border border-[#e8e7e3]'}`}>
+            {!isMine && <div className="text-[11px] text-gray-500 mb-1 font-medium">{senderName}</div>}
+            <div className={`px-3.5 py-2.5 rounded-2xl text-[13.5px] leading-relaxed shadow-sm ${isMine ? 'bg-gray-900 text-white rounded-br-[4px]' : 'bg-white text-gray-900 rounded-bl-[4px] border border-gray-200/60'}`}>
               {msg.message}
               {msg.attachments && msg.attachments.length > 0 && (
                 <div className="mt-2 space-y-1">
                   {msg.attachments.map((att, idx) => (
                     <div key={idx} className="flex items-center gap-2 p-1.5 bg-black/5 rounded-lg cursor-pointer hover:bg-black/10 transition" onClick={() => setPreviewAttachment(att)}>
                       {getFileIcon(att.name)}
-                      <span className="text-[11px] truncate flex-1">{att.name}</span>
-                      <span className="text-[9px] text-[#aaa]">{att.size}</span>
-                      <button onClick={(e) => { e.stopPropagation(); window.open(att.url, '_blank'); }} className="p-1 rounded hover:bg-black/10"><Download size={12} /></button>
-                      <button onClick={(e) => { e.stopPropagation(); setPreviewAttachment(att); }} className="p-1 rounded hover:bg-black/10"><Eye size={12} /></button>
+                      <span className="text-[11px] truncate flex-1 font-medium">{att.name}</span>
+                      <span className="text-[9px] text-gray-400">{att.size}</span>
+                      <button onClick={(e) => { e.stopPropagation(); window.open(att.url, '_blank'); }} className="p-1 rounded hover:bg-black/10"><Download size={12} strokeWidth={2} /></button>
+                      <button onClick={(e) => { e.stopPropagation(); setPreviewAttachment(att); }} className="p-1 rounded hover:bg-black/10"><Eye size={12} strokeWidth={2} /></button>
                     </div>
                   ))}
                 </div>
               )}
             </div>
             <div className="flex items-center gap-2 mt-1">
-              <div className={`text-[10px] text-[#aaa] ${isMine ? 'text-right' : ''}`}>{new Date(msg.created_at).toLocaleTimeString([], { hour:'2-digit', minute:'2-digit' })}</div>
-              <button onClick={() => setReplyingTo(msg)} className="text-[9px] text-[#4f46e5] opacity-0 group-hover:opacity-100 transition">Reply</button>
+              <div className={`text-[10px] text-gray-400 ${isMine ? 'text-right' : ''}`}>{new Date(msg.created_at).toLocaleTimeString([], { hour:'2-digit', minute:'2-digit' })}</div>
+              <button onClick={() => setReplyingTo(msg)} className="text-[9px] text-blue-600 opacity-0 group-hover:opacity-100 transition font-medium">Reply</button>
               {isOwner && (
-                <button onClick={() => handlePinMessage(msg.id, msg.is_pinned)} className="text-[9px] text-[#777] opacity-0 group-hover:opacity-100 transition">
+                <button onClick={() => handlePinMessage(msg.id, msg.is_pinned)} className="text-[9px] text-gray-500 opacity-0 group-hover:opacity-100 transition font-medium">
                   {msg.is_pinned ? 'Unpin' : 'Pin'}
                 </button>
               )}
               {(isOwner || isMine) && (
-                <button onClick={() => handleDeleteMessage(msg.id)} className="text-[9px] text-red-500 opacity-0 group-hover:opacity-100 transition">Delete</button>
+                <button onClick={() => handleDeleteMessage(msg.id)} className="text-[9px] text-rose-600 opacity-0 group-hover:opacity-100 transition font-medium">Delete</button>
               )}
             </div>
             {msg.replies && msg.replies.length > 0 && (
@@ -317,70 +322,151 @@ export default function BoardView({ board, onBack, currentUser }: BoardViewProps
   };
 
   return (
-    <div className="flex flex-col h-full bg-memu-canvas">
-      {/* Header with Tabs */}
-      <div className="px-6 py-4 border-b border-[#e8e7e3] bg-white">
-        <div className="flex items-center justify-between mb-4">
+    <div className="flex flex-col h-full w-full bg-memu-canvas animate-page-enter">
+      
+      {/* ================= PREMIUM HEADER ================= */}
+      <div className="relative z-50 px-6 py-4 border-b border-gray-200/40 bg-white/95 backdrop-blur-xl shadow-sm shrink-0">
+        <div className="flex items-center justify-between mb-3">
           <div className="flex items-center gap-3">
-            <button onClick={onBack} className="p-1 hover:bg-[#f2f1ee] rounded-md"><ChevronLeft size={18} className="text-[#777]" /></button>
-            <div className="w-3 h-3 rounded-full" style={{ background: board.color }} />
-            <div><h3 className="text-[16px] font-medium text-[#0f0f0f]">{board.name}</h3></div>
+            <button 
+              onClick={onBack} 
+              className="p-2 rounded-xl hover:bg-gray-100/80 transition text-gray-500 hover:text-blue-600 active:scale-95 pointer-events-auto"
+            >
+              <ChevronLeft size={20} strokeWidth={2} />
+            </button>
+            
+            {/* Premium Board Avatar */}
+            <div 
+              className="w-10 h-10 rounded-xl flex items-center justify-center text-xl shadow-lg flex-shrink-0"
+              style={{ 
+                background: `linear-gradient(135deg, ${bgColor}CC, ${bgColor}55)`,
+                color: '#fff',
+                boxShadow: `0 8px 24px ${bgColor}33`,
+                border: `1px solid ${bgColor}33`,
+              }}
+            >
+              {boardEmoji}
+            </div>
+            
+            <div>
+              <h3 className="text-lg font-bold text-gray-900 tracking-tight">{board.name}</h3>
+              <div className="flex items-center gap-2 text-xs text-gray-500 font-medium">
+                <Users size={12} strokeWidth={2} className="text-gray-400" />
+                <span>{boardMembers.length} member{boardMembers.length !== 1 ? 's' : ''}</span>
+                {isOwner && (
+                  <>
+                    <span className="w-1 h-1 rounded-full bg-gray-300" />
+                    <span className="flex items-center gap-1 text-blue-600">
+                      <Sparkles size={10} className="text-blue-500" />
+                      Owner
+                    </span>
+                  </>
+                )}
+              </div>
+            </div>
           </div>
-          <button onClick={() => setShowMemberList(true)} className="flex items-center gap-2 px-3 py-1.5 rounded-lg hover:bg-[#f2f1ee]">
-            <Users size={14} className="text-[#777]" />
-            <span className="text-[12px] text-[#777]">{boardMembers.length}</span>
+          
+          <button 
+            onClick={() => setShowMemberList(true)} 
+            className="flex items-center gap-2 px-3 py-2 rounded-xl hover:bg-gray-100/80 transition text-gray-600 hover:text-blue-600 pointer-events-auto"
+          >
+            <div className="flex -space-x-1.5">
+              {boardMembers.slice(0, 3).map((m) => (
+                <div 
+                  key={m.id}
+                  className="w-7 h-7 rounded-full flex items-center justify-center text-[9px] font-medium text-white border-2 border-white shadow-sm"
+                  style={{ background: m.color }}
+                >
+                  {m.initials}
+                </div>
+              ))}
+              {boardMembers.length > 3 && (
+                <div className="w-7 h-7 rounded-full bg-gray-100 flex items-center justify-center text-[9px] font-bold text-gray-500 border-2 border-white">
+                  +{boardMembers.length - 3}
+                </div>
+              )}
+            </div>
           </button>
         </div>
         
-        {/* View Tabs */}
-        <div className="flex items-center gap-1">
+        {/* View Tabs – Premium Pill Style */}
+        <div className="flex items-center gap-1.5">
           <button
             onClick={() => setActiveView('discussion')}
-            className={`px-4 py-2 text-[13px] font-medium rounded-lg transition-all ${
-              activeView === 'discussion'
-                ? 'text-[#4f46e5] bg-[#ede9fe]'
-                : 'text-[#777] hover:text-[#0f0f0f] hover:bg-[#f2f1ee]'
+            className={`flex items-center gap-2 px-4 py-2 rounded-xl text-sm font-semibold transition-all ${
+              activeView === 'discussion' 
+                ? 'text-white shadow-lg' 
+                : 'text-gray-500 hover:text-gray-700 hover:bg-gray-100/70'
             }`}
+            style={{
+              background: activeView === 'discussion' 
+                ? `linear-gradient(135deg, ${bgColor}, ${bgColor}DD)` 
+                : 'transparent',
+              boxShadow: activeView === 'discussion' 
+                ? `0 4px 14px ${bgColor}44` 
+                : 'none',
+            }}
           >
-            💬 Discussion
+            <MessageSquare size={14} strokeWidth={2} />
+            Discussion
           </button>
           <button
             onClick={() => setActiveView('kanban')}
-            className={`px-4 py-2 text-[13px] font-medium rounded-lg transition-all ${
-              activeView === 'kanban'
-                ? 'text-emerald-700 bg-emerald-50'
-                : 'text-[#777] hover:text-[#0f0f0f] hover:bg-[#f2f1ee]'
+            className={`flex items-center gap-2 px-4 py-2 rounded-xl text-sm font-semibold transition-all ${
+              activeView === 'kanban' 
+                ? 'text-white shadow-lg' 
+                : 'text-gray-500 hover:text-gray-700 hover:bg-gray-100/70'
             }`}
+            style={{
+              background: activeView === 'kanban' 
+                ? `linear-gradient(135deg, ${bgColor}, ${bgColor}DD)` 
+                : 'transparent',
+              boxShadow: activeView === 'kanban' 
+                ? `0 4px 14px ${bgColor}44` 
+                : 'none',
+            }}
           >
-             Kanban Board
+            <LayoutGrid size={14} strokeWidth={2} />
+            Kanban
           </button>
         </div>
       </div>
 
-      {/* Content Area */}
+      {/* ================= CONTENT AREA ================= */}
       {activeView === 'discussion' ? (
         <>
           {/* Member List Sidebar */}
           {showMemberList && (
-            <div className="fixed right-0 top-0 h-full w-80 bg-white border-l border-[#e8e7e3] shadow-xl z-40 flex flex-col">
-              <div className="p-4 border-b flex justify-between items-center">
-                <h3 className="text-[15px] font-medium">Members</h3>
-                <button onClick={() => setShowMemberList(false)} className="p-1 hover:bg-[#f2f1ee] rounded"><X size={16} /></button>
+            <div className="fixed right-0 top-0 h-full w-80 bg-white/95 backdrop-blur-xl border-l border-gray-200/40 shadow-xl z-40 flex flex-col animate-slide-in-right">
+              <div className="p-4 border-b border-gray-200/40 flex justify-between items-center">
+                <h3 className="text-base font-bold text-gray-900 tracking-tight">Members</h3>
+                <button onClick={() => setShowMemberList(false)} className="p-1.5 rounded-lg hover:bg-gray-100 transition text-gray-500 btn-press">
+                  <X size={18} strokeWidth={2} />
+                </button>
               </div>
               {isOwner && (
-                <button onClick={() => setShowAddMember(true)} className="mx-4 mt-4 flex items-center justify-center gap-2 py-2 border border-dashed rounded-xl text-[12px] text-[#4f46e5] hover:border-[#4f46e5]">
-                  <Plus size={14} /> Add Member
+                <button onClick={() => setShowAddMember(true)} className="mx-4 mt-4 flex items-center justify-center gap-2 py-2.5 border border-dashed border-gray-300 rounded-xl text-xs text-blue-600 hover:border-blue-400 hover:bg-blue-50 transition btn-press">
+                  <Plus size={14} strokeWidth={2} /> Add Member
                 </button>
               )}
               <div className="flex-1 overflow-y-auto p-4 space-y-2">
                 {boardMembers.map(m => (
-                  <div key={m.id} className="flex justify-between items-center p-2 rounded-lg hover:bg-[#f2f1ee]">
+                  <div key={m.id} className="flex justify-between items-center p-2 rounded-lg hover:bg-gray-50 transition">
                     <div className="flex items-center gap-3">
-                      <div className="w-8 h-8 rounded-full flex items-center justify-center text-[11px] font-medium" style={{ background: m.color, color: '#fff' }}>{m.initials}</div>
-                      <div><div className="text-[13px] font-medium">{m.name}</div><div className="text-[10px] text-[#777]">{m.handle}</div></div>
+                      <div className="w-8 h-8 rounded-full flex items-center justify-center text-[11px] font-medium shadow-sm" style={{ background: m.color, color: '#fff' }}>{m.initials}</div>
+                      <div>
+                        <div className="text-sm font-medium text-gray-900">{m.name}</div>
+                        <div className="text-[10px] text-gray-500">{m.handle}</div>
+                      </div>
                     </div>
-                    {isOwner && m.role !== 'owner' && <button className="p-1 rounded hover:bg-red-100"><UserMinus size={14} className="text-[#777] hover:text-red-500" /></button>}
-                    {m.role === 'owner' && <span className="text-[9px] px-1.5 py-0.5 rounded-full bg-[#f2f1ee]">Owner</span>}
+                    {isOwner && m.role !== 'owner' && (
+                      <button className="p-1 rounded hover:bg-red-50 text-gray-400 hover:text-red-600 transition btn-press">
+                        <UserMinus size={14} strokeWidth={2} />
+                      </button>
+                    )}
+                    {m.role === 'owner' && (
+                      <span className="text-[9px] px-2 py-0.5 rounded-full bg-amber-50 text-amber-700 border border-amber-200 font-medium tracking-wide">Owner</span>
+                    )}
                   </div>
                 ))}
               </div>
@@ -389,16 +475,19 @@ export default function BoardView({ board, onBack, currentUser }: BoardViewProps
 
           {/* Add Member Modal */}
           {showAddMember && (
-            <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50" onClick={() => setShowAddMember(false)}>
-              <div className="bg-white rounded-2xl w-[400px] max-w-[90%] p-6" onClick={e => e.stopPropagation()}>
-                <h3 className="text-[16px] font-semibold mb-4">Add Member</h3>
+            <div className="fixed inset-0 bg-black/40 backdrop-blur-sm flex items-center justify-center z-50 animate-fadeIn" onClick={() => setShowAddMember(false)}>
+              <div className="bg-white/95 backdrop-blur-xl rounded-2xl w-[400px] max-w-[90%] p-6 shadow-2xl border border-gray-200/60 animate-fade-in-scale" onClick={e => e.stopPropagation()}>
+                <h3 className="text-lg font-bold text-gray-900 mb-4 tracking-tight">Add Member</h3>
                 <div className="relative mb-4">
-                  <Search size={14} className="absolute left-3 top-1/2 -translate-y-1/2 text-[#aaa]" />
-                  <input type="text" placeholder="Search by email or name" className="w-full pl-9 pr-3 py-2 border rounded-lg text-sm" />
+                  <Search size={14} strokeWidth={2} className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400" />
+                  <input type="text" placeholder="Search by email or name" className="w-full pl-9 pr-3 py-2.5 bg-white border border-gray-200/60 rounded-xl text-sm outline-none focus:ring-4 focus:ring-blue-500/10 focus:border-blue-400 transition" />
                 </div>
                 <div className="flex justify-end gap-2">
-                  <button onClick={() => setShowAddMember(false)} className="px-4 py-2 border rounded-lg text-sm">Cancel</button>
-                  <button onClick={() => handleAddMember(searchQuery)} className="px-4 py-2 bg-[#0f0f0f] text-white rounded-lg text-sm">Add</button>
+                  <button onClick={() => setShowAddMember(false)} className="px-4 py-2 rounded-xl text-sm font-medium text-gray-600 hover:bg-gray-100 transition btn-press">Cancel</button>
+                  <button onClick={() => handleAddMember(searchQuery)} className="px-4 py-2 text-white rounded-xl text-sm font-medium shadow-md hover:shadow-lg transition btn-press" style={{
+                    background: `linear-gradient(135deg, ${bgColor}, ${bgColor}DD)`,
+                    boxShadow: `0 4px 14px ${bgColor}44`,
+                  }}>Add</button>
                 </div>
               </div>
             </div>
@@ -406,59 +495,120 @@ export default function BoardView({ board, onBack, currentUser }: BoardViewProps
 
           {/* Pinned Messages */}
           {pinnedMessages.length > 0 && (
-            <div className="border-b border-[#e8e7e3] bg-[#fef3c7]/30 p-3">
-              <div className="flex items-center gap-2 mb-2"><Pin size={12} className="text-[#d97706]" /><span className="text-[11px] font-medium text-[#d97706]">Pinned</span></div>
+            <div className="border-b border-gray-200/40 bg-amber-50/30 p-3">
+              <div className="flex items-center gap-2 mb-2">
+                <Pin size={12} strokeWidth={2} className="text-amber-600" />
+                <span className="text-[11px] font-semibold text-amber-700 uppercase tracking-wider">Pinned</span>
+              </div>
               <div className="space-y-2">{pinnedMessages.map(msg => renderMessage(msg))}</div>
             </div>
           )}
 
           {/* Messages List */}
-          <div className="flex-1 overflow-y-auto p-6 space-y-4">
-            {regularMessages.map(msg => renderMessage(msg))}
+          <div className="flex-1 overflow-y-auto p-6 space-y-4 custom-scroll">
+            {regularMessages.length === 0 && pinnedMessages.length === 0 ? (
+              <div className="flex flex-col items-center justify-center h-full text-center py-20">
+                <div 
+                  className="w-16 h-16 rounded-2xl flex items-center justify-center mb-4 shadow-sm"
+                  style={{ 
+                    background: `linear-gradient(135deg, ${bgColor}22, ${bgColor}11)`,
+                    border: `1px solid ${bgColor}22`,
+                  }}
+                >
+                  <MessageSquare size={24} style={{ color: bgColor }} strokeWidth={1.5} />
+                </div>
+                <h3 className="text-lg font-bold text-gray-900 mb-2">No messages yet</h3>
+                <p className="text-sm text-gray-500 max-w-sm leading-relaxed">
+                  Start the discussion in <span className="font-medium text-gray-700">{board.name}</span>. 
+                  Share ideas, ask questions, and collaborate with your team.
+                </p>
+              </div>
+            ) : (
+              regularMessages.map(msg => renderMessage(msg))
+            )}
             <div ref={messagesEndRef} />
           </div>
 
           {/* Reply Indicator */}
           {replyingTo && (
-            <div className="px-4 pt-2 border-t bg-[#f2f1ee]">
-              <div className="flex justify-between text-[11px] text-[#777]">
-                <span>Replying to {replyingTo.user?.full_name}</span>
-                <button onClick={() => setReplyingTo(null)} className="text-red-500">Cancel</button>
+            <div className="px-4 pt-2 border-t border-gray-200/40 bg-gray-50/80">
+              <div className="flex justify-between text-[11px] text-gray-500">
+                <span className="font-medium">Replying to {replyingTo.user?.full_name}</span>
+                <button onClick={() => setReplyingTo(null)} className="text-rose-600 hover:text-rose-700 font-medium btn-press">Cancel</button>
               </div>
-              <div className="text-[12px] text-[#777] italic pb-2">"{replyingTo.message.slice(0,60)}..."</div>
+              <div className="text-xs text-gray-400 italic pb-2">"{replyingTo.message.slice(0,60)}..."</div>
             </div>
           )}
 
           {/* Attachments Preview */}
           {attachments.length > 0 && (
-            <div className="px-4 pt-2 border-t bg-white">
+            <div className="px-4 pt-2 border-t border-gray-200/40 bg-white">
               <div className="flex flex-wrap gap-2">
                 {attachments.map((file, idx) => (
-                  <div key={idx} className="flex items-center gap-2 bg-[#f2f1ee] rounded-lg px-2 py-1">
-                    {getFileIcon(file.name)}<span className="text-[11px] truncate max-w-[150px]">{file.name}</span>
-                    <button onClick={() => handleRemoveAttachment(idx)} className="text-red-500"><X size={12} /></button>
+                  <div key={idx} className="flex items-center gap-2 bg-gray-100 rounded-lg px-2 py-1">
+                    {getFileIcon(file.name)}
+                    <span className="text-[11px] truncate max-w-[150px] font-medium">{file.name}</span>
+                    <button onClick={() => handleRemoveAttachment(idx)} className="text-gray-400 hover:text-rose-600 btn-press">
+                      <X size={12} strokeWidth={2.5} />
+                    </button>
                   </div>
                 ))}
               </div>
             </div>
           )}
 
-          {/* Message Input */}
-          <div className="p-4 border-t bg-white relative">
+          {/* Message Input – Premium */}
+          <div className="p-4 border-t border-gray-200/40 bg-white/95 backdrop-blur-xl relative">
             <div className="flex gap-2 items-end">
-              <button onClick={() => fileInputRef.current?.click()} className="p-2 rounded-full hover:bg-[#f2f1ee]"><Paperclip size={18} className="text-[#777]" /></button>
+              <button onClick={() => fileInputRef.current?.click()} className="p-2 rounded-xl hover:bg-gray-100 transition text-gray-500 hover:text-gray-700 btn-press">
+                <Paperclip size={18} strokeWidth={2} />
+              </button>
               <input ref={fileInputRef} type="file" multiple onChange={handleFileSelect} className="hidden" />
-              <textarea ref={textareaRef} value={newMessage} onChange={e => setNewMessage(e.target.value)} onKeyDown={handleKeyDown} placeholder={`Message #${board.name}... Use @ to mention`} rows={1} className="flex-1 border rounded-xl px-4 py-2.5 text-[13.5px] outline-none resize-none focus:border-[#4f46e5]" />
-              <button onClick={handleSendMessage} disabled={uploading} className="w-9 h-9 rounded-full bg-[#0f0f0f] text-white flex items-center justify-center disabled:opacity-50">{uploading ? <Upload size={14} className="animate-spin" /> : <Send size={14} />}</button>
+              <textarea 
+                ref={textareaRef} 
+                value={newMessage} 
+                onChange={e => setNewMessage(e.target.value)} 
+                onKeyDown={handleKeyDown} 
+                placeholder={`Message #${board.name}... Use @ to mention`} 
+                rows={1} 
+                className="flex-1 border border-gray-200/60 rounded-xl px-4 py-2.5 text-sm outline-none resize-none focus:border-blue-400 focus:ring-4 focus:ring-blue-500/10 transition bg-gray-50 focus:bg-white" 
+              />
+              <button 
+                onClick={handleSendMessage} 
+                disabled={uploading} 
+                className="w-10 h-10 rounded-xl text-white flex items-center justify-center shadow-md hover:shadow-lg transition disabled:opacity-50 btn-press"
+                style={{
+                  background: `linear-gradient(135deg, ${bgColor}, ${bgColor}DD)`,
+                  boxShadow: `0 4px 14px ${bgColor}44`,
+                }}
+              >
+                {uploading ? <Upload size={14} className="animate-spin" /> : <Send size={14} strokeWidth={2.5} />}
+              </button>
             </div>
             {showMentions && (
-              <div className="absolute bottom-full left-0 mb-1 w-64 bg-white border rounded-xl shadow-lg z-50">
-                <div className="p-2 border-b"><input type="text" value={mentionQuery} onChange={e => setMentionQuery(e.target.value)} placeholder="Search members..." className="w-full text-xs outline-none" autoFocus /></div>
-                <div className="max-h-48 overflow-y-auto">
+              <div className="absolute bottom-full left-0 mb-1 w-64 bg-white border border-gray-200/60 rounded-xl shadow-lg z-50 animate-fade-in-scale">
+                <div className="p-2 border-b border-gray-100/60">
+                  <input 
+                    type="text" 
+                    value={mentionQuery} 
+                    onChange={e => setMentionQuery(e.target.value)} 
+                    placeholder="Search members..." 
+                    className="w-full text-xs outline-none bg-transparent text-gray-900 placeholder:text-gray-400" 
+                    autoFocus 
+                  />
+                </div>
+                <div className="max-h-48 overflow-y-auto p-1">
                   {boardMembers.filter(m => m.name.toLowerCase().includes(mentionQuery.toLowerCase())).map(m => (
-                    <button key={m.id} onClick={() => handleMentionSelect(m)} className="w-full flex items-center gap-3 p-2 hover:bg-[#f2f1ee] text-left">
-                      <div className="w-6 h-6 rounded-full flex items-center justify-center text-[9px]" style={{ background: m.color, color: '#fff' }}>{m.initials}</div>
-                      <div><div className="text-[12px] font-medium">{m.name}</div><div className="text-[10px] text-[#777]">{m.handle}</div></div>
+                    <button 
+                      key={m.id} 
+                      onClick={() => handleMentionSelect(m)} 
+                      className="w-full flex items-center gap-3 p-2 rounded-lg hover:bg-gray-50 transition text-left"
+                    >
+                      <div className="w-6 h-6 rounded-full flex items-center justify-center text-[9px] font-medium shadow-sm" style={{ background: m.color, color: '#fff' }}>{m.initials}</div>
+                      <div>
+                        <div className="text-xs font-medium text-gray-900">{m.name}</div>
+                        <div className="text-[10px] text-gray-500">{m.handle}</div>
+                      </div>
                     </button>
                   ))}
                 </div>
@@ -468,17 +618,25 @@ export default function BoardView({ board, onBack, currentUser }: BoardViewProps
 
           {/* Attachment Preview Modal */}
           {previewAttachment && (
-            <div className="fixed inset-0 bg-black/80 flex items-center justify-center z-50" onClick={() => setPreviewAttachment(null)}>
-              <div className="bg-white rounded-2xl max-w-4xl max-h-[90vh] flex flex-col" onClick={e => e.stopPropagation()}>
-                <div className="p-4 border-b flex justify-between items-center">
-                  <div><h3 className="text-[14px] font-medium">{previewAttachment.name}</h3><p className="text-[11px] text-[#777]">{previewAttachment.size}</p></div>
-                  <button onClick={() => setPreviewAttachment(null)}><X size={18} /></button>
+            <div className="fixed inset-0 bg-black/80 flex items-center justify-center z-[9999] animate-fadeIn" onClick={() => setPreviewAttachment(null)}>
+              <div className="bg-white rounded-2xl max-w-4xl max-h-[90vh] flex flex-col shadow-2xl animate-fade-in-scale" onClick={e => e.stopPropagation()}>
+                <div className="p-4 border-b border-gray-200/60 flex justify-between items-center">
+                  <div>
+                    <h3 className="text-sm font-semibold text-gray-900">{previewAttachment.name}</h3>
+                    <p className="text-[11px] text-gray-500">{previewAttachment.size}</p>
+                  </div>
+                  <button onClick={() => setPreviewAttachment(null)} className="p-1.5 rounded-lg hover:bg-gray-100 transition text-gray-500 btn-press">
+                    <X size={18} strokeWidth={2} />
+                  </button>
                 </div>
                 <div className="flex-1 overflow-auto p-6 text-center">
                   {previewAttachment.type.startsWith('image/') && <img src={previewAttachment.url} alt="preview" className="max-w-full max-h-[70vh] object-contain mx-auto" />}
                   {previewAttachment.type === 'application/pdf' && <iframe src={previewAttachment.url} className="w-full h-[70vh]" />}
                   {!previewAttachment.type.startsWith('image/') && previewAttachment.type !== 'application/pdf' && (
-                    <div className="py-12"><p className="text-[#777]">Preview not available. <a href={previewAttachment.url} target="_blank" className="text-[#4f46e5] underline">Download</a></p></div>
+                    <div className="py-12">
+                      <p className="text-gray-500 font-medium">Preview not available.</p>
+                      <a href={previewAttachment.url} target="_blank" className="text-blue-600 hover:underline font-medium">Download</a>
+                    </div>
                   )}
                 </div>
               </div>
@@ -487,10 +645,23 @@ export default function BoardView({ board, onBack, currentUser }: BoardViewProps
         </>
       ) : (
         <div className="flex-1 overflow-hidden">
-          <BoardKanbanPanel boardId={board.id} boardColor={board.color} />
+          <BoardKanbanPanel boardId={board.id} boardColor={bgColor} />
         </div>
       )}
+
+      <style>{`
+        .custom-scroll::-webkit-scrollbar { width: 4px; }
+        .custom-scroll::-webkit-scrollbar-thumb { background: #e2e8f0; border-radius: 10px; }
+        .custom-scroll::-webkit-scrollbar-track { background: transparent; }
+        @keyframes fadeIn { from { opacity: 0; } to { opacity: 1; } }
+        .animate-fadeIn { animation: fadeIn 0.2s ease-out; }
+        @keyframes fadeInScale { from { opacity: 0; transform: scale(0.95); } to { opacity: 1; transform: scale(1); } }
+        .animate-fade-in-scale { animation: fadeInScale 0.2s ease-out; }
+        @keyframes slideInRight { from { opacity: 0; transform: translateX(20px); } to { opacity: 1; transform: translateX(0); } }
+        .animate-slide-in-right { animation: slideInRight 0.25s ease-out; }
+        .btn-press:active { transform: scale(0.95); }
+        .animate-page-enter { animation: fadeIn 0.3s ease-out; }
+      `}</style>
     </div>
   );
 }
-

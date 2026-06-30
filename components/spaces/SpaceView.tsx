@@ -1,46 +1,61 @@
 'use client';
 
 import { useState, useEffect } from 'react';
+import { useRouter } from 'next/navigation';
 import { createClient } from '@/lib/supabase/client';
 import { useToast } from '@/contexts/ToastContext';
 import { 
-  ArrowLeft, Users, MessageSquare, Settings, 
-  Loader2, KanbanSquare, CheckSquare
+  Users, MessageSquare, Settings, Loader2, 
+  CheckSquare, Folder, Sparkles, LayoutGrid
 } from 'lucide-react';
+
+// Child Panels
 import BoardsPanel from '../boards/BoardsPanel';
 import SpaceTasksPanel from './SpaceTasksPanel';
 import SpaceChatsPanel from './SpaceChatsPanel';
 import SpaceMembersPanel from './SpaceMembersPanel';
+import SpaceFiles from './SpaceFiles';
+import SpaceSettingsModal from './SpaceSettingsModal';
 
-interface Member {
+// Types
+interface SpaceMember {
   id: string;
   name: string;
   handle: string;
-  initials: string;
-  color: string;
-  textColor: string;
   role: 'owner' | 'admin' | 'member';
 }
 
-interface Space {
+interface SpaceData {
   id: string;
   name: string;
-  color: string;
-  members: Member[];
+  description: string | null;
+  icon: string | null;
+  color: string | null;
+  members: SpaceMember[];
+  created_by?: string;
+  role?: string;
 }
+
+type TabType = 'chats' | 'tasks' | 'boards' | 'files' | 'members';
 
 interface SpaceViewProps {
   spaceId?: string;
 }
 
-type TabType = 'chats' | 'boards' | 'tasks' | 'members';
+const getInitials = (name: string) => {
+  if (!name) return '📁';
+  return name.split(' ').map(word => word[0]).join('').toUpperCase().slice(0, 2);
+};
 
 export default function SpaceView({ spaceId }: SpaceViewProps) {
-  const [space, setSpace] = useState<Space | null>(null);
+  const router = useRouter();
+  const { showToast } = useToast();
+  
+  const [space, setSpace] = useState<SpaceData | null>(null);
   const [loading, setLoading] = useState(true);
   const [activeTab, setActiveTab] = useState<TabType>('chats');
   const [currentUserId, setCurrentUserId] = useState<string | null>(null);
-  const { showToast } = useToast();
+  const [isSettingsOpen, setIsSettingsOpen] = useState(false);
 
   useEffect(() => {
     const getUser = async () => {
@@ -52,11 +67,8 @@ export default function SpaceView({ spaceId }: SpaceViewProps) {
   }, []);
 
   useEffect(() => {
-    if (spaceId && currentUserId) {
-      fetchSpace(spaceId);
-    } else {
-      setLoading(false);
-    }
+    if (spaceId && currentUserId) fetchSpace(spaceId);
+    else if (!spaceId) setLoading(false);
   }, [spaceId, currentUserId]);
 
   const fetchSpace = async (id: string) => {
@@ -64,49 +76,84 @@ export default function SpaceView({ spaceId }: SpaceViewProps) {
     const supabase = createClient();
 
     try {
-      const { data: spaceData, error: spaceError } = await supabase.from('spaces').select('*').eq('id', id).single();
+      const { data: spaceData, error: spaceError } = await supabase
+        .from('spaces')
+        .select('*')
+        .eq('id', id)
+        .single();
       if (spaceError) throw spaceError;
 
-      const { data: membersData } = await supabase.from('space_members').select('user_id, role, profiles(full_name, username)').eq('space_id', id);
+      const { data: membersData, error: membersError } = await supabase
+        .from('space_members')
+        .select('user_id, role, profiles(full_name, username)')
+        .eq('space_id', id);
+      if (membersError) throw membersError;
 
-      const members: Member[] = (membersData || []).map((m: any, idx: number) => {
-        let role: 'owner' | 'admin' | 'member' = 'member';
-        if (m.role === 'owner') role = 'owner';
-        else if (m.role === 'admin') role = 'admin';
-        
-        return {
-          id: m.user_id,
-          name: m.profiles?.full_name || m.profiles?.username || 'Unknown',
-          handle: `@${m.profiles?.username || 'user'}`,
-          initials: (m.profiles?.full_name || m.profiles?.username || 'U').substring(0, 2).toUpperCase(),
-          color: ['#4f46e5', '#059669', '#d97706', '#dc2626', '#8b5cf6'][idx % 5],
-          textColor: '#ffffff',
-          role,
-        };
+      const currentUserMember = membersData?.find(m => m.user_id === currentUserId);
+
+      const members: SpaceMember[] = (membersData || []).map((m: any) => ({
+        id: m.user_id,
+        name: m.profiles?.full_name || m.profiles?.username || 'Unknown',
+        handle: `@${m.profiles?.username || 'user'}`,
+        role: (m.role === 'owner' ? 'owner' : m.role === 'admin' ? 'admin' : 'member') as SpaceMember['role'],
+      }));
+
+      setSpace({
+        id: spaceData.id,
+        name: spaceData.name,
+        description: spaceData.description,
+        icon: spaceData.icon,
+        color: spaceData.color || '#3B82F6',
+        members,
+        created_by: spaceData.created_by,
+        role: currentUserMember?.role || 'member',
       });
-
-      setSpace({ id: spaceData.id, name: spaceData.name, color: spaceData.color || '#4f46e5', members });
-    } catch (err) {
-      console.error('Error fetching space:', err);
-      showToast('Failed to load space', 'error');
+    } catch (err: any) {
+      console.error('Fetch space error:', err);
+      showToast(err.message || 'Failed to load space', 'error');
     } finally {
       setLoading(false);
     }
   };
 
-  const tabs = [
-    { id: 'chats' as TabType, label: 'Chats', icon: <MessageSquare size={14} />, gradient: 'from-blue-500/20 to-indigo-500/20' },
-    { id: 'boards' as TabType, label: 'Boards', icon: <KanbanSquare size={14} />, gradient: 'from-emerald-500/20 to-teal-500/20' },
-    { id: 'tasks' as TabType, label: 'Tasks', icon: <CheckSquare size={14} />, gradient: 'from-purple-500/20 to-pink-500/20' },
-    { id: 'members' as TabType, label: 'Members', icon: <Users size={14} />, gradient: 'from-orange-500/20 to-amber-500/20' },
+  // Settings Handlers
+  const handleUpdateSpace = async (updatedData: any) => {
+    const supabase = createClient();
+    const { error } = await supabase
+      .from('spaces')
+      .update({
+        name: updatedData.name,
+        description: updatedData.description,
+        icon: updatedData.icon,
+        color: updatedData.color,
+      })
+      .eq('id', space?.id);
+
+    if (error) throw error;
+    
+    // Update local state immediately for real-time preview
+    setSpace(prev => prev ? { ...prev, ...updatedData } : null);
+  };
+
+  const handleDeleteSpace = async (deletedSpaceId: string) => {
+    // Navigate back to spaces list after deletion
+    router.push('/?panel=spaces');
+  };
+
+  const tabs: { id: TabType; label: string; icon: React.ReactNode }[] = [
+    { id: 'chats', label: 'Chat', icon: <MessageSquare size={18} strokeWidth={2} /> },
+    { id: 'tasks', label: 'Tasks', icon: <CheckSquare size={18} strokeWidth={2} /> },
+    { id: 'boards', label: 'Boards', icon: <LayoutGrid size={18} strokeWidth={2} /> },
+    { id: 'files', label: 'Files', icon: <Folder size={18} strokeWidth={2} /> },
+    { id: 'members', label: 'Members', icon: <Users size={18} strokeWidth={2} /> },
   ];
 
   if (loading) {
     return (
-      <div className="flex items-center justify-center h-full bg-gradient-to-br from-[#fafaf8] to-white">
+      <div className="flex items-center justify-center h-full w-full bg-memu-canvas">
         <div className="relative">
-          <div className="absolute inset-0 rounded-full bg-[#4f46e5] blur-xl opacity-20 animate-pulse"></div>
-          <Loader2 className="w-10 h-10 animate-spin text-[#4f46e5] relative z-10" />
+          <div className="absolute inset-0 rounded-full bg-blue-500/20 blur-xl animate-pulse" />
+          <Loader2 className="w-8 h-8 animate-spin text-blue-600 relative z-10" strokeWidth={2} />
         </div>
       </div>
     );
@@ -114,70 +161,197 @@ export default function SpaceView({ spaceId }: SpaceViewProps) {
 
   if (!space) {
     return (
-      <div className="flex items-center justify-center h-full bg-gradient-to-br from-[#fafaf8] to-white">
-        <div className="text-center animate-in fade-in slide-in-from-bottom-4 duration-500">
-          <div className="w-24 h-24 rounded-full bg-gradient-to-br from-gray-100 to-gray-200 flex items-center justify-center mx-auto mb-6 shadow-inner">
-            <Users size={40} className="text-gray-400" />
-          </div>
-          <h3 className="text-xl font-semibold text-gray-800 mb-2">Space not found</h3>
-          <p className="text-sm text-gray-500">This space may have been deleted or you don't have access.</p>
+      <div className="flex flex-col items-center justify-center h-full w-full bg-memu-canvas p-6 text-center">
+        <div className="w-20 h-20 rounded-2xl bg-gray-50 flex items-center justify-center mb-6 border border-gray-200/60">
+          <Folder size={32} strokeWidth={1.5} className="text-gray-400" />
         </div>
+        <h3 className="text-xl font-semibold text-gray-900 mb-2 tracking-tight">Space not found</h3>
+        <p className="text-sm text-gray-500 font-light mb-6 max-w-xs">This space may have been deleted or you no longer have access.</p>
+        <button 
+          onClick={() => router.push('/?panel=spaces')}
+          className="px-6 py-2.5 bg-blue-600 text-white rounded-xl text-sm font-medium hover:bg-blue-700 hover:shadow-md transition-all btn-press"
+        >
+          Back to Spaces
+        </button>
       </div>
     );
   }
 
+  const bgColor = space.color || '#3B82F6';
+  const memberCount = space.members.length;
+  const initials = getInitials(space.name);
+  const displayIcon = space.icon || initials;
+  const isCreator = space.created_by === currentUserId;
+
   return (
-    <div className="flex flex-col h-full bg-gradient-to-br from-[#fafaf8] via-white to-[#fafaf8]">
-      {/* Glassmorphic Header */}
-      <div className="sticky top-0 z-10 backdrop-blur-md bg-white/80 border-b border-white/20 shadow-sm">
-        <div className="px-6 md:px-10 pt-6 pb-2">
-          <div className="flex items-center justify-between mb-6">
-            <div className="flex items-center gap-3">
-              <button onClick={() => window.history.back()} className="group p-2 rounded-xl hover:bg-white/60 transition-all duration-200 text-gray-500 hover:text-gray-900 backdrop-blur-sm">
-                <ArrowLeft size={18} className="group-hover:-translate-x-0.5 transition-transform" />
-              </button>
-              <div className="relative">
-                <div className="absolute inset-0 rounded-full blur-md opacity-60" style={{ background: space.color }}></div>
-                <div className="w-6 h-6 rounded-full shadow-md relative" style={{ background: space.color }} />
+    <div className="flex flex-col h-full w-full bg-memu-canvas overflow-hidden">
+      
+      {/* ================= PREMIUM HEADER ================= */}
+      <div className="sticky top-0 z-20 bg-white/90 backdrop-blur-xl border-b border-gray-200/40 shadow-sm">
+        <div className="px-6 md:px-10 pt-5 pb-3">
+          {/* Top Row: Space Identity */}
+          <div className="flex items-center justify-between mb-4">
+            <div className="flex items-center gap-4">
+              <div 
+                className="w-12 h-12 rounded-2xl flex items-center justify-center text-2xl shadow-lg flex-shrink-0 transition-all duration-300 hover:scale-105"
+                style={{ 
+                  background: `linear-gradient(135deg, ${bgColor}CC, ${bgColor}55)`,
+                  color: '#fff',
+                  boxShadow: `0 8px 24px ${bgColor}33, inset 0 1px 0 ${bgColor}44`,
+                  border: `1px solid ${bgColor}33`,
+                }}
+              >
+                {displayIcon}
               </div>
-              <h1 className="font-['Playfair_Display'] text-2xl md:text-3xl font-semibold bg-gradient-to-r from-gray-900 to-gray-600 bg-clip-text text-transparent">
-                {space.name}
-              </h1>
+              
+              <div>
+                <h1 className="text-xl font-bold text-gray-900 tracking-tight leading-tight">
+                  {space.name}
+                </h1>
+                <div className="flex items-center gap-2 text-sm text-gray-500 font-medium">
+                  <Users size={13} strokeWidth={2} className="text-gray-400" />
+                  <span>{memberCount} member{memberCount !== 1 ? 's' : ''}</span>
+                  {isCreator && (
+                    <>
+                      <span className="w-1 h-1 rounded-full bg-gray-300" />
+                      <span className="flex items-center gap-1">
+                        <Sparkles size={11} className="text-blue-500" />
+                        Created by you
+                      </span>
+                    </>
+                  )}
+                </div>
+              </div>
             </div>
-            <button className="group p-2 rounded-xl hover:bg-white/60 transition-all duration-200 text-gray-500 hover:text-gray-900">
-              <Settings size={18} className="group-hover:rotate-12 transition-transform" />
-            </button>
-          </div>
 
-          {/* Animated Tabs */}
-          <div className="relative flex items-center gap-1">
-            {tabs.map((tab) => (
-              <button key={tab.id} onClick={() => setActiveTab(tab.id)} className={`relative px-5 py-2.5 text-sm font-medium rounded-xl transition-all duration-300 ${activeTab === tab.id ? 'text-indigo-700 bg-gradient-to-r ' + tab.gradient : 'text-gray-500 hover:text-gray-700 hover:bg-white/40'}`}>
-                <div className="flex items-center gap-2">{tab.icon}{tab.label}</div>
-                {activeTab === tab.id && <div className="absolute bottom-0 left-0 right-0 h-0.5 bg-gradient-to-r from-indigo-500 to-purple-500 rounded-full animate-in slide-in-from-left-2 duration-300" />}
+            <div className="flex items-center gap-2">
+              {/* Files Button - Quick Access */}
+              <button 
+                onClick={() => setActiveTab('files')}
+                className={`group p-2.5 rounded-xl transition-all duration-300 btn-press ${
+                  activeTab === 'files' 
+                    ? 'bg-blue-50 text-blue-600 shadow-sm' 
+                    : 'hover:bg-gray-100/70 text-gray-500 hover:text-gray-700'
+                }`}
+                title="Space Files"
+              >
+                <Folder 
+                  size={18} 
+                  strokeWidth={2} 
+                  className="transition-all duration-300 group-hover:scale-105" 
+                />
               </button>
-            ))}
+
+              {/* Settings Button - Opens Modal */}
+              <button 
+                onClick={() => setIsSettingsOpen(true)}
+                className="group p-2.5 rounded-xl transition-all duration-300 btn-press hover:bg-gray-100/70"
+                title="Space Settings"
+              >
+                <Settings 
+                  size={18} 
+                  strokeWidth={2} 
+                  className="text-gray-500 transition-all duration-300 group-hover:rotate-45 group-hover:scale-105 group-hover:text-gray-700" 
+                />
+              </button>
+            </div>
+          </div>
+
+          {/* ================= PREMIUM TABS ================= */}
+          <div className="flex items-center gap-1.5 overflow-x-auto custom-scroll-hide pb-1">
+            {tabs.map((tab) => {
+              const isActive = activeTab === tab.id;
+              return (
+                <button
+                  key={tab.id}
+                  onClick={() => setActiveTab(tab.id)}
+                  className={`
+                    relative flex items-center gap-2.5 px-5 py-2.5 rounded-2xl
+                    transition-all duration-300 whitespace-nowrap btn-press
+                    ${isActive 
+                      ? 'text-white shadow-lg' 
+                      : 'text-gray-500 hover:text-gray-700 hover:bg-gray-100/70'
+                    }
+                  `}
+                  style={{
+                    background: isActive 
+                      ? `linear-gradient(135deg, ${bgColor}, ${bgColor}DD)` 
+                      : 'transparent',
+                    boxShadow: isActive 
+                      ? `0 8px 24px ${bgColor}44, inset 0 1px 0 ${bgColor}44` 
+                      : 'none',
+                  }}
+                >
+                  <span className="transition-colors duration-300">
+                    {tab.icon}
+                  </span>
+                  <span 
+                    className={`text-sm font-medium transition-colors duration-300 ${
+                      isActive ? 'text-white' : 'text-gray-600'
+                    }`}
+                  >
+                    {tab.label}
+                  </span>
+                  
+                  {isActive && (
+                    <span 
+                      className="absolute -bottom-1 left-1/2 -translate-x-1/2 w-1.5 h-1.5 rounded-full bg-white/70"
+                    />
+                  )}
+                </button>
+              );
+            })}
           </div>
         </div>
       </div>
 
-      {/* Content Area */}
-      <div className="flex-1 overflow-y-auto custom-scrollbar">
-        <div className="p-6 md:p-8 max-w-6xl mx-auto">
-          {activeTab === 'chats' && <SpaceChatsPanel space={space} currentUserId={currentUserId} />}
-          {activeTab === 'boards' && <BoardsPanel spaceId={space.id} />}
-          {activeTab === 'tasks' && <SpaceTasksPanel spaceId={space.id} />}
-          {activeTab === 'members' && <SpaceMembersPanel space={space} />}
+      {/* ================= SCROLLABLE CONTENT ================= */}
+      <div className="flex-1 overflow-y-auto custom-scroll">
+        <div className="p-6 md:p-8 max-w-6xl mx-auto w-full">
+          
+          {activeTab === 'chats' && (
+            <SpaceChatsPanel space={space} currentUserId={currentUserId} />
+          )}
+
+          {activeTab === 'tasks' && (
+            <SpaceTasksPanel spaceId={space.id} />
+          )}
+
+          {activeTab === 'boards' && (
+            <BoardsPanel spaceId={space.id} />
+          )}
+
+          {activeTab === 'files' && (
+            <SpaceFiles spaceId={space.id} />
+          )}
+
+          {activeTab === 'members' && (
+            <SpaceMembersPanel space={space} />
+          )}
+          
         </div>
       </div>
 
-      <style jsx>{`
-        .custom-scrollbar::-webkit-scrollbar { width: 6px; }
-        .custom-scrollbar::-webkit-scrollbar-track { background: #f1f1f1; border-radius: 10px; }
-        .custom-scrollbar::-webkit-scrollbar-thumb { background: #cbd5e1; border-radius: 10px; }
-        .custom-scrollbar::-webkit-scrollbar-thumb:hover { background: #94a3b8; }
+      {/* ================= SETTINGS MODAL ================= */}
+      {isSettingsOpen && (
+        <SpaceSettingsModal
+          isOpen={isSettingsOpen}
+          space={space}
+          onClose={() => setIsSettingsOpen(false)}
+          onUpdate={handleUpdateSpace}
+          onDelete={handleDeleteSpace}
+        />
+      )}
+
+      <style>{`
+        .custom-scroll::-webkit-scrollbar { width: 6px; }
+        .custom-scroll::-webkit-scrollbar-thumb { background: #e2e8f0; border-radius: 10px; }
+        .custom-scroll::-webkit-scrollbar-track { background: transparent; }
+        .custom-scroll-hide::-webkit-scrollbar { display: none; }
+        @keyframes fadeIn { from { opacity: 0; transform: translateY(8px); } to { opacity: 1; transform: translateY(0); } }
+        .animate-fadeIn { animation: fadeIn 0.25s ease-out; }
+        .btn-press:active { transform: scale(0.95); }
       `}</style>
     </div>
   );
 }
-

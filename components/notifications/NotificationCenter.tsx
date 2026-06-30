@@ -23,7 +23,11 @@ interface Notification {
 
 type FilterType = 'all' | 'memus' | 'spaces' | 'system';
 
-export default function NotificationCenter() {
+interface NotificationCenterProps {
+  dark?: boolean;
+}
+
+export default function NotificationCenter({ dark = false }: NotificationCenterProps) {
   const [isOpen, setIsOpen] = useState(false);
   const [notifications, setNotifications] = useState<Notification[]>([]);
   const [unreadCount, setUnreadCount] = useState(0);
@@ -263,6 +267,15 @@ export default function NotificationCenter() {
     { id: 'system' as FilterType, label: 'System', icon: Settings },
   ];
 
+  // Conditional styles for dark mode
+  const bellBtnClass = dark
+    ? 'relative w-10 h-10 rounded-xl bg-white/10 backdrop-blur-sm border border-white/10 flex items-center justify-center text-white/80 hover:text-white hover:border-white/30 transition-all shadow-sm btn-press'
+    : 'relative w-10 h-10 rounded-xl bg-white border border-gray-200 flex items-center justify-center text-gray-600 hover:text-indigo-600 hover:border-indigo-200 transition-all shadow-sm btn-press';
+
+  const badgeClass = dark
+    ? 'absolute -top-1 -right-1 min-w-[18px] h-[18px] px-1 bg-gradient-to-r from-rose-500 to-pink-500 text-white text-[10px] font-bold rounded-full flex items-center justify-center shadow-lg border-2 border-white/20'
+    : 'absolute -top-1 -right-1 min-w-[18px] h-[18px] px-1 bg-gradient-to-r from-rose-500 to-pink-500 text-white text-[10px] font-bold rounded-full flex items-center justify-center shadow-lg border-2 border-white';
+
   return (
     <div className="relative" ref={containerRef}>
       {/* Bell Button */}
@@ -271,12 +284,12 @@ export default function NotificationCenter() {
           triggerHaptic('light');
           setIsOpen(!isOpen);
         }}
-        className="relative w-10 h-10 rounded-xl bg-white border border-gray-200 flex items-center justify-center text-gray-600 hover:text-indigo-600 hover:border-indigo-200 transition-all shadow-sm btn-press"
+        className={bellBtnClass}
         title="Notifications"
       >
         <Bell size={18} strokeWidth={2.5} />
         {unreadCount > 0 && (
-          <span className="absolute -top-1 -right-1 min-w-[18px] h-[18px] px-1 bg-gradient-to-r from-rose-500 to-pink-500 text-white text-[10px] font-bold rounded-full flex items-center justify-center shadow-lg border-2 border-white">
+          <span className={badgeClass}>
             {unreadCount > 9 ? '9+' : unreadCount}
           </span>
         )}
@@ -354,8 +367,7 @@ export default function NotificationCenter() {
                 <p className="text-xs text-gray-500 max-w-[200px]">
                   {activeFilter === 'all' 
                     ? 'When you receive notifications, they will appear here.'
-                    : 'Try changing the filter to see more notifications.'
-                  }
+                    : 'Try changing the filter to see more notifications.'}
                 </p>
               </div>
             ) : (

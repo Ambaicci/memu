@@ -196,10 +196,7 @@ export default function SpaceSettingsModal({ isOpen, space, onClose, onUpdate, o
     try {
       const supabase = createClient();
       
-      // Delete members first
       await supabase.from('space_members').delete().eq('space_id', space.id);
-      
-      // Delete space
       const { error } = await supabase.from('spaces').delete().eq('id', space.id);
       
       if (error) throw error;
@@ -217,7 +214,6 @@ export default function SpaceSettingsModal({ isOpen, space, onClose, onUpdate, o
     }
   };
 
-  // RESTORED: handleAddMember function
   const handleAddMember = async (user: any) => {
     if (!space) return;
     const supabase = createClient();
@@ -238,7 +234,6 @@ export default function SpaceSettingsModal({ isOpen, space, onClose, onUpdate, o
     }
   };
 
-  // RESTORED: handleRemoveMember function
   const handleRemoveMember = async (userId: string) => {
     if (!space || userId === currentUserId) {
       showToast('Cannot remove yourself', 'error');
@@ -276,65 +271,62 @@ export default function SpaceSettingsModal({ isOpen, space, onClose, onUpdate, o
 
   return createPortal(
     <div
-      style={{
-        position: 'fixed', top: 0, left: 0, right: 0, bottom: 0,
-        width: '100vw', height: '100vh', zIndex: 99999,
-        display: 'flex', alignItems: 'center', justifyContent: 'center',
-        backgroundColor: 'rgba(0, 0, 0, 0.5)', backdropFilter: 'blur(4px)',
-      }}
+      className="fixed inset-0 w-screen h-screen z-[99999] flex items-center justify-center bg-black/50 backdrop-blur-sm animate-fadeIn"
       onClick={handleOverlayClick}
     >
       <div
         ref={modalRef}
-        style={{
-          position: 'relative', width: '90%', maxWidth: '560px', maxHeight: '90vh',
-          backgroundColor: 'rgba(255, 255, 255, 0.95)', backdropFilter: 'blur(12px)',
-          borderRadius: '24px', boxShadow: '0 25px 50px -12px rgba(0, 0, 0, 0.25)',
-          border: '1px solid rgba(229, 231, 235, 0.6)', overflow: 'hidden',
-          animation: 'fadeInScale 0.25s cubic-bezier(0.16, 1, 0.3, 1)',
-        }}
+        className="relative w-[95%] md:w-[90%] max-w-[560px] max-h-[95vh] md:max-h-[90vh] bg-white/95 backdrop-blur-xl rounded-2xl md:rounded-3xl shadow-2xl border border-gray-200/60 overflow-hidden animate-slideUp"
         onClick={(e) => e.stopPropagation()}
       >
-        <div className="hide-scrollbar" style={{ padding: '32px', maxHeight: '90vh', overflowY: 'auto' }}>
+        <div className="hide-scrollbar p-5 md:p-8 max-h-[95vh] md:max-h-[90vh] overflow-y-auto">
           {/* Header */}
-          <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '24px' }}>
-            <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
-              <div style={{
-                width: '44px', height: '44px', borderRadius: '16px',
-                background: 'linear-gradient(135deg, #2563EB, #4F46E5, #7C3AED)',
-                display: 'flex', alignItems: 'center', justifyContent: 'center',
-                boxShadow: '0 10px 25px -5px rgba(37, 99, 235, 0.25)', flexShrink: 0,
-              }}>
-                <Sparkles size={22} style={{ color: 'white', strokeWidth: 2 }} />
+          <div className="flex items-center justify-between mb-6">
+            <div className="flex items-center gap-3">
+              <div className="w-11 h-11 rounded-2xl bg-gradient-to-br from-blue-600 via-indigo-600 to-purple-600 flex items-center justify-center shadow-lg flex-shrink-0">
+                <Sparkles size={20} className="text-white" strokeWidth={2} />
               </div>
               <div>
-                <h3 style={{ fontSize: '20px', fontWeight: 700, color: '#111827', letterSpacing: '-0.02em', margin: 0 }}>Space Settings</h3>
-                <p style={{ fontSize: '14px', color: '#6B7280', fontWeight: 300, margin: 0 }}>
+                <h3 className="text-lg md:text-xl font-bold text-gray-900 tracking-tight">Space Settings</h3>
+                <p className="text-xs md:text-sm text-gray-500 font-light">
                   {isEditing ? 'Edit your workspace details' : `Manage ${space.name}`}
                 </p>
               </div>
             </div>
-            <button onClick={onClose} style={{ padding: '10px', borderRadius: '12px', background: 'transparent', border: 'none', cursor: 'pointer', color: '#6B7280', transition: 'all 0.2s', flexShrink: 0 }} onMouseEnter={(e) => { e.currentTarget.style.background = 'rgba(243, 244, 246, 0.8)' }} onMouseLeave={(e) => { e.currentTarget.style.background = 'transparent' }}>
-              <X size={18} strokeWidth={2} />
+            <button 
+              onClick={onClose} 
+              className="p-2.5 rounded-xl hover:bg-gray-100 text-gray-500 hover:text-gray-700 transition-all flex-shrink-0"
+              aria-label="Close"
+            >
+              <X size={20} strokeWidth={2} />
             </button>
           </div>
 
-          <div style={{ display: 'flex', flexDirection: 'column', gap: '20px' }}>
+          <div className="flex flex-col gap-5">
             {/* Space Preview */}
-            <div style={{ display: 'flex', alignItems: 'center', gap: '16px', padding: '16px', background: 'linear-gradient(135deg, rgba(249, 250, 251, 0.8), rgba(243, 244, 246, 0.4))', borderRadius: '16px', border: '1px solid rgba(229, 231, 235, 0.4)' }}>
-              <div style={{ width: '56px', height: '56px', borderRadius: '16px', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: '32px', boxShadow: '0 10px 25px -5px rgba(0,0,0,0.15)', flexShrink: 0, background: `linear-gradient(135deg, ${displayColor}CC, ${displayColor}55)`, color: '#fff', transition: 'all 0.3s ease' }}>
+            <div className="flex items-center gap-4 p-4 bg-gradient-to-br from-gray-50/80 to-gray-100/40 rounded-2xl border border-gray-200/40">
+              <div 
+                className="w-14 h-14 rounded-2xl flex items-center justify-center text-3xl shadow-lg flex-shrink-0 transition-all duration-300"
+                style={{ 
+                  background: `linear-gradient(135deg, ${displayColor}CC, ${displayColor}55)`,
+                  color: '#fff',
+                }}
+              >
                 {displayIcon}
               </div>
-              <div style={{ flex: 1, minWidth: 0 }}>
-                <p style={{ fontSize: '16px', fontWeight: 700, color: '#111827', margin: 0, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+              <div className="flex-1 min-w-0">
+                <p className="text-base font-bold text-gray-900 truncate">
                   {displayName || 'Space Name'}
                 </p>
-                <p style={{ fontSize: '12px', color: '#6B7280', fontWeight: 500, margin: 0 }}>
+                <p className="text-xs text-gray-500 font-medium">
                   {spaceMembers.length} members • {space.role || 'member'}
                 </p>
               </div>
               {!isEditing && (
-                <button onClick={handleStartEdit} style={{ padding: '8px 16px', borderRadius: '12px', background: 'rgba(243, 244, 246, 0.8)', border: 'none', cursor: 'pointer', color: '#374151', fontSize: '12px', fontWeight: 500, transition: 'all 0.2s', display: 'flex', alignItems: 'center', gap: '6px' }} onMouseEnter={(e) => { e.currentTarget.style.background = 'rgba(229, 231, 235, 0.8)' }} onMouseLeave={(e) => { e.currentTarget.style.background = 'rgba(243, 244, 246, 0.8)' }}>
+                <button 
+                  onClick={handleStartEdit} 
+                  className="px-4 py-2 rounded-xl bg-gray-100/80 hover:bg-gray-200/80 text-gray-700 text-xs font-medium transition-all flex items-center gap-1.5 flex-shrink-0"
+                >
                   <Edit2 size={14} /> Edit
                 </button>
               )}
@@ -343,39 +335,49 @@ export default function SpaceSettingsModal({ isOpen, space, onClose, onUpdate, o
             {!isEditing ? (
               <>
                 <div>
-                  <label style={{ display: 'block', fontSize: '11px', fontWeight: 700, color: '#6B7280', textTransform: 'uppercase', letterSpacing: '0.04em', marginBottom: '4px' }}>Name</label>
-                  <p style={{ fontSize: '14px', color: '#111827', fontWeight: 500, margin: 0 }}>{space.name}</p>
+                  <label className="block text-[11px] font-bold text-gray-500 uppercase tracking-wider mb-1">Name</label>
+                  <p className="text-sm text-gray-900 font-medium">{space.name}</p>
                 </div>
                 <div>
-                  <label style={{ display: 'block', fontSize: '11px', fontWeight: 700, color: '#6B7280', textTransform: 'uppercase', letterSpacing: '0.04em', marginBottom: '4px' }}>Description</label>
-                  <p style={{ fontSize: '14px', color: '#6B7280', margin: 0 }}>{space.description || 'No description provided'}</p>
+                  <label className="block text-[11px] font-bold text-gray-500 uppercase tracking-wider mb-1">Description</label>
+                  <p className="text-sm text-gray-600">{space.description || 'No description provided'}</p>
                 </div>
 
                 {/* Members Section */}
                 <div>
-                  <label style={{ display: 'block', fontSize: '11px', fontWeight: 700, color: '#6B7280', textTransform: 'uppercase', letterSpacing: '0.04em', marginBottom: '8px' }}>Members ({spaceMembers.length})</label>
+                  <label className="block text-[11px] font-bold text-gray-500 uppercase tracking-wider mb-2">Members ({spaceMembers.length})</label>
 
                   {isOwner && (
-                    <div style={{ position: 'relative', marginBottom: '12px' }}>
-                      <Search size={16} strokeWidth={2} style={{ position: 'absolute', left: '12px', top: '50%', transform: 'translateY(-50%)', color: '#9CA3AF' }} />
-                      <input type="text" value={memberSearchQuery} onChange={(e) => setMemberSearchQuery(e.target.value)} placeholder="Add member by handle or name..." style={{ width: '100%', padding: '10px 12px 10px 40px', background: 'white', border: '1px solid #E5E7EB', borderRadius: '12px', fontSize: '13px', outline: 'none', transition: 'all 0.2s', boxSizing: 'border-box' }} onFocus={(e) => { e.currentTarget.style.borderColor = '#3B82F6'; e.currentTarget.style.boxShadow = '0 0 0 4px rgba(59, 130, 246, 0.1)' }} onBlur={(e) => { e.currentTarget.style.borderColor = '#E5E7EB'; e.currentTarget.style.boxShadow = 'none' }} />
+                    <div className="relative mb-3">
+                      <Search size={16} strokeWidth={2} className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400" />
+                      <input 
+                        type="text" 
+                        value={memberSearchQuery} 
+                        onChange={(e) => setMemberSearchQuery(e.target.value)} 
+                        placeholder="Add member by handle or name..." 
+                        className="w-full pl-10 pr-3 py-2.5 bg-white border border-gray-200 rounded-xl text-sm outline-none focus:ring-4 focus:ring-blue-500/10 focus:border-blue-400 transition"
+                      />
                       {memberSearching && (
-                        <div style={{ marginTop: '8px', padding: '8px', background: 'rgba(249, 250, 251, 0.8)', borderRadius: '8px', fontSize: '12px', color: '#6B7280', textAlign: 'center' }}>
-                          <Loader2 size={12} style={{ display: 'inline', marginRight: '6px', animation: 'spin 1s linear infinite' }} /> Searching...
+                        <div className="mt-2 p-2 bg-gray-50/80 rounded-lg text-xs text-gray-600 text-center">
+                          <Loader2 size={12} className="inline mr-1.5 animate-spin" /> Searching...
                         </div>
                       )}
                       {!memberSearching && memberSearchResults.length > 0 && (
-                        <div style={{ marginTop: '8px', background: 'white', border: '1px solid #E5E7EB', borderRadius: '12px', boxShadow: '0 4px 12px rgba(0,0,0,0.08)', overflow: 'hidden' }}>
+                        <div className="mt-2 bg-white border border-gray-200 rounded-xl shadow-lg overflow-hidden">
                           {memberSearchResults.map((user) => (
-                            <button key={user.id} onClick={() => handleAddMember(user)} style={{ width: '100%', display: 'flex', alignItems: 'center', gap: '10px', padding: '10px 12px', background: 'transparent', border: 'none', borderBottom: '1px solid #F3F4F6', cursor: 'pointer', textAlign: 'left', transition: 'background 0.2s' }} onMouseEnter={(e) => { e.currentTarget.style.background = 'rgba(239, 246, 255, 0.8)' }} onMouseLeave={(e) => { e.currentTarget.style.background = 'transparent' }}>
-                              <div style={{ width: '32px', height: '32px', borderRadius: '9999px', background: 'linear-gradient(135deg, #3B82F6, #4F46E5)', display: 'flex', alignItems: 'center', justifyContent: 'center', color: 'white', fontSize: '9px', fontWeight: 700, flexShrink: 0 }}>
+                            <button 
+                              key={user.id} 
+                              onClick={() => handleAddMember(user)} 
+                              className="w-full flex items-center gap-2.5 p-3 hover:bg-blue-50/80 border-b border-gray-100 last:border-b-0 transition-all text-left"
+                            >
+                              <div className="w-8 h-8 rounded-full bg-gradient-to-br from-blue-500 to-indigo-600 flex items-center justify-center text-white text-[9px] font-bold flex-shrink-0">
                                 {getInitials(user.full_name || user.username)}
                               </div>
-                              <div style={{ flex: 1, minWidth: 0 }}>
-                                <p style={{ fontSize: '13px', fontWeight: 500, color: '#111827', margin: 0, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{user.full_name || user.username}</p>
-                                <p style={{ fontSize: '11px', color: '#6B7280', margin: 0, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>@{user.username}</p>
+                              <div className="flex-1 min-w-0">
+                                <p className="text-sm font-medium text-gray-900 truncate">{user.full_name || user.username}</p>
+                                <p className="text-[11px] text-gray-500 truncate">@{user.username}</p>
                               </div>
-                              <Plus size={14} style={{ color: '#3B82F6', flexShrink: 0 }} />
+                              <Plus size={14} className="text-blue-500 flex-shrink-0" />
                             </button>
                           ))}
                         </div>
@@ -383,21 +385,31 @@ export default function SpaceSettingsModal({ isOpen, space, onClose, onUpdate, o
                     </div>
                   )}
 
-                  <div style={{ display: 'flex', flexDirection: 'column', gap: '6px' }}>
+                  <div className="flex flex-col gap-1.5">
                     {spaceMembers.map((member) => (
-                      <div key={member.id} style={{ display: 'flex', alignItems: 'center', gap: '10px', padding: '8px 12px', background: 'rgba(249, 250, 251, 0.6)', borderRadius: '10px', border: '1px solid rgba(229, 231, 235, 0.3)' }}>
-                        <div style={{ width: '32px', height: '32px', borderRadius: '9999px', background: `linear-gradient(135deg, ${displayColor}CC, ${displayColor}55)`, display: 'flex', alignItems: 'center', justifyContent: 'center', color: 'white', fontSize: '10px', fontWeight: 700, flexShrink: 0 }}>
+                      <div 
+                        key={member.id} 
+                        className="flex items-center gap-2.5 p-2.5 bg-gray-50/60 rounded-xl border border-gray-200/30"
+                      >
+                        <div 
+                          className="w-8 h-8 rounded-full flex items-center justify-center text-white text-[10px] font-bold flex-shrink-0"
+                          style={{ background: `linear-gradient(135deg, ${displayColor}CC, ${displayColor}55)` }}
+                        >
                           {getInitials(member.name)}
                         </div>
-                        <div style={{ flex: 1, minWidth: 0 }}>
-                          <p style={{ fontSize: '13px', fontWeight: 500, color: '#111827', margin: 0, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
-                            {member.name} {member.id === currentUserId && '(You)'}
+                        <div className="flex-1 min-w-0">
+                          <p className="text-sm font-medium text-gray-900 truncate">
+                            {member.name} {member.id === currentUserId && <span className="text-xs text-gray-400">(You)</span>}
                           </p>
-                          <p style={{ fontSize: '11px', color: '#6B7280', margin: 0 }}>@{member.username} • {member.role}</p>
+                          <p className="text-[11px] text-gray-500">@{member.username} • {member.role}</p>
                         </div>
                         {isOwner && member.id !== currentUserId && (
-                          <button onClick={() => handleRemoveMember(member.id)} style={{ padding: '6px', borderRadius: '8px', background: 'transparent', border: 'none', cursor: 'pointer', color: '#9CA3AF', transition: 'all 0.2s', display: 'flex' }} onMouseEnter={(e) => { e.currentTarget.style.color = '#EF4444'; e.currentTarget.style.background = 'rgba(239, 68, 68, 0.1)' }} onMouseLeave={(e) => { e.currentTarget.style.color = '#9CA3AF'; e.currentTarget.style.background = 'transparent' }}>
-                            <X size={14} strokeWidth={2} />
+                          <button 
+                            onClick={() => handleRemoveMember(member.id)} 
+                            className="p-2 rounded-lg hover:bg-red-50 text-gray-400 hover:text-red-500 transition-all flex-shrink-0"
+                            aria-label="Remove member"
+                          >
+                            <X size={16} strokeWidth={2} />
                           </button>
                         )}
                       </div>
@@ -406,21 +418,30 @@ export default function SpaceSettingsModal({ isOpen, space, onClose, onUpdate, o
                 </div>
 
                 {/* Delete Section */}
-                <div style={{ paddingTop: '16px', borderTop: '1px solid rgba(229, 231, 235, 0.6)' }}>
+                <div className="pt-4 border-t border-gray-200/60">
                   {!showDeleteConfirm ? (
-                    <button onClick={() => setShowDeleteConfirm(true)} style={{ display: 'flex', alignItems: 'center', gap: '8px', padding: '8px 12px', background: 'transparent', border: 'none', cursor: 'pointer', color: '#EF4444', fontSize: '13px', fontWeight: 500, borderRadius: '10px', transition: 'all 0.2s' }} onMouseEnter={(e) => { e.currentTarget.style.background = 'rgba(239, 68, 68, 0.08)' }} onMouseLeave={(e) => { e.currentTarget.style.background = 'transparent' }}>
-                      <Trash2 size={14} /> Delete Space
+                    <button 
+                      onClick={() => setShowDeleteConfirm(true)} 
+                      className="flex items-center gap-2 px-3 py-2.5 hover:bg-red-50/80 text-red-500 text-sm font-medium rounded-xl transition-all"
+                    >
+                      <Trash2 size={16} /> Delete Space
                     </button>
                   ) : (
-                    <div style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>
-                      <p style={{ fontSize: '13px', color: '#6B7280', margin: 0 }}>
+                    <div className="flex flex-col gap-3">
+                      <p className="text-sm text-gray-600">
                         Are you sure? This action cannot be undone. All messages and files will be permanently lost.
                       </p>
-                      <div style={{ display: 'flex', gap: '10px' }}>
-                        <button onClick={() => setShowDeleteConfirm(false)} style={{ padding: '8px 16px', borderRadius: '10px', background: 'rgba(243, 244, 246, 0.8)', border: 'none', cursor: 'pointer', color: '#374151', fontSize: '13px', fontWeight: 500, transition: 'all 0.2s' }} onMouseEnter={(e) => { e.currentTarget.style.background = 'rgba(229, 231, 235, 0.8)' }} onMouseLeave={(e) => { e.currentTarget.style.background = 'rgba(243, 244, 246, 0.8)' }}>
+                      <div className="flex gap-2.5">
+                        <button 
+                          onClick={() => setShowDeleteConfirm(false)} 
+                          className="flex-1 px-4 py-2.5 rounded-xl bg-gray-100/80 hover:bg-gray-200/80 text-gray-700 text-sm font-medium transition-all"
+                        >
                           Cancel
                         </button>
-                        <button onClick={handleDelete} style={{ padding: '8px 16px', borderRadius: '10px', background: '#EF4444', border: 'none', cursor: 'pointer', color: 'white', fontSize: '13px', fontWeight: 600, transition: 'all 0.2s' }} onMouseEnter={(e) => { e.currentTarget.style.background = '#DC2626' }} onMouseLeave={(e) => { e.currentTarget.style.background = '#EF4444' }}>
+                        <button 
+                          onClick={handleDelete} 
+                          className="flex-1 px-4 py-2.5 rounded-xl bg-red-500 hover:bg-red-600 text-white text-sm font-semibold transition-all"
+                        >
                           Delete Permanently
                         </button>
                       </div>
@@ -431,22 +452,43 @@ export default function SpaceSettingsModal({ isOpen, space, onClose, onUpdate, o
             ) : (
               <>
                 <div>
-                  <label style={{ display: 'block', fontSize: '11px', fontWeight: 700, color: '#6B7280', textTransform: 'uppercase', letterSpacing: '0.04em', marginBottom: '8px' }}>Space Name</label>
-                  <input type="text" value={editName} onChange={(e) => setEditName(e.target.value)} placeholder="Space name..." style={{ width: '100%', padding: '12px 16px', background: 'white', border: '1px solid #E5E7EB', borderRadius: '16px', fontSize: '14px', outline: 'none', transition: 'all 0.2s', boxSizing: 'border-box' }} onFocus={(e) => { e.currentTarget.style.borderColor = '#3B82F6'; e.currentTarget.style.boxShadow = '0 0 0 4px rgba(59, 130, 246, 0.1)' }} onBlur={(e) => { e.currentTarget.style.borderColor = '#E5E7EB'; e.currentTarget.style.boxShadow = 'none' }} />
+                  <label className="block text-[11px] font-bold text-gray-500 uppercase tracking-wider mb-2">Space Name</label>
+                  <input 
+                    type="text" 
+                    value={editName} 
+                    onChange={(e) => setEditName(e.target.value)} 
+                    placeholder="Space name..." 
+                    className="w-full px-4 py-3 bg-white border border-gray-200 rounded-2xl text-sm outline-none focus:ring-4 focus:ring-blue-500/10 focus:border-blue-400 transition"
+                  />
                 </div>
                 <div>
-                  <label style={{ display: 'block', fontSize: '11px', fontWeight: 700, color: '#6B7280', textTransform: 'uppercase', letterSpacing: '0.04em', marginBottom: '8px' }}>Description</label>
-                  <textarea value={editDescription} onChange={(e) => setEditDescription(e.target.value)} placeholder="What is this space for?" rows={2} style={{ width: '100%', padding: '12px 16px', background: 'white', border: '1px solid #E5E7EB', borderRadius: '16px', fontSize: '14px', outline: 'none', transition: 'all 0.2s', resize: 'none', boxSizing: 'border-box', fontFamily: 'inherit' }} onFocus={(e) => { e.currentTarget.style.borderColor = '#3B82F6'; e.currentTarget.style.boxShadow = '0 0 0 4px rgba(59, 130, 246, 0.1)' }} onBlur={(e) => { e.currentTarget.style.borderColor = '#E5E7EB'; e.currentTarget.style.boxShadow = 'none' }} />
+                  <label className="block text-[11px] font-bold text-gray-500 uppercase tracking-wider mb-2">Description</label>
+                  <textarea 
+                    value={editDescription} 
+                    onChange={(e) => setEditDescription(e.target.value)} 
+                    placeholder="What is this space for?" 
+                    rows={2}
+                    className="w-full px-4 py-3 bg-white border border-gray-200 rounded-2xl text-sm outline-none focus:ring-4 focus:ring-blue-500/10 focus:border-blue-400 transition resize-none"
+                  />
                 </div>
                 <div>
-                  <label style={{ display: 'block', fontSize: '11px', fontWeight: 700, color: '#6B7280', textTransform: 'uppercase', letterSpacing: '0.04em', marginBottom: '8px' }}>Icon</label>
-                  <div style={{ display: 'grid', gridTemplateColumns: 'repeat(8, 1fr)', gap: '6px' }}>
+                  <label className="block text-[11px] font-bold text-gray-500 uppercase tracking-wider mb-2">Icon</label>
+                  <div className="grid grid-cols-6 md:grid-cols-8 gap-2">
                     {PREMIUM_ICONS.map((item, index) => (
-                      <button key={index} onClick={() => setEditIcon(item.emoji)} style={{ position: 'relative', padding: '8px', borderRadius: '12px', fontSize: '20px', border: editIcon === item.emoji ? '2px solid #3B82F6' : '2px solid transparent', background: editIcon === item.emoji ? 'rgba(59, 130, 246, 0.1)' : 'rgba(249, 250, 251, 0.8)', cursor: 'pointer', transition: 'all 0.2s', transform: editIcon === item.emoji ? 'scale(1.1)' : 'scale(1)', boxShadow: editIcon === item.emoji ? '0 4px 12px rgba(59, 130, 246, 0.2)' : 'none' }} title={item.label} onMouseEnter={(e) => { if (editIcon !== item.emoji) { e.currentTarget.style.background = 'rgba(243, 244, 246, 0.8)'; e.currentTarget.style.transform = 'scale(1.05)' } }} onMouseLeave={(e) => { if (editIcon !== item.emoji) { e.currentTarget.style.background = 'rgba(249, 250, 251, 0.8)'; e.currentTarget.style.transform = 'scale(1)' } }}>
-                        <span style={{ position: 'relative', zIndex: 1 }}>{item.emoji}</span>
+                      <button 
+                        key={index} 
+                        onClick={() => setEditIcon(item.emoji)} 
+                        className={`relative p-2 rounded-xl text-xl transition-all ${
+                          editIcon === item.emoji 
+                            ? 'border-2 border-blue-500 bg-blue-50/80 scale-110 shadow-md' 
+                            : 'border-2 border-transparent bg-gray-50/80 hover:bg-gray-100/80 hover:scale-105'
+                        }`}
+                        title={item.label}
+                      >
+                        <span className="relative z-10">{item.emoji}</span>
                         {editIcon === item.emoji && (
-                          <div style={{ position: 'absolute', top: '-4px', right: '-4px', width: '16px', height: '16px', borderRadius: '9999px', background: '#3B82F6', display: 'flex', alignItems: 'center', justifyContent: 'center', boxShadow: '0 2px 8px rgba(59, 130, 246, 0.3)' }}>
-                            <Check size={8} strokeWidth={3} style={{ color: 'white' }} />
+                          <div className="absolute -top-1 -right-1 w-4 h-4 rounded-full bg-blue-500 flex items-center justify-center shadow-md">
+                            <Check size={8} strokeWidth={3} className="text-white" />
                           </div>
                         )}
                       </button>
@@ -454,21 +496,42 @@ export default function SpaceSettingsModal({ isOpen, space, onClose, onUpdate, o
                   </div>
                 </div>
                 <div>
-                  <label style={{ display: 'block', fontSize: '11px', fontWeight: 700, color: '#6B7280', textTransform: 'uppercase', letterSpacing: '0.04em', marginBottom: '8px' }}>Color</label>
-                  <div style={{ display: 'flex', gap: '8px', flexWrap: 'wrap' }}>
+                  <label className="block text-[11px] font-bold text-gray-500 uppercase tracking-wider mb-2">Color</label>
+                  <div className="flex gap-2 flex-wrap">
                     {PREMIUM_COLORS.map((c) => (
-                      <button key={c.hex} onClick={() => setEditColor(c.hex)} style={{ width: '36px', height: '36px', borderRadius: '9999px', border: editColor === c.hex ? '4px solid rgba(59, 130, 246, 0.2)' : 'none', background: c.hex, cursor: 'pointer', transition: 'all 0.2s', transform: editColor === c.hex ? 'scale(1.1)' : 'scale(1)', display: 'flex', alignItems: 'center', justifyContent: 'center' }} title={c.name} onMouseEnter={(e) => { if (editColor !== c.hex) { e.currentTarget.style.transform = 'scale(1.05)' } }} onMouseLeave={(e) => { if (editColor !== c.hex) { e.currentTarget.style.transform = 'scale(1)' } }}>
-                        {editColor === c.hex && <Check size={12} strokeWidth={3} style={{ color: 'white' }} />}
+                      <button 
+                        key={c.hex} 
+                        onClick={() => setEditColor(c.hex)} 
+                        className={`w-9 h-9 rounded-full transition-all flex items-center justify-center ${
+                          editColor === c.hex 
+                            ? 'border-4 border-blue-200/60 scale-110' 
+                            : 'hover:scale-105'
+                        }`}
+                        style={{ background: c.hex }}
+                        title={c.name}
+                      >
+                        {editColor === c.hex && <Check size={12} strokeWidth={3} className="text-white" />}
                       </button>
                     ))}
                   </div>
                 </div>
-                <div style={{ display: 'flex', gap: '12px', paddingTop: '8px' }}>
-                  <button onClick={handleSaveEdit} disabled={isUpdating || !editName.trim()} style={{ flex: 1, display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '8px', padding: '12px 16px', background: isUpdating || !editName.trim() ? 'rgba(156, 163, 175, 0.5)' : 'linear-gradient(135deg, #2563EB, #4F46E5, #7C3AED)', color: 'white', border: 'none', borderRadius: '16px', fontSize: '14px', fontWeight: 600, cursor: isUpdating || !editName.trim() ? 'not-allowed' : 'pointer', transition: 'all 0.2s', boxShadow: isUpdating || !editName.trim() ? 'none' : '0 4px 14px rgba(37, 99, 235, 0.25)' }} onMouseEnter={(e) => { if (!isUpdating && editName.trim()) { e.currentTarget.style.transform = 'translateY(-2px)'; e.currentTarget.style.boxShadow = '0 8px 25px -5px rgba(37, 99, 235, 0.35)'; } }} onMouseLeave={(e) => { if (!isUpdating && editName.trim()) { e.currentTarget.style.transform = 'translateY(0)'; e.currentTarget.style.boxShadow = '0 4px 14px rgba(37, 99, 235, 0.25)'; } }}>
-                    {isUpdating ? <Loader2 size={16} style={{ animation: 'spin 1s linear infinite' }} /> : <Check size={16} strokeWidth={2.5} />}
+                <div className="flex gap-3 pt-2">
+                  <button 
+                    onClick={handleSaveEdit} 
+                    disabled={isUpdating || !editName.trim()}
+                    className={`flex-1 flex items-center justify-center gap-2 px-4 py-3 rounded-2xl text-sm font-semibold transition-all ${
+                      isUpdating || !editName.trim()
+                        ? 'bg-gray-300/50 text-gray-500 cursor-not-allowed'
+                        : 'bg-gradient-to-r from-blue-600 via-indigo-600 to-purple-600 text-white shadow-lg hover:shadow-xl hover:-translate-y-0.5'
+                    }`}
+                  >
+                    {isUpdating ? <Loader2 size={16} className="animate-spin" /> : <Check size={16} strokeWidth={2.5} />}
                     {isUpdating ? 'Saving...' : 'Save Changes'}
                   </button>
-                  <button onClick={handleCancelEdit} style={{ padding: '12px 16px', background: 'rgba(243, 244, 246, 0.8)', color: '#374151', border: 'none', borderRadius: '16px', fontSize: '14px', fontWeight: 500, cursor: 'pointer', transition: 'all 0.2s' }} onMouseEnter={(e) => { e.currentTarget.style.background = 'rgba(229, 231, 235, 0.8)' }} onMouseLeave={(e) => { e.currentTarget.style.background = 'rgba(243, 244, 246, 0.8)' }}>
+                  <button 
+                    onClick={handleCancelEdit} 
+                    className="px-4 py-3 rounded-2xl bg-gray-100/80 hover:bg-gray-200/80 text-gray-700 text-sm font-medium transition-all"
+                  >
                     Cancel
                   </button>
                 </div>
@@ -479,16 +542,30 @@ export default function SpaceSettingsModal({ isOpen, space, onClose, onUpdate, o
       </div>
 
       <style>{`
-        @keyframes fadeInScale {
-          from { opacity: 0; transform: scale(0.95) translateY(10px); }
-          to { opacity: 1; transform: scale(1) translateY(0); }
+        @keyframes fadeIn {
+          from { opacity: 0; }
+          to { opacity: 1; }
         }
-        @keyframes spin {
-          from { transform: rotate(0deg); }
-          to { transform: rotate(360deg); }
+        .animate-fadeIn { animation: fadeIn 0.2s ease-out; }
+        
+        @keyframes slideUp {
+          from { opacity: 0; transform: translateY(20px) scale(0.95); }
+          to { opacity: 1; transform: translateY(0) scale(1); }
         }
+        .animate-slideUp { animation: slideUp 0.3s cubic-bezier(0.16, 1, 0.3, 1); }
+        
         .hide-scrollbar::-webkit-scrollbar { display: none; }
         .hide-scrollbar { -ms-overflow-style: none; scrollbar-width: none; }
+        
+        @media (max-width: 768px) {
+          .animate-slideUp {
+            animation: slideUpMobile 0.3s cubic-bezier(0.16, 1, 0.3, 1);
+          }
+          @keyframes slideUpMobile {
+            from { opacity: 0; transform: translateY(100%); }
+            to { opacity: 1; transform: translateY(0); }
+          }
+        }
       `}</style>
     </div>,
     document.body

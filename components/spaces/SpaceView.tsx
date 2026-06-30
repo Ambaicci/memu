@@ -116,7 +116,6 @@ export default function SpaceView({ spaceId }: SpaceViewProps) {
     }
   };
 
-  // Settings Handlers
   const handleUpdateSpace = async (updatedData: any) => {
     const supabase = createClient();
     const { error } = await supabase
@@ -131,12 +130,10 @@ export default function SpaceView({ spaceId }: SpaceViewProps) {
 
     if (error) throw error;
     
-    // Update local state immediately for real-time preview
     setSpace(prev => prev ? { ...prev, ...updatedData } : null);
   };
 
   const handleDeleteSpace = async (deletedSpaceId: string) => {
-    // Navigate back to spaces list after deletion
     router.push('/?panel=spaces');
   };
 
@@ -169,7 +166,7 @@ export default function SpaceView({ spaceId }: SpaceViewProps) {
         <p className="text-sm text-gray-500 font-light mb-6 max-w-xs">This space may have been deleted or you no longer have access.</p>
         <button 
           onClick={() => router.push('/?panel=spaces')}
-          className="px-6 py-2.5 bg-blue-600 text-white rounded-xl text-sm font-medium hover:bg-blue-700 hover:shadow-md transition-all btn-press"
+          className="px-6 py-3 bg-blue-600 text-white rounded-xl text-sm font-medium hover:bg-blue-700 hover:shadow-md transition-all btn-press"
         >
           Back to Spaces
         </button>
@@ -188,12 +185,12 @@ export default function SpaceView({ spaceId }: SpaceViewProps) {
       
       {/* ================= PREMIUM HEADER ================= */}
       <div className="sticky top-0 z-20 bg-white/90 backdrop-blur-xl border-b border-gray-200/40 shadow-sm">
-        <div className="px-6 md:px-10 pt-5 pb-3">
+        <div className="px-4 md:px-10 pt-4 md:pt-5 pb-2 md:pb-3">
           {/* Top Row: Space Identity */}
-          <div className="flex items-center justify-between mb-4">
-            <div className="flex items-center gap-4">
+          <div className="flex items-center justify-between mb-3 md:mb-4">
+            <div className="flex items-center gap-3 md:gap-4 min-w-0 flex-1">
               <div 
-                className="w-12 h-12 rounded-2xl flex items-center justify-center text-2xl shadow-lg flex-shrink-0 transition-all duration-300 hover:scale-105"
+                className="w-11 h-11 md:w-12 md:h-12 rounded-2xl flex items-center justify-center text-xl md:text-2xl shadow-lg flex-shrink-0 transition-all duration-300 active:scale-95"
                 style={{ 
                   background: `linear-gradient(135deg, ${bgColor}CC, ${bgColor}55)`,
                   color: '#fff',
@@ -204,19 +201,19 @@ export default function SpaceView({ spaceId }: SpaceViewProps) {
                 {displayIcon}
               </div>
               
-              <div>
-                <h1 className="text-xl font-bold text-gray-900 tracking-tight leading-tight">
+              <div className="min-w-0 flex-1">
+                <h1 className="text-lg md:text-xl font-bold text-gray-900 tracking-tight leading-tight truncate">
                   {space.name}
                 </h1>
-                <div className="flex items-center gap-2 text-sm text-gray-500 font-medium">
-                  <Users size={13} strokeWidth={2} className="text-gray-400" />
-                  <span>{memberCount} member{memberCount !== 1 ? 's' : ''}</span>
+                <div className="flex items-center gap-1.5 md:gap-2 text-xs md:text-sm text-gray-500 font-medium mt-0.5">
+                  <Users size={12} strokeWidth={2} className="text-gray-400 flex-shrink-0" />
+                  <span className="truncate">{memberCount} member{memberCount !== 1 ? 's' : ''}</span>
                   {isCreator && (
                     <>
-                      <span className="w-1 h-1 rounded-full bg-gray-300" />
-                      <span className="flex items-center gap-1">
-                        <Sparkles size={11} className="text-blue-500" />
-                        Created by you
+                      <span className="w-1 h-1 rounded-full bg-gray-300 flex-shrink-0" />
+                      <span className="flex items-center gap-1 truncate">
+                        <Sparkles size={10} className="text-blue-500 flex-shrink-0" />
+                        <span className="hidden sm:inline">Created by you</span>
                       </span>
                     </>
                   )}
@@ -224,41 +221,43 @@ export default function SpaceView({ spaceId }: SpaceViewProps) {
               </div>
             </div>
 
-            <div className="flex items-center gap-2">
+            <div className="flex items-center gap-1.5 md:gap-2 flex-shrink-0 ml-2">
               {/* Files Button - Quick Access */}
               <button 
                 onClick={() => setActiveTab('files')}
-                className={`group p-2.5 rounded-xl transition-all duration-300 btn-press ${
+                className={`group p-2.5 md:p-3 rounded-xl transition-all duration-300 btn-press ${
                   activeTab === 'files' 
                     ? 'bg-blue-50 text-blue-600 shadow-sm' 
-                    : 'hover:bg-gray-100/70 text-gray-500 hover:text-gray-700'
+                    : 'active:bg-gray-100 text-gray-500 active:text-gray-700'
                 }`}
                 title="Space Files"
+                aria-label="Space Files"
               >
                 <Folder 
                   size={18} 
                   strokeWidth={2} 
-                  className="transition-all duration-300 group-hover:scale-105" 
+                  className="transition-all duration-300" 
                 />
               </button>
 
               {/* Settings Button - Opens Modal */}
               <button 
                 onClick={() => setIsSettingsOpen(true)}
-                className="group p-2.5 rounded-xl transition-all duration-300 btn-press hover:bg-gray-100/70"
+                className="group p-2.5 md:p-3 rounded-xl transition-all duration-300 btn-press active:bg-gray-100"
                 title="Space Settings"
+                aria-label="Space Settings"
               >
                 <Settings 
                   size={18} 
                   strokeWidth={2} 
-                  className="text-gray-500 transition-all duration-300 group-hover:rotate-45 group-hover:scale-105 group-hover:text-gray-700" 
+                  className="text-gray-500 transition-all duration-300 group-active:rotate-45 group-active:scale-95 group-active:text-gray-700" 
                 />
               </button>
             </div>
           </div>
 
           {/* ================= PREMIUM TABS ================= */}
-          <div className="flex items-center gap-1.5 overflow-x-auto custom-scroll-hide pb-1">
+          <div className="flex items-center gap-1 md:gap-1.5 overflow-x-auto custom-scroll-hide pb-1 -mx-4 md:-mx-0 px-4 md:px-0">
             {tabs.map((tab) => {
               const isActive = activeTab === tab.id;
               return (
@@ -266,11 +265,11 @@ export default function SpaceView({ spaceId }: SpaceViewProps) {
                   key={tab.id}
                   onClick={() => setActiveTab(tab.id)}
                   className={`
-                    relative flex items-center gap-2.5 px-5 py-2.5 rounded-2xl
-                    transition-all duration-300 whitespace-nowrap btn-press
+                    relative flex items-center gap-2 md:gap-2.5 px-4 md:px-5 py-2.5 rounded-2xl
+                    transition-all duration-300 whitespace-nowrap btn-press flex-shrink-0
                     ${isActive 
                       ? 'text-white shadow-lg' 
-                      : 'text-gray-500 hover:text-gray-700 hover:bg-gray-100/70'
+                      : 'text-gray-500 active:text-gray-700 active:bg-gray-100/70'
                     }
                   `}
                   style={{
@@ -282,7 +281,7 @@ export default function SpaceView({ spaceId }: SpaceViewProps) {
                       : 'none',
                   }}
                 >
-                  <span className="transition-colors duration-300">
+                  <span className="transition-colors duration-300 flex-shrink-0">
                     {tab.icon}
                   </span>
                   <span 
@@ -307,7 +306,7 @@ export default function SpaceView({ spaceId }: SpaceViewProps) {
 
       {/* ================= SCROLLABLE CONTENT ================= */}
       <div className="flex-1 overflow-y-auto custom-scroll">
-        <div className="p-6 md:p-8 max-w-6xl mx-auto w-full">
+        <div className="p-4 md:p-8 max-w-6xl mx-auto w-full">
           
           {activeTab === 'chats' && (
             <SpaceChatsPanel space={space} currentUserId={currentUserId} />

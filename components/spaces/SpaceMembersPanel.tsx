@@ -31,6 +31,7 @@ interface SpaceMembersPanelProps {
     color?: string | null;
   };
 }
+
 export default function SpaceMembersPanel({ space }: SpaceMembersPanelProps) {
   const [members, setMembers] = useState<SpaceMember[]>([]);
   const [loading, setLoading] = useState(true);
@@ -53,7 +54,6 @@ export default function SpaceMembersPanel({ space }: SpaceMembersPanelProps) {
 
   const spaceColor = space.color || '#3B82F6';
 
-  // Helper to extract profile from member
   const getProfile = (member: SpaceMember): MemberProfile | null => {
     if (Array.isArray(member.profiles)) {
       return member.profiles[0] || null;
@@ -289,13 +289,13 @@ export default function SpaceMembersPanel({ space }: SpaceMembersPanelProps) {
   const memberCount = members.filter(m => m.role === 'member').length;
 
   return (
-    <div className="flex flex-col gap-4 w-full h-full">
+    <div className="flex flex-col gap-3 md:gap-4 w-full h-full">
       
       {/* ================= PREMIUM HEADER ================= */}
       <div className="flex items-center justify-between flex-nowrap shrink-0">
-        <div className="flex items-center gap-3">
+        <div className="flex items-center gap-2 md:gap-3 min-w-0 flex-1">
           <div 
-            className="w-8 h-8 rounded-xl flex items-center justify-center"
+            className="w-8 h-8 md:w-9 md:h-9 rounded-xl flex items-center justify-center flex-shrink-0"
             style={{ 
               background: `linear-gradient(135deg, ${spaceColor}22, ${spaceColor}11)`,
               color: spaceColor,
@@ -303,10 +303,10 @@ export default function SpaceMembersPanel({ space }: SpaceMembersPanelProps) {
           >
             <Users size={16} strokeWidth={2} />
           </div>
-          <div>
-            <h2 className="text-base font-bold text-gray-900 tracking-tight">Members</h2>
-            <p className="text-xs text-gray-500 font-medium">
-              {members.length} people • {ownerCount} owner{ownerCount !== 1 ? 's' : ''} • {adminCount} admin{adminCount !== 1 ? 's' : ''} • {memberCount} member{memberCount !== 1 ? 's' : ''}
+          <div className="min-w-0 flex-1">
+            <h2 className="text-sm md:text-base font-bold text-gray-900 tracking-tight">Members</h2>
+            <p className="text-[10px] md:text-xs text-gray-500 font-medium truncate">
+              {members.length} people • {ownerCount} owner{ownerCount !== 1 ? 's' : ''} • {adminCount} admin{adminCount !== 1 ? 's' : ''}
             </p>
           </div>
         </div>
@@ -314,24 +314,30 @@ export default function SpaceMembersPanel({ space }: SpaceMembersPanelProps) {
         <div className="relative" ref={dropdownRef}>
           <button 
             onClick={() => setShowInvite(!showInvite)}
-            className="flex items-center gap-2 px-4 py-2.5 rounded-xl text-sm font-semibold transition-all shadow-md hover:shadow-lg hover:-translate-y-0.5"
+            className="flex items-center gap-1.5 md:gap-2 px-3 md:px-4 py-2.5 rounded-xl text-xs md:text-sm font-semibold transition-all shadow-md active:shadow-lg active:scale-95"
             style={{
               background: `linear-gradient(135deg, ${spaceColor}, ${spaceColor}DD)`,
               color: 'white',
               boxShadow: `0 4px 14px ${spaceColor}44`,
             }}
+            aria-label="Invite members"
           >
             <UserPlus size={16} strokeWidth={2} />
-            Invite
+            <span className="hidden sm:inline">Invite</span>
           </button>
 
           {showInvite && (
-            <div className="absolute right-0 top-full mt-2 w-80 bg-white/95 backdrop-blur-xl rounded-2xl shadow-2xl border border-gray-200/60 z-50 overflow-hidden animate-fade-in-scale">
+            <div className="fixed md:absolute inset-x-0 md:inset-auto md:right-0 md:top-full md:mt-2 bottom-0 md:bottom-auto w-full md:w-80 bg-white/95 backdrop-blur-xl md:rounded-2xl shadow-2xl border-t md:border border-gray-200/60 z-50 overflow-hidden animate-slideUp md:animate-fade-in-scale">
               
+              {/* Mobile: Drag handle */}
+              <div className="md:hidden flex justify-center py-2 border-b border-gray-100/60">
+                <div className="w-10 h-1 bg-gray-300 rounded-full" />
+              </div>
+
               {/* Search Input */}
-              <div className="p-3 border-b border-gray-100/60 bg-gray-50/50">
+              <div className="p-3 md:p-3 border-b border-gray-100/60 bg-gray-50/50">
                 <div className="relative">
-                  <Search size={14} className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400" />
+                  <Search size={16} className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400" />
                   <input
                     ref={inputRef}
                     type="text"
@@ -339,11 +345,11 @@ export default function SpaceMembersPanel({ space }: SpaceMembersPanelProps) {
                     onChange={(e) => setSearchQuery(e.target.value)}
                     onKeyDown={handleKeyDown}
                     placeholder="Search by handle or name..."
-                    className="w-full pl-9 pr-3 py-2 bg-white border border-gray-200/60 rounded-xl text-sm outline-none focus:ring-4 focus:ring-blue-500/10 focus:border-blue-400 transition"
+                    className="w-full pl-10 pr-3 py-3 md:py-2 bg-white border border-gray-200/60 rounded-xl text-sm outline-none focus:ring-4 focus:ring-blue-500/10 focus:border-blue-400 transition"
                     autoFocus
                   />
                   {searchQuery.length >= 2 && !searching && searchResults.length > 0 && (
-                    <div className="absolute right-2 top-1/2 -translate-y-1/2 flex gap-1">
+                    <div className="absolute right-3 top-1/2 -translate-y-1/2 hidden md:flex gap-1">
                       <ArrowUp size={10} className="text-gray-300" />
                       <ArrowDown size={10} className="text-gray-300" />
                     </div>
@@ -352,7 +358,7 @@ export default function SpaceMembersPanel({ space }: SpaceMembersPanelProps) {
               </div>
 
               {/* Content */}
-              <div className="max-h-80 overflow-y-auto custom-scroll p-2">
+              <div className="max-h-[60vh] md:max-h-80 overflow-y-auto custom-scroll p-2">
                 
                 {/* Global Search Results */}
                 {searchQuery.length >= 2 && (
@@ -363,7 +369,7 @@ export default function SpaceMembersPanel({ space }: SpaceMembersPanelProps) {
                       <div className="space-y-2 p-2">
                         {[1, 2, 3].map(i => (
                           <div key={i} className="flex items-center gap-3 animate-pulse">
-                            <div className="w-8 h-8 rounded-full bg-gray-200" />
+                            <div className="w-10 h-10 md:w-8 md:h-8 rounded-full bg-gray-200" />
                             <div className="flex-1 space-y-1">
                               <div className="h-3 w-24 bg-gray-200 rounded" />
                               <div className="h-2 w-16 bg-gray-100 rounded" />
@@ -380,15 +386,15 @@ export default function SpaceMembersPanel({ space }: SpaceMembersPanelProps) {
                             onClick={() => handleAddMember(user)}
                             onMouseEnter={() => setSelectedIndex(index)}
                             disabled={addingId === user.id}
-                            className={`w-full flex items-center gap-3 p-2 rounded-xl transition text-left group ${
+                            className={`w-full flex items-center gap-3 p-3 md:p-2 rounded-xl transition text-left group active:bg-blue-50 ${
                               isSelected ? 'bg-blue-50' : 'hover:bg-gray-50'
                             }`}
                           >
                             {user.avatar_url ? (
-                              <img src={user.avatar_url} alt="" className="w-8 h-8 rounded-full object-cover border border-gray-100 shrink-0" />
+                              <img src={user.avatar_url} alt="" className="w-10 h-10 md:w-8 md:h-8 rounded-full object-cover border border-gray-100 shrink-0" />
                             ) : (
                               <div 
-                                className="w-8 h-8 rounded-full flex items-center justify-center text-white text-xs font-bold shrink-0"
+                                className="w-10 h-10 md:w-8 md:h-8 rounded-full flex items-center justify-center text-white text-xs font-bold shrink-0"
                                 style={{ background: `linear-gradient(135deg, ${spaceColor}, ${spaceColor}DD)` }}
                               >
                                 {getInitials(user.full_name || user.username)}
@@ -401,11 +407,11 @@ export default function SpaceMembersPanel({ space }: SpaceMembersPanelProps) {
                             </div>
                             
                             {addingId === user.id ? (
-                              <Loader2 size={14} className="animate-spin text-blue-600" />
+                              <Loader2 size={16} className="animate-spin text-blue-600" />
                             ) : isSelected ? (
-                              <CornerDownLeft size={14} style={{ color: spaceColor }} />
+                              <CornerDownLeft size={16} style={{ color: spaceColor }} className="hidden md:block" />
                             ) : (
-                              <UserPlus size={14} className="text-gray-400 opacity-0 group-hover:opacity-100" />
+                              <UserPlus size={16} className="text-gray-400" />
                             )}
                           </button>
                         );
@@ -426,13 +432,13 @@ export default function SpaceMembersPanel({ space }: SpaceMembersPanelProps) {
                           key={user.id}
                           onClick={() => handleAddMember(user)}
                           disabled={addingId === user.id}
-                          className="w-full flex items-center gap-3 p-2 hover:bg-blue-50 rounded-xl transition text-left group"
+                          className="w-full flex items-center gap-3 p-3 md:p-2 active:bg-blue-50 rounded-xl transition text-left group"
                         >
                           {user.avatar_url ? (
-                            <img src={user.avatar_url} className="w-8 h-8 rounded-full object-cover shrink-0 border border-gray-100" />
+                            <img src={user.avatar_url} className="w-10 h-10 md:w-8 md:h-8 rounded-full object-cover shrink-0 border border-gray-100" />
                           ) : (
                             <div 
-                              className="w-8 h-8 rounded-full flex items-center justify-center text-white text-xs font-bold shrink-0"
+                              className="w-10 h-10 md:w-8 md:h-8 rounded-full flex items-center justify-center text-white text-xs font-bold shrink-0"
                               style={{ background: `linear-gradient(135deg, ${spaceColor}, ${spaceColor}DD)` }}
                             >
                               {getInitials(user.full_name || user.username)}
@@ -442,7 +448,7 @@ export default function SpaceMembersPanel({ space }: SpaceMembersPanelProps) {
                             <p className="text-sm font-semibold text-gray-900 truncate">{user.full_name || user.username}</p>
                             <p className="text-[11px] text-gray-500 truncate">@{user.username}</p>
                           </div>
-                          {addingId === user.id ? <Loader2 size={14} className="animate-spin text-blue-600" /> : <UserPlus size={14} className="text-gray-400 opacity-0 group-hover:opacity-100" />}
+                          {addingId === user.id ? <Loader2 size={16} className="animate-spin text-blue-600" /> : <UserPlus size={16} className="text-gray-400" />}
                         </button>
                       ))
                     ) : (
@@ -456,7 +462,7 @@ export default function SpaceMembersPanel({ space }: SpaceMembersPanelProps) {
         </div>
       </div>
 
-      {/* ================= MEMBERS LIST – PREMIUM CARDS ================= */}
+      {/* ================= MEMBERS LIST – MOBILE OPTIMIZED ================= */}
       <div className="flex-1 overflow-y-auto custom-scroll -mx-2 px-2">
         <div className="space-y-2">
           {members.map((member) => {
@@ -471,7 +477,7 @@ export default function SpaceMembersPanel({ space }: SpaceMembersPanelProps) {
             return (
               <div 
                 key={member.id} 
-                className="group flex items-center gap-3 p-3 bg-white border border-gray-200/50 rounded-xl hover:border-blue-200/60 hover:shadow-md transition-all duration-200"
+                className="group relative flex items-center gap-2 md:gap-3 p-3 bg-white border border-gray-200/50 rounded-xl active:border-blue-200/60 active:shadow-md transition-all duration-200"
                 style={{
                   borderLeft: `3px solid ${member.role === 'owner' ? '#F59E0B' : member.role === 'admin' ? spaceColor : 'transparent'}`,
                 }}
@@ -479,10 +485,10 @@ export default function SpaceMembersPanel({ space }: SpaceMembersPanelProps) {
                 {/* Avatar */}
                 <div className="relative shrink-0">
                   {profile.avatar_url ? (
-                    <img src={profile.avatar_url} alt="" className="w-10 h-10 rounded-full object-cover border border-gray-100 shadow-sm" />
+                    <img src={profile.avatar_url} alt="" className="w-10 h-10 md:w-10 md:h-10 rounded-full object-cover border border-gray-100 shadow-sm" />
                   ) : (
                     <div 
-                      className="w-10 h-10 rounded-full flex items-center justify-center text-white text-xs font-bold shadow-sm"
+                      className="w-10 h-10 md:w-10 md:h-10 rounded-full flex items-center justify-center text-white text-xs font-bold shadow-sm"
                       style={{ background: `linear-gradient(135deg, ${spaceColor}, ${spaceColor}DD)` }}
                     >
                       {getInitials(profile.full_name || profile.username)}
@@ -508,24 +514,36 @@ export default function SpaceMembersPanel({ space }: SpaceMembersPanelProps) {
                   <p className="text-xs text-gray-500 truncate">@{profile.username}</p>
                 </div>
 
-                {/* Joined Date (hidden on small screens) */}
+                {/* Joined Date (hidden on mobile) */}
                 <div className="hidden md:flex items-center gap-1 text-[10px] text-gray-400 font-medium shrink-0">
                   <Clock size={10} strokeWidth={2} />
                   {formatDate(member.joined_at)}
                 </div>
 
                 {/* Role Badge */}
-                <div className={`flex items-center gap-1 px-2.5 py-1 rounded-full border text-[10px] font-bold uppercase tracking-wider ${roleBadge.color} shrink-0`}>
+                <div className={`hidden md:flex items-center gap-1 px-2.5 py-1 rounded-full border text-[10px] font-bold uppercase tracking-wider ${roleBadge.color} shrink-0`}>
                   {roleBadge.icon}
                   {roleBadge.label}
                 </div>
 
-                {/* Actions */}
+                {/* Mobile: Always show menu button */}
                 {canManage && !isMe && member.role !== 'owner' && (
-                  <div className="relative shrink-0" ref={menuRef}>
+                  <button 
+                    onClick={() => setOpenMenuId(openMenuId === member.id ? null : member.id)}
+                    className="md:hidden p-2.5 rounded-lg active:bg-gray-100 text-gray-400 active:text-gray-600 transition-all shrink-0"
+                    aria-label="Member options"
+                  >
+                    <MoreVertical size={16} strokeWidth={2} />
+                  </button>
+                )}
+
+                {/* Desktop: Menu button on hover */}
+                {canManage && !isMe && member.role !== 'owner' && (
+                  <div className="hidden md:block relative shrink-0" ref={menuRef}>
                     <button 
                       onClick={() => setOpenMenuId(openMenuId === member.id ? null : member.id)}
                       className="p-1.5 rounded-lg hover:bg-gray-100 text-gray-400 hover:text-gray-600 transition-all opacity-0 group-hover:opacity-100"
+                      aria-label="Member options"
                     >
                       <MoreVertical size={14} strokeWidth={2} />
                     </button>
@@ -534,21 +552,44 @@ export default function SpaceMembersPanel({ space }: SpaceMembersPanelProps) {
                       <div className="absolute right-0 top-full mt-1 w-40 bg-white/95 backdrop-blur-xl rounded-xl shadow-lg border border-gray-100 z-50 overflow-hidden animate-fade-in-scale">
                         <button 
                           onClick={() => handleRoleChange(member.id, member.role === 'admin' ? 'member' : 'admin')}
-                          className="w-full flex items-center gap-2 px-3 py-2 text-xs text-gray-700 hover:bg-gray-50 transition-colors text-left"
+                          className="w-full flex items-center gap-2 px-3 py-2.5 text-xs text-gray-700 hover:bg-gray-50 transition-colors text-left"
                         >
-                          <Shield size={12} strokeWidth={2} />
+                          <Shield size={14} strokeWidth={2} />
                           {member.role === 'admin' ? 'Make Member' : 'Make Admin'}
                         </button>
                         <div className="h-px bg-gray-100" />
                         <button 
                           onClick={() => handleRemove(member.id)}
-                          className="w-full flex items-center gap-2 px-3 py-2 text-xs text-red-600 hover:bg-red-50 transition-colors text-left"
+                          className="w-full flex items-center gap-2 px-3 py-2.5 text-xs text-red-600 hover:bg-red-50 transition-colors text-left"
                         >
-                          <Trash2 size={12} strokeWidth={2} />
+                          <Trash2 size={14} strokeWidth={2} />
                           Remove
                         </button>
                       </div>
                     )}
+                  </div>
+                )}
+
+                {/* Mobile Menu Dropdown */}
+                {openMenuId === member.id && (
+                  <div className="md:hidden absolute right-3 top-full mt-1 w-48 bg-white rounded-xl shadow-lg border border-gray-200 z-50 overflow-hidden animate-fadeIn">
+                    <div className="p-1">
+                      <button 
+                        onClick={() => handleRoleChange(member.id, member.role === 'admin' ? 'member' : 'admin')}
+                        className="w-full flex items-center gap-2 px-3 py-3 text-sm text-gray-700 active:bg-gray-50 transition-colors text-left rounded-lg"
+                      >
+                        <Shield size={16} strokeWidth={2} />
+                        {member.role === 'admin' ? 'Make Member' : 'Make Admin'}
+                      </button>
+                      <div className="h-px bg-gray-100 my-1" />
+                      <button 
+                        onClick={() => handleRemove(member.id)}
+                        className="w-full flex items-center gap-2 px-3 py-3 text-sm text-red-600 active:bg-red-50 transition-colors text-left rounded-lg"
+                      >
+                        <Trash2 size={16} strokeWidth={2} />
+                        Remove
+                      </button>
+                    </div>
                   </div>
                 )}
               </div>
@@ -562,6 +603,10 @@ export default function SpaceMembersPanel({ space }: SpaceMembersPanelProps) {
         .custom-scroll::-webkit-scrollbar-thumb { background: #e2e8f0; border-radius: 10px; }
         @keyframes fadeInScale { from { opacity: 0; transform: scale(0.95); } to { opacity: 1; transform: scale(1); } }
         .animate-fade-in-scale { animation: fadeInScale 0.2s ease-out; }
+        @keyframes slideUp { from { opacity: 0; transform: translateY(100%); } to { opacity: 1; transform: translateY(0); } }
+        .animate-slideUp { animation: slideUp 0.3s cubic-bezier(0.16, 1, 0.3, 1); }
+        @keyframes fadeIn { from { opacity: 0; transform: translateY(8px); } to { opacity: 1; transform: translateY(0); } }
+        .animate-fadeIn { animation: fadeIn 0.3s ease-out; }
         .btn-press:active { transform: scale(0.95); }
       `}</style>
     </div>

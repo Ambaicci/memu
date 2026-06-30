@@ -6,7 +6,7 @@ import { useToast } from '@/contexts/ToastContext';
 import { 
   Plus, Loader2, CheckCircle2, Circle, Trash2, 
   Flag, List, LayoutGrid, GripVertical, Sparkles,
-  Clock, Calendar, User
+  Clock, Calendar, User, ChevronDown, MoreVertical
 } from 'lucide-react';
 
 interface Task {
@@ -52,6 +52,7 @@ export default function SpaceTasksPanel({ spaceId, spaceColor = '#3B82F6' }: Spa
   const [currentUserId, setCurrentUserId] = useState<string | null>(null);
   const [viewMode, setViewMode] = useState<'list' | 'board'>('list');
   const [draggedTaskId, setDraggedTaskId] = useState<string | null>(null);
+  const [mobileMenuTaskId, setMobileMenuTaskId] = useState<string | null>(null);
   const { showToast } = useToast();
 
   useEffect(() => {
@@ -130,6 +131,7 @@ export default function SpaceTasksPanel({ spaceId, spaceColor = '#3B82F6' }: Spa
       showToast('Failed to update status', 'error');
     } else {
       fetchTasks();
+      setMobileMenuTaskId(null);
     }
   };
 
@@ -138,6 +140,7 @@ export default function SpaceTasksPanel({ spaceId, spaceColor = '#3B82F6' }: Spa
     await supabase.from('space_tasks').delete().eq('id', taskId);
     setTasks(tasks.filter(t => t.id !== taskId));
     showToast('Task deleted', 'success');
+    setMobileMenuTaskId(null);
   };
 
   const handleKeyDown = (e: React.KeyboardEvent) => {
@@ -191,13 +194,13 @@ export default function SpaceTasksPanel({ spaceId, spaceColor = '#3B82F6' }: Spa
   const doneCount = tasks.filter(t => t.status === 'done').length;
 
   return (
-    <div className="flex flex-col gap-4 w-full h-full">
+    <div className="flex flex-col gap-3 md:gap-4 w-full h-full">
       
       {/* ================= PREMIUM HEADER ================= */}
       <div className="flex items-center justify-between flex-nowrap shrink-0">
-        <div className="flex items-center gap-3">
+        <div className="flex items-center gap-2 md:gap-3 min-w-0 flex-1">
           <div 
-            className="w-8 h-8 rounded-xl flex items-center justify-center"
+            className="w-8 h-8 md:w-9 md:h-9 rounded-xl flex items-center justify-center flex-shrink-0"
             style={{ 
               background: `linear-gradient(135deg, ${spaceColor}22, ${spaceColor}11)`,
               color: spaceColor,
@@ -205,39 +208,41 @@ export default function SpaceTasksPanel({ spaceId, spaceColor = '#3B82F6' }: Spa
           >
             <CheckCircle2 size={16} strokeWidth={2} />
           </div>
-          <div>
-            <h2 className="text-base font-bold text-gray-900 tracking-tight">Tasks</h2>
-            <p className="text-xs text-gray-500 font-medium">
-              {tasks.length} total • {todoCount} to do • {inProgressCount} in progress • {doneCount} done
+          <div className="min-w-0 flex-1">
+            <h2 className="text-sm md:text-base font-bold text-gray-900 tracking-tight">Tasks</h2>
+            <p className="text-[10px] md:text-xs text-gray-500 font-medium truncate">
+              {tasks.length} total • {todoCount} to do • {inProgressCount} in progress
             </p>
           </div>
         </div>
         
-        <div className="flex items-center gap-1 p-0.5 bg-gray-100/80 rounded-xl shrink-0">
+        <div className="flex items-center gap-0.5 md:gap-1 p-0.5 md:p-1 bg-gray-100/80 rounded-xl shrink-0 ml-2">
           <button 
             onClick={() => setViewMode('list')}
-            className={`p-2 rounded-lg transition-all ${
+            className={`p-2.5 md:p-2 rounded-lg transition-all ${
               viewMode === 'list' 
                 ? 'bg-white shadow-sm text-blue-600' 
-                : 'text-gray-500 hover:text-gray-700'
+                : 'text-gray-500 active:text-gray-700 active:bg-gray-200/60'
             }`}
+            aria-label="List view"
           >
-            <List size={14} strokeWidth={2} />
+            <List size={16} strokeWidth={2} />
           </button>
           <button 
             onClick={() => setViewMode('board')}
-            className={`p-2 rounded-lg transition-all ${
+            className={`p-2.5 md:p-2 rounded-lg transition-all ${
               viewMode === 'board' 
                 ? 'bg-white shadow-sm text-blue-600' 
-                : 'text-gray-500 hover:text-gray-700'
+                : 'text-gray-500 active:text-gray-700 active:bg-gray-200/60'
             }`}
+            aria-label="Board view"
           >
-            <LayoutGrid size={14} strokeWidth={2} />
+            <LayoutGrid size={16} strokeWidth={2} />
           </button>
         </div>
       </div>
 
-      {/* ================= QUICK ADD INPUT – FIXED ================= */}
+      {/* ================= QUICK ADD INPUT ================= */}
       <div className="flex items-center gap-2 flex-nowrap shrink-0">
         <div className="flex-1 relative">
           <div 
@@ -250,13 +255,13 @@ export default function SpaceTasksPanel({ spaceId, spaceColor = '#3B82F6' }: Spa
             onChange={(e) => setNewTaskTitle(e.target.value)}
             onKeyDown={handleKeyDown}
             placeholder="Add a new task..."
-            className="w-full pl-8 pr-4 py-2.5 text-sm bg-white border border-gray-200/60 rounded-xl outline-none focus:ring-4 focus:ring-blue-500/10 focus:border-blue-400 transition shadow-sm"
+            className="w-full pl-8 pr-4 py-3 md:py-2.5 text-sm bg-white border border-gray-200/60 rounded-xl outline-none focus:ring-4 focus:ring-blue-500/10 focus:border-blue-400 transition shadow-sm"
           />
         </div>
         <button 
           onClick={addTask}
           disabled={!newTaskTitle.trim()}
-          className="p-2.5 rounded-xl transition-all shrink-0 flex items-center justify-center"
+          className="p-3 md:p-2.5 rounded-xl transition-all shrink-0 flex items-center justify-center"
           style={{
             background: newTaskTitle.trim() 
               ? `linear-gradient(135deg, ${spaceColor || '#3B82F6'}, ${(spaceColor || '#3B82F6')}DD)` 
@@ -266,15 +271,16 @@ export default function SpaceTasksPanel({ spaceId, spaceColor = '#3B82F6' }: Spa
             boxShadow: newTaskTitle.trim() 
               ? `0 4px 12px ${spaceColor || '#3B82F6'}44` 
               : 'none',
-            width: '36px',
-            height: '36px',
+            minWidth: '44px',
+            minHeight: '44px',
           }}
+          aria-label="Add task"
         >
-          <Plus size={16} strokeWidth={2.5} />
+          <Plus size={18} strokeWidth={2.5} />
         </button>
       </div>
 
-      {/* ================= LIST VIEW – PREMIUM ================= */}
+      {/* ================= LIST VIEW – MOBILE OPTIMIZED ================= */}
       {viewMode === 'list' && (
         <div className="flex-1 overflow-y-auto custom-scroll -mx-2 px-2">
           {tasks.length === 0 ? (
@@ -301,24 +307,25 @@ export default function SpaceTasksPanel({ spaceId, spaceColor = '#3B82F6' }: Spa
                 return (
                   <div 
                     key={task.id} 
-                    className="group relative flex items-center gap-3 p-3 bg-white border border-gray-200/50 rounded-xl hover:border-blue-200/60 hover:shadow-md transition-all duration-200"
+                    className="group relative flex items-center gap-2 md:gap-3 p-3 bg-white border border-gray-200/50 rounded-xl active:border-blue-200/60 active:shadow-md transition-all duration-200"
                     style={{
                       borderLeft: `3px solid ${isDone ? '#10B981' : priorityConf.color}`,
                     }}
                   >
-                    {/* Status Toggle */}
+                    {/* Status Toggle - Larger on mobile */}
                     <button 
                       onClick={() => {
                         const next: Task['status'] = task.status === 'todo' ? 'in_progress' : task.status === 'in_progress' ? 'done' : 'todo';
                         updateTaskStatus(task.id, next);
                       }}
-                      className={`flex items-center justify-center w-7 h-7 rounded-lg transition-all hover:scale-105 shrink-0 ${
+                      className={`flex items-center justify-center w-9 h-9 md:w-7 md:h-7 rounded-lg transition-all active:scale-95 shrink-0 ${
                         task.status === 'done' ? 'bg-emerald-50 text-emerald-600' :
                         task.status === 'in_progress' ? 'bg-blue-50 text-blue-600' :
-                        'bg-gray-50 text-gray-400 hover:text-gray-600'
+                        'bg-gray-50 text-gray-400 active:text-gray-600'
                       }`}
+                      aria-label="Toggle status"
                     >
-                      {task.status === 'done' ? <CheckCircle2 size={14} strokeWidth={2.5} /> : <Circle size={14} strokeWidth={2} />}
+                      {task.status === 'done' ? <CheckCircle2 size={16} strokeWidth={2.5} /> : <Circle size={16} strokeWidth={2} />}
                     </button>
                     
                     {/* Task Title */}
@@ -326,7 +333,7 @@ export default function SpaceTasksPanel({ spaceId, spaceColor = '#3B82F6' }: Spa
                       <p className={`text-sm font-medium truncate ${isDone ? 'line-through text-gray-400' : 'text-gray-900'}`}>
                         {task.title}
                       </p>
-                      <div className="flex items-center gap-3 mt-0.5">
+                      <div className="flex items-center gap-2 mt-0.5 flex-wrap">
                         <span className={`text-[10px] font-medium ${status.color}`}>
                           {status.label}
                         </span>
@@ -338,9 +345,9 @@ export default function SpaceTasksPanel({ spaceId, spaceColor = '#3B82F6' }: Spa
                       </div>
                     </div>
 
-                    {/* Priority Badge – Premium */}
+                    {/* Priority Badge - Tappable on mobile */}
                     <div 
-                      className="flex items-center gap-1.5 px-2.5 py-1 rounded-full text-[10px] font-medium shrink-0"
+                      className="hidden md:flex items-center gap-1.5 px-2.5 py-1 rounded-full text-[10px] font-medium shrink-0"
                       style={{ 
                         background: priorityConf.bg,
                         color: priorityConf.color,
@@ -350,13 +357,52 @@ export default function SpaceTasksPanel({ spaceId, spaceColor = '#3B82F6' }: Spa
                       {priorityConf.label}
                     </div>
 
-                    {/* Delete Button */}
+                    {/* Mobile: Always show menu button */}
+                    <button 
+                      onClick={() => setMobileMenuTaskId(mobileMenuTaskId === task.id ? null : task.id)}
+                      className="md:hidden p-2 rounded-lg active:bg-gray-100 text-gray-400 active:text-gray-600 transition-all shrink-0"
+                      aria-label="Task options"
+                    >
+                      <MoreVertical size={16} strokeWidth={2} />
+                    </button>
+
+                    {/* Desktop: Delete button on hover */}
                     <button 
                       onClick={() => deleteTask(task.id)}
-                      className="opacity-0 group-hover:opacity-100 p-1.5 rounded-lg hover:bg-red-50 text-gray-400 hover:text-red-500 transition-all shrink-0"
+                      className="hidden md:block opacity-0 group-hover:opacity-100 p-1.5 rounded-lg hover:bg-red-50 text-gray-400 hover:text-red-500 transition-all shrink-0"
+                      aria-label="Delete task"
                     >
                       <Trash2 size={14} strokeWidth={2} />
                     </button>
+
+                    {/* Mobile Menu Dropdown */}
+                    {mobileMenuTaskId === task.id && (
+                      <div className="absolute right-3 top-full mt-1 w-48 bg-white rounded-xl shadow-lg border border-gray-200 z-50 overflow-hidden animate-fadeIn">
+                        <div className="p-1">
+                          <div className="px-3 py-2 text-[10px] font-bold text-gray-400 uppercase tracking-wider">Change Status</div>
+                          {columns.map((col) => (
+                            <button
+                              key={col.id}
+                              onClick={() => updateTaskStatus(task.id, col.id as Task['status'])}
+                              className={`w-full flex items-center gap-2 px-3 py-2 text-sm text-left rounded-lg transition-all ${
+                                task.status === col.id ? 'bg-blue-50 text-blue-700 font-medium' : 'text-gray-700 active:bg-gray-50'
+                              }`}
+                            >
+                              <span>{col.icon}</span>
+                              {col.label}
+                            </button>
+                          ))}
+                          <div className="h-px bg-gray-100 my-1" />
+                          <button
+                            onClick={() => deleteTask(task.id)}
+                            className="w-full flex items-center gap-2 px-3 py-2 text-sm text-red-600 text-left rounded-lg active:bg-red-50 transition-all"
+                          >
+                            <Trash2 size={14} strokeWidth={2} />
+                            Delete Task
+                          </button>
+                        </div>
+                      </div>
+                    )}
                   </div>
                 );
               })}
@@ -365,10 +411,10 @@ export default function SpaceTasksPanel({ spaceId, spaceColor = '#3B82F6' }: Spa
         </div>
       )}
 
-      {/* ================= BOARD VIEW (KANBAN) – PREMIUM ================= */}
+      {/* ================= BOARD VIEW (KANBAN) – MOBILE OPTIMIZED ================= */}
       {viewMode === 'board' && (
         <div className="flex-1 overflow-x-auto overflow-y-hidden custom-scroll">
-          <div className="flex gap-4 h-full min-w-[800px] pb-2">
+          <div className="flex gap-3 md:gap-4 h-full min-w-[800px] pb-2">
             {columns.map((col) => {
               const colTasks = tasks.filter(t => t.status === col.id);
               const status = statusConfig[col.id as keyof typeof statusConfig] || statusConfig.todo;
@@ -376,14 +422,14 @@ export default function SpaceTasksPanel({ spaceId, spaceColor = '#3B82F6' }: Spa
               return (
                 <div 
                   key={col.id} 
-                  className="flex-1 flex flex-col bg-gray-50/50 rounded-2xl border border-gray-200/40 p-3"
+                  className="flex-1 flex flex-col bg-gray-50/50 rounded-2xl border border-gray-200/40 p-2 md:p-3"
                   onDragOver={handleDragOver}
                   onDrop={(e) => handleDrop(e, col.id as Task['status'])}
                 >
-                  {/* Column Header – Premium */}
-                  <div className="flex items-center justify-between px-3 py-2 rounded-xl mb-3">
+                  {/* Column Header */}
+                  <div className="flex items-center justify-between px-2 md:px-3 py-2 rounded-xl mb-2 md:mb-3">
                     <div className="flex items-center gap-2">
-                      <span className="text-sm font-semibold text-gray-700">{col.label}</span>
+                      <span className="text-xs md:text-sm font-semibold text-gray-700">{col.label}</span>
                       <span 
                         className="text-[10px] font-bold px-1.5 py-0.5 rounded-md text-white"
                         style={{ background: spaceColor }}
@@ -405,10 +451,10 @@ export default function SpaceTasksPanel({ spaceId, spaceColor = '#3B82F6' }: Spa
                           key={task.id}
                           draggable
                           onDragStart={(e) => handleDragStart(e, task.id)}
-                          className="group bg-white p-3 rounded-xl border border-gray-200/60 shadow-sm hover:shadow-md hover:border-blue-200/60 transition-all cursor-grab active:cursor-grabbing"
+                          className="group bg-white p-3 rounded-xl border border-gray-200/60 shadow-sm active:shadow-md active:border-blue-200/60 transition-all cursor-grab active:cursor-grabbing"
                         >
                           <div className="flex items-start gap-2">
-                            <GripVertical size={14} className="text-gray-300 mt-0.5 opacity-0 group-hover:opacity-100 transition-opacity" />
+                            <GripVertical size={14} className="text-gray-300 mt-0.5 opacity-0 md:group-hover:opacity-100 transition-opacity flex-shrink-0" />
                             <p className="text-sm font-medium text-gray-900 flex-1 leading-snug">{task.title}</p>
                           </div>
                           <div className="flex items-center justify-between mt-2.5 pt-2 border-t border-gray-100/60">
@@ -422,13 +468,54 @@ export default function SpaceTasksPanel({ spaceId, spaceColor = '#3B82F6' }: Spa
                               <span className={`w-1 h-1 rounded-full ${priorityConf.dot}`} />
                               {priorityConf.label}
                             </div>
+                            
+                            {/* Mobile: Always show menu */}
+                            <button 
+                              onClick={() => setMobileMenuTaskId(mobileMenuTaskId === task.id ? null : task.id)}
+                              className="md:hidden p-1.5 rounded-lg active:bg-gray-100 text-gray-400 active:text-gray-600 transition-all"
+                              aria-label="Task options"
+                            >
+                              <MoreVertical size={14} strokeWidth={2} />
+                            </button>
+                            
+                            {/* Desktop: Delete on hover */}
                             <button 
                               onClick={() => deleteTask(task.id)}
-                              className="opacity-0 group-hover:opacity-100 p-1 rounded hover:bg-red-50 text-gray-400 hover:text-red-500 transition-all"
+                              className="hidden md:block opacity-0 group-hover:opacity-100 p-1 rounded hover:bg-red-50 text-gray-400 hover:text-red-500 transition-all"
+                              aria-label="Delete task"
                             >
                               <Trash2 size={12} strokeWidth={2} />
                             </button>
                           </div>
+
+                          {/* Mobile Menu Dropdown */}
+                          {mobileMenuTaskId === task.id && (
+                            <div className="absolute right-3 top-full mt-1 w-48 bg-white rounded-xl shadow-lg border border-gray-200 z-50 overflow-hidden animate-fadeIn">
+                              <div className="p-1">
+                                <div className="px-3 py-2 text-[10px] font-bold text-gray-400 uppercase tracking-wider">Move to</div>
+                                {columns.map((c) => (
+                                  <button
+                                    key={c.id}
+                                    onClick={() => updateTaskStatus(task.id, c.id as Task['status'])}
+                                    className={`w-full flex items-center gap-2 px-3 py-2 text-sm text-left rounded-lg transition-all ${
+                                      task.status === c.id ? 'bg-blue-50 text-blue-700 font-medium' : 'text-gray-700 active:bg-gray-50'
+                                    }`}
+                                  >
+                                    <span>{c.icon}</span>
+                                    {c.label}
+                                  </button>
+                                ))}
+                                <div className="h-px bg-gray-100 my-1" />
+                                <button
+                                  onClick={() => deleteTask(task.id)}
+                                  className="w-full flex items-center gap-2 px-3 py-2 text-sm text-red-600 text-left rounded-lg active:bg-red-50 transition-all"
+                                >
+                                  <Trash2 size={14} strokeWidth={2} />
+                                  Delete Task
+                                </button>
+                              </div>
+                            </div>
+                          )}
                         </div>
                       );
                     })}

@@ -10,7 +10,6 @@ interface SpaceChatsPanelProps {
   currentUserId: string | null;
 }
 
-// Helper to generate consistent colors for users
 const getUserColor = (id: string) => {
   const colors = [
     'from-blue-500 to-indigo-600',
@@ -37,12 +36,10 @@ export default function SpaceChatsPanel({ space, currentUserId }: SpaceChatsPane
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const { showToast } = useToast();
 
-  // 1. Fetch Messages
   useEffect(() => {
     if (space?.id) fetchMessages();
   }, [space?.id]);
 
-  // 2. Realtime Subscription
   useEffect(() => {
     if (!space?.id) return;
 
@@ -85,7 +82,6 @@ export default function SpaceChatsPanel({ space, currentUserId }: SpaceChatsPane
     return () => { supabase.removeChannel(channel); };
   }, [space?.id, space?.members, messages]);
 
-  // 3. Auto-scroll
   useEffect(() => {
     messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
   }, [messages]);
@@ -173,25 +169,25 @@ export default function SpaceChatsPanel({ space, currentUserId }: SpaceChatsPane
     <div className="flex flex-col h-full min-h-[500px] max-h-[calc(100vh-250px)]">
       
       {/* ================= MESSAGE LIST ================= */}
-      <div className="flex-1 overflow-y-auto custom-scroll px-2 py-4 space-y-4">
+      <div className="flex-1 overflow-y-auto custom-scroll px-3 md:px-4 py-4 space-y-3 md:space-y-4">
         {messages.length === 0 ? (
-          <div className="flex flex-col items-center justify-center h-full py-20 text-center animate-fadeIn">
-            {/* Premium Empty State */}
+          <div className="flex flex-col items-center justify-center h-full py-12 md:py-20 text-center animate-fadeIn">
             <div 
-              className="w-24 h-24 rounded-3xl flex items-center justify-center mb-6 shadow-xl"
+              className="w-20 h-20 md:w-24 md:h-24 rounded-3xl flex items-center justify-center mb-4 md:mb-6 shadow-xl"
               style={{
                 background: `linear-gradient(135deg, ${space.color || '#2563EB'}22, ${space.color || '#2563EB'}11)`,
                 border: `1px solid ${space.color || '#2563EB'}33`,
               }}
             >
-              <Sparkles size={36} style={{ color: space.color || '#2563EB' }} strokeWidth={1.5} />
+              <Sparkles size={32} className="md:hidden" style={{ color: space.color || '#2563EB' }} strokeWidth={1.5} />
+              <Sparkles size={36} className="hidden md:block" style={{ color: space.color || '#2563EB' }} strokeWidth={1.5} />
             </div>
-            <h3 className="text-xl font-bold text-gray-900 mb-2 tracking-tight">
+            <h3 className="text-lg md:text-xl font-bold text-gray-900 mb-2 tracking-tight">
               Start the conversation
             </h3>
-            <p className="text-sm text-gray-500 max-w-xs leading-relaxed">
+            <p className="text-xs md:text-sm text-gray-500 max-w-xs leading-relaxed px-4">
               No messages yet in <span className="font-medium text-gray-700">{space.name}</span>. 
-              Say hello to your team and get the collaboration started!
+              Say hello to your team!
             </p>
           </div>
         ) : (
@@ -201,36 +197,36 @@ export default function SpaceChatsPanel({ space, currentUserId }: SpaceChatsPane
             return (
               <div 
                 key={msg.id} 
-                className={`flex gap-3 group animate-fadeIn ${isMe ? 'flex-row-reverse' : ''}`}
+                className={`flex gap-2 md:gap-3 group animate-fadeIn ${isMe ? 'flex-row-reverse' : ''}`}
               >
                 {/* Avatar – Only show for others */}
                 {!isMe && (
                   <div 
-                    className={`w-9 h-9 rounded-full bg-gradient-to-br ${msg.sender.color} flex items-center justify-center text-white text-xs font-bold shadow-sm flex-shrink-0`}
+                    className={`w-8 h-8 md:w-9 md:h-9 rounded-full bg-gradient-to-br ${msg.sender.color} flex items-center justify-center text-white text-[10px] md:text-xs font-bold shadow-sm flex-shrink-0`}
                   >
                     {msg.sender.initials}
                   </div>
                 )}
 
                 {/* Content */}
-                <div className={`flex-1 min-w-0 max-w-[80%] ${isMe ? 'flex flex-col items-end' : ''}`}>
-                  <div className={`flex items-baseline gap-2 mb-1 ${isMe ? 'flex-row-reverse' : ''}`}>
-                    <span className="text-sm font-bold text-gray-900 tracking-tight">
+                <div className={`flex-1 min-w-0 max-w-[85%] md:max-w-[80%] ${isMe ? 'flex flex-col items-end' : ''}`}>
+                  <div className={`flex items-baseline gap-1.5 md:gap-2 mb-1 ${isMe ? 'flex-row-reverse' : ''}`}>
+                    <span className="text-xs md:text-sm font-bold text-gray-900 tracking-tight">
                       {isMe ? 'You' : msg.sender.name}
                     </span>
-                    <span className="text-[11px] text-gray-400 font-medium">
+                    <span className="text-[10px] md:text-[11px] text-gray-400 font-medium">
                       {formatTime(msg.created_at)}
                     </span>
                   </div>
                   
                   <div 
-                    className={`rounded-2xl px-4 py-3 shadow-sm border inline-block max-w-full ${
+                    className={`rounded-2xl px-3 md:px-4 py-2.5 md:py-3 shadow-sm border inline-block max-w-full ${
                       isMe 
                         ? 'bg-gradient-to-br from-blue-600 to-indigo-600 text-white border-blue-500/20 rounded-tr-none'
                         : 'bg-white text-gray-700 border-gray-200/60 rounded-tl-none'
                     }`}
                   >
-                    <p className={`text-sm leading-relaxed whitespace-pre-wrap break-words ${isMe ? 'text-white' : 'text-gray-700'}`}>
+                    <p className={`text-xs md:text-sm leading-relaxed whitespace-pre-wrap break-words ${isMe ? 'text-white' : 'text-gray-700'}`}>
                       {msg.content}
                     </p>
                   </div>
@@ -239,7 +235,7 @@ export default function SpaceChatsPanel({ space, currentUserId }: SpaceChatsPane
                 {/* Avatar for self (small, on the right) */}
                 {isMe && (
                   <div 
-                    className="w-9 h-9 rounded-full bg-gradient-to-br from-blue-600 to-indigo-600 flex items-center justify-center text-white text-xs font-bold shadow-sm flex-shrink-0"
+                    className="w-8 h-8 md:w-9 md:h-9 rounded-full bg-gradient-to-br from-blue-600 to-indigo-600 flex items-center justify-center text-white text-[10px] md:text-xs font-bold shadow-sm flex-shrink-0"
                   >
                     {getInitials('You')}
                   </div>
@@ -251,22 +247,20 @@ export default function SpaceChatsPanel({ space, currentUserId }: SpaceChatsPane
         <div ref={messagesEndRef} />
       </div>
 
-      {/* ================= INPUT AREA – CLEAN & MINIMAL ================= */}
-      <div className="sticky bottom-0 bg-white/90 backdrop-blur-xl border-t border-gray-200/40 p-4 rounded-t-3xl shadow-lg">
+      {/* ================= INPUT AREA – MOBILE OPTIMIZED ================= */}
+      <div className="sticky bottom-0 bg-white/90 backdrop-blur-xl border-t border-gray-200/40 p-3 md:p-4 rounded-t-3xl shadow-lg">
         <div 
           className="relative bg-gray-50/80 border border-gray-200/60 rounded-2xl focus-within:ring-4 focus-within:ring-blue-500/10 focus-within:border-blue-400 transition-all shadow-sm"
-          style={{
-            boxShadow: `0 0 0 0 ${space.color || '#2563EB'}22`,
-          }}
         >
           {/* Input Row */}
-          <div className="flex items-center gap-2 p-2">
+          <div className="flex items-end gap-1.5 md:gap-2 p-1.5 md:p-2">
             {/* Attachment Button */}
             <button 
-              className="p-2.5 rounded-xl hover:bg-gray-200/60 text-gray-500 hover:text-gray-700 transition-colors btn-press"
+              className="p-3 md:p-2.5 rounded-xl active:bg-gray-200/60 text-gray-500 active:text-gray-700 transition-colors btn-press flex-shrink-0"
               title="Attach file"
+              aria-label="Attach file"
             >
-              <Paperclip size={16} strokeWidth={2} />
+              <Paperclip size={18} strokeWidth={2} />
             </button>
             
             <textarea
@@ -275,40 +269,42 @@ export default function SpaceChatsPanel({ space, currentUserId }: SpaceChatsPane
               onKeyDown={handleKeyDown}
               placeholder={`Message ${space.name}...`}
               rows={1}
-              className="flex-1 bg-transparent outline-none resize-none text-sm text-gray-900 placeholder:text-gray-400 py-2 px-1 max-h-32"
-              style={{ minHeight: '24px' }}
+              className="flex-1 bg-transparent outline-none resize-none text-sm text-gray-900 placeholder:text-gray-400 py-2.5 px-2 max-h-32 min-h-[40px]"
+              style={{ minHeight: '40px' }}
             />
             
-            <div className="flex items-center gap-1">
+            <div className="flex items-center gap-1 flex-shrink-0">
               {/* Emoji Button */}
               <button 
-                className="p-2.5 rounded-xl hover:bg-gray-200/60 text-gray-500 hover:text-gray-700 transition-colors btn-press"
+                className="p-3 md:p-2.5 rounded-xl active:bg-gray-200/60 text-gray-500 active:text-gray-700 transition-colors btn-press"
                 title="Emoji"
+                aria-label="Emoji"
               >
-                <Smile size={16} strokeWidth={2} />
+                <Smile size={18} strokeWidth={2} />
               </button>
               
               {/* Send Button */}
               <button 
                 onClick={handleSend}
                 disabled={!input.trim() || sending}
-                className={`p-2.5 rounded-xl transition-all btn-press ${
+                className={`p-3 md:p-2.5 rounded-xl transition-all btn-press ${
                   input.trim() 
-                    ? 'bg-gradient-to-r from-blue-600 to-indigo-600 text-white shadow-md hover:shadow-lg' 
+                    ? 'bg-gradient-to-r from-blue-600 to-indigo-600 text-white shadow-md active:shadow-lg' 
                     : 'bg-gray-200 text-gray-400 cursor-not-allowed'
                 }`}
                 style={{
                   boxShadow: input.trim() ? `0 4px 12px ${space.color || '#2563EB'}44` : 'none',
                 }}
+                aria-label="Send message"
               >
-                {sending ? <Loader2 size={16} className="animate-spin" /> : <Send size={16} strokeWidth={2.5} />}
+                {sending ? <Loader2 size={18} className="animate-spin" /> : <Send size={18} strokeWidth={2.5} />}
               </button>
             </div>
           </div>
         </div>
         
-        {/* Subtle footer */}
-        <p className="text-[10px] text-gray-400 text-center mt-2 font-medium">
+        {/* Subtle footer - Hidden on mobile */}
+        <p className="hidden md:block text-[10px] text-gray-400 text-center mt-2 font-medium">
           Press <kbd className="px-1.5 py-0.5 bg-gray-100 rounded border border-gray-200 text-[9px] font-mono">Enter</kbd> to send, <kbd className="px-1.5 py-0.5 bg-gray-100 rounded border border-gray-200 text-[9px] font-mono">Shift+Enter</kbd> for new line
         </p>
       </div>

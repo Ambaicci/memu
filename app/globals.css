@@ -1,11 +1,7 @@
-
 @import "tailwindcss";
 
-/* Enable class-based dark mode in Tailwind v4 */
-@custom-variant dark (&:where(.dark, .dark *));
-
 /* =========================================
-    MEMU DESIGN SYSTEM v3.1 - BLUE-PRIMARY
+   MEMU DESIGN SYSTEM v3.1 - BLUE-PRIMARY
    ========================================= */
 
 @theme {
@@ -36,35 +32,30 @@
   --gradient-memu-hero: linear-gradient(135deg, #1D4ED8 0%, #4F46E5 40%, #7C3AED 100%);
   --gradient-memu-glow: radial-gradient(circle at 30% 20%, rgba(59, 130, 246, 0.25) 0%, transparent 70%);
 
-  /* DEPRECATED: Keeping for backward compatibility */
-  --color-memu-purple: #7C3AED;
-  --color-memu-accent: #818CF8;
-  --color-memu-blue: #2563EB;
-
-  /* Canvas & Surfaces (Unchanged) */
-  --color-memu-canvas: #F4F5F7;
+  /* Canvas & Surfaces */
+  --color-memu-canvas: #F5F5F7;
   --color-memu-surface: #FFFFFF;
   --color-memu-surface-2: #E2E8F0;
   --color-memu-surface-hover: #F8FAFC;
 
-  /* Typography & Ink (Unchanged) */
+  /* Typography & Ink */
   --color-memu-ink: #0B0F19;
   --color-memu-ink-2: #334155;
   --color-memu-ink-3: #64748B;
   --color-memu-ink-4: #94A3B8;
   --color-memu-ink-5: #CBD5E1;
 
-  /* Status Colors (Unchanged) */
+  /* Status Colors */
   --color-memu-success: #10B981;
   --color-memu-warning: #F59E0B;
   --color-memu-error: #EF4444;
   --color-memu-info: #3B82F6;
 
-  /* Typography (Unchanged) */
+  /* Typography */
   --font-sans: -apple-system, BlinkMacSystemFont, "SF Pro Text", "DM Sans", "Inter", system-ui, sans-serif !important;
   --font-serif: -apple-system, BlinkMacSystemFont, "SF Pro Text", "DM Sans", "Inter", system-ui, sans-serif !important;
 
-  /* Spacing (Unchanged) */
+  /* Spacing */
   --spacing-xs: 4px;
   --spacing-sm: 8px;
   --spacing-md: 16px;
@@ -72,7 +63,7 @@
   --spacing-xl: 32px;
   --spacing-2xl: 48px;
 
-  /* Border Radius (Unchanged) */
+  /* Border Radius */
   --radius-sm: 8px;
   --radius-md: 12px;
   --radius-lg: 16px;
@@ -80,20 +71,20 @@
   --radius-2xl: 24px;
   --radius-full: 9999px;
 
-  /* Shadows (Unchanged) */
+  /* Shadows */
   --shadow-xs: 0 1px 2px rgba(0, 0, 0, 0.04);
   --shadow-sm: 0 2px 4px rgba(0, 0, 0, 0.06);
   --shadow-md: 0 4px 8px rgba(0, 0, 0, 0.08);
-  --shadow-lg: 0 8px 16px rgba(0, 0, 0, 0.1);
+  --shadow-lg: 0 8px 16px rgba(0, 0, 0, 0.10);
   --shadow-xl: 0 12px 24px rgba(0, 0, 0, 0.12);
   --shadow-2xl: 0 20px 40px rgba(0, 0, 0, 0.15);
 
-  /* Glossy Shadows (NEW) */
+  /* Glossy Shadows */
   --shadow-glow-blue: 0 0 60px -10px rgba(37, 99, 235, 0.25);
   --shadow-glow-purple: 0 0 60px -10px rgba(124, 58, 237, 0.2);
   --shadow-glow-bridge: 0 0 80px -20px rgba(79, 70, 229, 0.25);
 
-  /* Transitions (Unchanged) */
+  /* Transitions */
   --transition-fast: 150ms cubic-bezier(0.4, 0, 0.2, 1);
   --transition-base: 250ms cubic-bezier(0.4, 0, 0.2, 1);
   --transition-slow: 400ms cubic-bezier(0.4, 0, 0.2, 1);
@@ -101,7 +92,7 @@
 }
 
 /* ==========================================
-   GLOSSY HERO & GLOW EFFECTS (NEW)
+   GLOSSY HERO & GLOW EFFECTS
    ========================================== */
 
 .bg-hero-gradient {
@@ -173,7 +164,7 @@
 }
 
 /* ==========================================
-   GLOBAL STYLES (Unchanged except colour updates)
+   GLOBAL STYLES
    ========================================== */
 
 :root {
@@ -188,7 +179,7 @@
   --blue: #2563EB;
   --purple: #7C3AED;
   --bridge: #4F46E5;
-  --memu-canvas: #F4F5F7;
+  --memu-canvas: #F5F5F7;
 }
 
 * {
@@ -223,7 +214,7 @@ h1, h2, h3, h4, h5, h6, .heading-serif {
   line-height: 1.2;
 }
 
-/* Gradient text (deprecated - use text-gradient-primary) */
+/* Gradient text */
 .heading-gradient {
   background: var(--gradient-memu-primary);
   background-clip: text;
@@ -253,7 +244,7 @@ h1, h2, h3, h4, h5, h6, .heading-serif {
 }
 
 /* ==========================================
-   SCROLLBARS (Unchanged)
+   SCROLLBARS
    ========================================== */
 
 ::-webkit-scrollbar {
@@ -273,7 +264,7 @@ h1, h2, h3, h4, h5, h6, .heading-serif {
 }
 
 /* ==========================================
-   CARDS - Updated with subtle blue accents
+   CARDS
    ========================================== */
 
 .card {
@@ -289,7 +280,7 @@ h1, h2, h3, h4, h5, h6, .heading-serif {
   transform: translateY(-2px);
 }
 
-/* Premium Card Variant - Bridge colour */
+/* Premium Card Variant */
 .card-premium {
   background: white;
   border: 1px solid rgba(79, 70, 229, 0.1);
@@ -304,7 +295,7 @@ h1, h2, h3, h4, h5, h6, .heading-serif {
 }
 
 /* ==========================================
-   BUTTONS - Updated with Blue-Primary
+   BUTTONS
    ========================================== */
 
 .btn-primary {
@@ -365,7 +356,7 @@ h1, h2, h3, h4, h5, h6, .heading-serif {
 }
 
 /* ==========================================
-   BADGES - Updated with Blue/Purple variants
+   BADGES
    ========================================== */
 
 .badge-blue {
@@ -392,7 +383,6 @@ h1, h2, h3, h4, h5, h6, .heading-serif {
   border: 1px solid rgba(251, 191, 36, 0.2);
 }
 
-/* Existing nature badges (unchanged) */
 .badge-fyi {
   background: rgba(245, 158, 11, 0.1);
   color: #D97706;
@@ -418,7 +408,7 @@ h1, h2, h3, h4, h5, h6, .heading-serif {
 }
 
 /* ==========================================
-   ANIMATIONS (Unchanged)
+   ANIMATIONS
    ========================================== */
 
 @keyframes spin {
@@ -576,42 +566,7 @@ h1, h2, h3, h4, h5, h6, .heading-serif {
 }
 
 /* ==========================================
-   DARK MODE (Unchanged)
-   ========================================== */
-
-:root {
-  --bg-primary: #ffffff;
-  --bg-secondary: #f9fafb;
-  --bg-tertiary: #f3f4f6;
-  --text-primary: #111827;
-  --text-secondary: #6b7280;
-  --text-tertiary: #9ca3af;
-  --border-primary: #e5e7eb;
-  --border-secondary: #d1d5db;
-}
-
-.dark {
-  --bg-primary: #111827;
-  --bg-secondary: #1f2937;
-  --bg-tertiary: #374151;
-  --text-primary: #f9fafb;
-  --text-secondary: #d1d5db;
-  --text-tertiary: #9ca3af;
-  --border-primary: #374151;
-  --border-secondary: #4b5563;
-}
-
-.dark .bg-white { background-color: var(--bg-primary); }
-.dark .bg-gray-50 { background-color: var(--bg-secondary); }
-.dark .bg-gray-100 { background-color: var(--bg-tertiary); }
-.dark .text-gray-900 { color: var(--text-primary); }
-.dark .text-gray-700 { color: var(--text-secondary); }
-.dark .text-gray-500 { color: var(--text-tertiary); }
-.dark .border-gray-200 { border-color: var(--border-primary); }
-.dark .border-gray-300 { border-color: var(--border-secondary); }
-
-/* ==========================================
-   AVATAR & BADGE (Unchanged)
+   AVATAR & BADGE
    ========================================== */
 
 .badge {
@@ -680,29 +635,4 @@ h1, h2, h3, h4, h5, h6, .heading-serif {
   color: var(--ink3);
   max-width: 320px;
   line-height: 1.6;
-}
-/* ==========================================
-   MOBILE-SAFE UTILITIES
-   ========================================== */
-
-/* Safe area padding for fixed elements */
-.pb-safe-bottom {
-  padding-bottom: var(--safe-area-inset-bottom);
-}
-
-/* Bottom nav height utility */
-.h-bottom-nav {
-  height: var(--bottom-nav-height);
-}
-
-/* Total bottom spacing for scroll containers */
-.pb-bottom-nav {
-  padding-bottom: var(--bottom-nav-total);
-}
-
-/* Prevent iOS zoom on inputs (applied globally) */
-@media (max-width: 768px) {
-  input, textarea, select {
-    font-size: 16px !important;
-  }
 }
